@@ -1,0 +1,143 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: timescaledb
+  title: TimescaleDB
+  tagline: PostgreSQL tuned for time-series data
+  description: |
+    TimescaleDB turns a PostgreSQL table into a hypertable: partitioned by time under the
+    covers, an ordinary table to query. Inserts stay fast as the table grows into billions
+    of rows, and time-bucketed queries read only the chunks they need.
+
+    ```sql
+    CREATE EXTENSION timescaledb;
+    CREATE TABLE metrics (time timestamptz NOT NULL, device text, value double precision);
+    SELECT create_hypertable('metrics', 'time');
+    SELECT time_bucket('5 minutes', time) AS bucket, avg(value)
+      FROM metrics WHERE time > now() - interval '1 day' GROUP BY bucket;
+    ```
+
+    **This template sets up**
+
+    - a database, a user and a generated password
+    - a persistent data volume
+    - a health check with `pg_isready`
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (5432),
+    `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and `HIVEPAAS_DATABASE_NAME`. `CREATE EXTENSION
+    timescaledb;` is yours to run. Everything PostgreSQL does, it still does: this is a
+    PostgreSQL server, so ordinary drivers, `pg_dump` and existing SQL all work.
+
+    **Licence**
+
+    These images carry the community edition, under the Timescale License. It is free to
+    run - including commercially, and including here - but it forbids offering TimescaleDB
+    itself as a database service to third parties. Compression, continuous aggregates and
+    the other hyperfunctions live in this edition. If you need Apache-2.0 terms only, the
+    same release is published as an `-oss` image: set it as an image override on the app
+    (Advanced, when creating it), and expect the community features to be absent.
+
+    **Choosing a version**
+
+    The version is the TimescaleDB release; the variant is the PostgreSQL major it is built
+    on. The major is the one you cannot change later without a dump and restore, so pick it
+    first.
+  categories: [databases/time-series]
+  tags: [sql, relational, time-series, analytics, open-source]
+  aliases: [timescale]
+  icon: icons/timescaledb.svg
+  links:
+    website: https://www.timescale.com
+    documentation: https://docs.timescale.com
+    source: https://github.com/timescale/timescaledb
+  license: Timescale-License
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+variants:
+  - name: pg18
+    title: PostgreSQL 18
+    default: true
+  - name: pg17
+    title: PostgreSQL 17
+  - name: pg16
+    title: PostgreSQL 16
+
+versions:
+  - name: "2.30"
+    release: "2.30.1"
+    default: true
+    images:
+      pg18: timescale/timescaledb:2.30.1-pg18
+      pg17: timescale/timescaledb:2.30.1-pg17
+      pg16: timescale/timescaledb:2.30.1-pg16
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # One mount for every major. PostgreSQL 18 keeps its data under
+        # /var/lib/postgresql and the majors before it under /var/lib/postgresql/data;
+        # PGDATA below puts every variant in the same place inside this volume, so the
+        # variant a person picks does not change where their data lives.
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: PGDATA, v: /var/lib/postgresql/hpdata}
+    routing:
+      port: 5432

@@ -563,6 +563,60 @@
       }
     },
     {
+      "name": "pgvector",
+      "file": {
+        "path": "templates/pgvector.yaml",
+        "sha256": "72a8d796617d028e84a7c59f5e6144add0b573d60d72b0c1819f19a950e4e571"
+      },
+      "icon": {
+        "path": "icons/pgvector.svg",
+        "sha256": "f79d041adeed374ec3eaf4b0bfab00f2c0cf45984289e9335ed41415baf8be7c"
+      },
+      "title": "PostgreSQL + pgvector",
+      "tagline": "PostgreSQL that stores and searches embeddings",
+      "categories": [
+        "databases/vector"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "vector",
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "postgres-vector",
+        "postgresql-pgvector"
+      ],
+      "variants": [
+        {
+          "name": "pg18",
+          "default": true
+        },
+        {
+          "name": "pg17"
+        },
+        {
+          "name": "pg16"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.8",
+          "release": "0.8.6",
+          "default": true,
+          "variants": [
+            "pg18",
+            "pg17",
+            "pg16"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "postgres",
       "file": {
         "path": "templates/postgres.yaml",
@@ -768,6 +822,59 @@
         {
           "name": "7.4",
           "release": "7.4.11"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "timescaledb",
+      "file": {
+        "path": "templates/timescaledb.yaml",
+        "sha256": "c24c3905f2b3cfcdbb5e09e6d44c92ae19c2dc66a1a6d818a99028f10b2b0571"
+      },
+      "icon": {
+        "path": "icons/timescaledb.svg",
+        "sha256": "f31eb0630d79c70a6f8cd1756c297ff9f4998e06e065be11d6d8719537839b09"
+      },
+      "title": "TimescaleDB",
+      "tagline": "PostgreSQL tuned for time-series data",
+      "categories": [
+        "databases/time-series"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "time-series",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "timescale"
+      ],
+      "variants": [
+        {
+          "name": "pg18",
+          "default": true
+        },
+        {
+          "name": "pg17"
+        },
+        {
+          "name": "pg16"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.30",
+          "release": "2.30.1",
+          "default": true,
+          "variants": [
+            "pg18",
+            "pg17",
+            "pg16"
+          ]
         }
       ],
       "requires": {

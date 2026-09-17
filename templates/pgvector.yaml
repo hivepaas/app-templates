@@ -1,0 +1,137 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pgvector
+  title: PostgreSQL + pgvector
+  tagline: PostgreSQL that stores and searches embeddings
+  description: |
+    The official PostgreSQL image with the pgvector extension built in. It adds a `vector`
+    column type and the distance operators and indexes that make nearest-neighbour search
+    fast, so embeddings live next to the rest of your data and a single query can filter by
+    tenant, date and permissions before ranking by similarity.
+
+    ```sql
+    CREATE EXTENSION vector;
+    CREATE TABLE docs (id bigserial PRIMARY KEY, body text, embedding vector(1536));
+    CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
+    SELECT id FROM docs ORDER BY embedding <=> $1 LIMIT 10;
+    ```
+
+    **This template sets up**
+
+    - a database, a user and a generated password
+    - a persistent data volume
+    - a health check with `pg_isready`
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (5432),
+    `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and `HIVEPAAS_DATABASE_NAME`. `CREATE EXTENSION
+    vector;` is yours to run - the extension is installed in the image, not enabled in your
+    database.
+
+    **Choosing a version**
+
+    The version is the pgvector release; the variant is the PostgreSQL major it is built on.
+    They move independently, and the major is the one you cannot change later without a dump
+    and restore - pick it first. A dedicated vector database (Qdrant is in this repository)
+    wins on raw scale; pgvector wins whenever the vectors belong to rows you already keep in
+    PostgreSQL, because there is one database to back up, one transaction, and no sync to get
+    wrong.
+  categories: [databases/vector]
+  tags: [sql, relational, vector, ai, open-source]
+  aliases: [postgres-vector, postgresql-pgvector]
+  icon: icons/pgvector.svg
+  links:
+    website: https://github.com/pgvector/pgvector
+    documentation: https://github.com/pgvector/pgvector#getting-started
+    source: https://github.com/pgvector/pgvector
+  license: PostgreSQL
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+variants:
+  - name: pg18
+    title: PostgreSQL 18
+    default: true
+  - name: pg17
+    title: PostgreSQL 17
+  - name: pg16
+    title: PostgreSQL 16
+
+versions:
+  - name: "0.8"
+    release: "0.8.6"
+    default: true
+    images:
+      pg18: pgvector/pgvector:0.8.6-pg18-trixie
+      pg17: pgvector/pgvector:0.8.6-pg17-trixie
+      pg16: pgvector/pgvector:0.8.6-pg16-trixie
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # One mount for every major. PostgreSQL 18 keeps its data under
+        # /var/lib/postgresql and the majors before it under /var/lib/postgresql/data;
+        # PGDATA below puts every variant in the same place inside this volume, so the
+        # variant a person picks does not change where their data lives.
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: PGDATA, v: /var/lib/postgresql/hpdata}
+    routing:
+      port: 5432
