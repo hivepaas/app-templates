@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: seaweedfs
+  title: SeaweedFS
+  tagline: S3-compatible object storage in a single process
+  description: |
+    SeaweedFS stores objects and serves them over the S3 API, so anything written against
+    S3 - an SDK, `aws s3`, a backup tool, an application's upload handler - works against it
+    unchanged. This template runs its all-in-one mode: master, volume server, filer and S3
+    gateway in one container, on one volume.
+
+    **This template sets up**
+
+    - an access key and a generated secret key, with anonymous requests refused
+    - a bucket, created on first start
+    - a persistent data volume
+    - a health check on the S3 port
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (8333),
+    `HIVEPAAS_KEY_ID`, `HIVEPAAS_SECRET`, `HIVEPAAS_BUCKET` and `HIVEPAAS_REGION` - the key id
+    and the secret are this store's S3 access key and secret key.
+    Point an S3 client at `http://HIVEPAAS_HOST:8333` and use path-style addressing:
+    virtual-host style needs a wildcard domain, which an internal address does not have.
+
+    **What this is for**
+
+    One container, one volume, no replication: this is object storage for an application's
+    own files - uploads, generated documents, backups - not a distributed cluster. SeaweedFS
+    can be run as a real cluster with replicated volumes, and that is a different deployment
+    from this one. The data is exactly as durable as the volume underneath it, so treat that
+    volume the way you treat a database's.
+
+    Region is recorded and handed to clients because S3 SDKs insist on one; SeaweedFS itself
+    does not place data by region.
+  categories: [storage/object-storage]
+  tags: [object-storage, s3, open-source]
+  aliases: [seaweed, weed]
+  icon: icons/seaweedfs.svg
+  links:
+    website: https://seaweedfs.com
+    documentation: https://github.com/seaweedfs/seaweedfs/wiki
+    source: https://github.com/seaweedfs/seaweedfs
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: accessKey
+    title: Access key
+    description: The S3 access key other apps sign their requests with.
+    type: string
+    default: app
+    pattern: '^[A-Za-z0-9_-]{3,64}$'
+  - name: secretKey
+    title: Secret key
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 40}
+  - name: bucket
+    title: Bucket
+    description: Created on first start. More can be created later through the S3 API.
+    type: string
+    default: app
+    pattern: '^[a-z0-9][a-z0-9.-]{2,62}$'
+  - name: region
+    title: Region
+    description: What clients are told the region is. SeaweedFS does not place data by region.
+    type: string
+    default: us-east-1
+    pattern: '^[a-z0-9-]{1,32}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the objects are kept on.
+    type: volume
+
+versions:
+  - name: "4.47"
+    release: "4.47"
+    default: true
+    image: chrislusf/seaweedfs:4.47
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The all-in-one mode. Telemetry is off: a storage server should not call
+      # home from somebody else's cluster.
+      command: mini -dir=/data -master.telemetry=false
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The S3 port, because that is the one clients use. The image carries
+        # busybox wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8333/status
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: storage
+      engine: seaweedfs
+      version: "${{ version.name }}"
+      storage:
+        keyId: "${{ params.accessKey }}"
+        secret: "${{ params.secretKey }}"
+        bucket: "${{ params.bucket }}"
+        region: "${{ params.region }}"
+    envVars:
+      data:
+        # SeaweedFS takes its one admin identity from these two, which is why this
+        # template needs no S3 configuration file.
+        - {k: AWS_ACCESS_KEY_ID, v: "${HIVEPAAS_KEY_ID}"}
+        - {k: AWS_SECRET_ACCESS_KEY, v: "${HIVEPAAS_SECRET}"}
+        - {k: S3_BUCKET, v: "${HIVEPAAS_BUCKET}"}
+    routing:
+      port: 8333

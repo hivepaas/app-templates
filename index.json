@@ -79,6 +79,10 @@
         {
           "id": "object-storage",
           "title": "Object Storage"
+        },
+        {
+          "id": "backup",
+          "title": "Backup"
         }
       ]
     }
@@ -163,6 +167,18 @@
     {
       "id": "redis-compatible",
       "title": "Redis Compatible"
+    },
+    {
+      "id": "object-storage",
+      "title": "Object Storage"
+    },
+    {
+      "id": "s3",
+      "title": "S3"
+    },
+    {
+      "id": "backup",
+      "title": "Backup"
     }
   ],
   "templates": [
@@ -839,6 +855,78 @@
         {
           "name": "7.4",
           "release": "7.4.11"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "restic-rest-server",
+      "file": {
+        "path": "templates/restic-rest-server.yaml",
+        "sha256": "a7e174be136fd819215bbe98fedec005b4164e9e1f05ff52b34e57310d8a21c3"
+      },
+      "icon": {
+        "path": "icons/restic-rest-server.svg",
+        "sha256": "82e534091625d725654550f725dcc3849e8b59f7c0375df0c748b91de9ba2c4e"
+      },
+      "title": "restic REST Server",
+      "tagline": "A backup destination restic can write to directly",
+      "categories": [
+        "storage/backup"
+      ],
+      "tags": [
+        "backup",
+        "object-storage",
+        "open-source"
+      ],
+      "aliases": [
+        "rest-server",
+        "restic"
+      ],
+      "license": "BSD-2-Clause",
+      "versions": [
+        {
+          "name": "0.14",
+          "release": "0.14.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "seaweedfs",
+      "file": {
+        "path": "templates/seaweedfs.yaml",
+        "sha256": "253b4033382598dd2429a30a9c1f82ed4e431cf391503a0a1f49d1ee72fffa4d"
+      },
+      "icon": {
+        "path": "icons/seaweedfs.svg",
+        "sha256": "1b6fa4a64d21a149283022eb2f39ca3df8344c9f5d0240d0f01abfd3ce214050"
+      },
+      "title": "SeaweedFS",
+      "tagline": "S3-compatible object storage in a single process",
+      "categories": [
+        "storage/object-storage"
+      ],
+      "tags": [
+        "object-storage",
+        "s3",
+        "open-source"
+      ],
+      "aliases": [
+        "seaweed",
+        "weed"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "4.47",
+          "release": "4.47",
+          "default": true
         }
       ],
       "requires": {

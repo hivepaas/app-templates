@@ -27,3 +27,4 @@ categories:
     title: Storage
     children:
       - {id: object-storage, title: Object Storage}
+      - {id: backup, title: Backup}

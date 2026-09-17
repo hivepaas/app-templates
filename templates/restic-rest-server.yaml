@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: restic-rest-server
+  title: restic REST Server
+  tagline: A backup destination restic can write to directly
+  description: |
+    The REST server restic backs up to. It is the fastest backend restic has - faster than
+    SFTP, and faster than talking to object storage - and it needs nothing but a volume.
+
+    ```bash
+    export RESTIC_REPOSITORY="rest:http://USER:PASSWORD@HOST:8000/"
+    export RESTIC_PASSWORD="the-encryption-password"   # yours, not this server's
+    restic init
+    restic backup /var/lib/myapp
+    ```
+
+    **This template sets up**
+
+    - an account, created on every start from the credentials below
+    - a persistent data volume for the repositories
+    - a health check on the HTTP port
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (8000),
+    `HIVEPAAS_KEY_ID` and `HIVEPAAS_SECRET`. This server authenticates over HTTP rather than
+    with an S3 key pair, so those two carry the user name and the password.
+
+    **Two passwords, and only one of them is here**
+
+    The credentials above let a client reach the server. They are not the key your backups
+    are encrypted with - that one is `RESTIC_PASSWORD`, it never leaves your machine, and
+    HivePaaS neither sets nor stores it. Lose it and the backups are unreadable, including by
+    you. Keep it where you keep your other irreplaceable secrets.
+
+    **Worth knowing**
+
+    Restic deduplicates and encrypts before anything is sent, so this server only ever sees
+    opaque blobs. Adding `--append-only` to the app's command turns the server into one that
+    accepts new backups but refuses deletions, which is what stops a compromised client from
+    erasing its own history - at the price of `restic forget --prune` no longer working.
+  categories: [storage/backup]
+  tags: [backup, object-storage, open-source]
+  aliases: [rest-server, restic]
+  icon: icons/restic-rest-server.svg
+  links:
+    website: https://restic.net
+    documentation: https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html#rest-server
+    source: https://github.com/restic/rest-server
+  license: BSD-2-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Username
+    description: What clients authenticate as.
+    type: string
+    default: backup
+    pattern: '^[A-Za-z0-9_-]{1,64}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one. This is not the backup encryption password.
+    type: secret
+    minLength: 16
+    generate: {length: 40}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the repositories are kept on.
+    type: volume
+
+versions:
+  - name: "0.14"
+    release: "0.14.0"
+    default: true
+    image: restic/rest-server:0.14.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own entrypoint expects the account to exist already, and prints a
+      # warning telling you to create it by hand. This writes it from the app's
+      # credentials on every start instead, so changing the password in HivePaaS is
+      # enough - and the password reaches htpasswd through the environment, never
+      # through the stored command.
+      #
+      # PASSWORD_FILE below keeps that file in the container rather than on the data
+      # volume, where the image puts it by default. Every task then derives the
+      # account from its own environment, instead of tasks of a rolling update
+      # rewriting one file underneath each other - and the volume that holds the
+      # backups holds no credential.
+      command: >-
+        sh -c 'htpasswd -Bbc "$PASSWORD_FILE" "$HIVEPAAS_KEY_ID" "$HIVEPAAS_SECRET"
+        >/dev/null 2>&1 && exec /entrypoint.sh'
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # An unauthenticated request answered with 401 proves both that the server is
+        # listening and that it is asking for credentials. The image carries busybox
+        # wget, which cannot send them itself.
+        command: wget -O /dev/null http://127.0.0.1:8000/ 2>&1 | grep -q 401
+        interval: 10s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: storage
+      engine: restic-rest-server
+      version: "${{ version.name }}"
+      storage:
+        # No buckets here, and the pair is an HTTP user and password rather than an
+        # S3 key pair - which is why these two fields are not named after S3.
+        keyId: "${{ params.username }}"
+        secret: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: PASSWORD_FILE, v: /run/rest-server.htpasswd}
+    routing:
+      port: 8000
