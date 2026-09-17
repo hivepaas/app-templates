@@ -1,0 +1,104 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: memcached
+  title: Memcached
+  tagline: A plain, fast memory cache with nothing else in it
+  description: |
+    Memcached stores keys and values in memory and evicts the least recently used ones
+    when it is full. It has no data types beyond bytes, no persistence and no replication,
+    which is why it stays small, predictable and quick.
+
+    Use it when a cache is all you need. When you also want lists, sorted sets, pub/sub,
+    a queue or data that survives a restart, take Redis or Valkey instead.
+
+    **This template sets up**
+
+    - the cache size and the connection limit you choose
+    - a health check that asks the server for its version
+    - a memory limit on the container
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST` and `HIVEPAAS_PORT`
+    (11211).
+
+    **There is no authentication.** The official image is built without SASL support, so
+    anything that can open a connection can read and write every key. HivePaaS keeps the
+    app on the project's private network and does not publish the port, which is what
+    protects it - do not expose it with a domain or a published port, and do not put data
+    in it that its neighbours may not read. `HIVEPAAS_PASSWORD` is published as an empty
+    value so that an app written against Redis can refer to it without failing.
+
+    Nothing is persisted: everything is gone when the container is replaced, by design.
+  categories: [databases/cache]
+  tags: [cache, key-value, in-memory, open-source]
+  aliases: [memcache]
+  icon: icons/memcached.svg
+  links:
+    website: https://memcached.org
+    documentation: https://github.com/memcached/memcached/wiki
+    source: https://github.com/memcached/memcached
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: cacheSizeMB
+    title: Cache size (MB)
+    description: >-
+      How much memory Memcached fills with items before it starts evicting. Keep it below
+      the container's memory limit.
+    type: int
+    default: 256
+    min: 16
+    max: 65536
+  - name: maxConnections
+    title: Connection limit
+    description: How many clients may be connected at once.
+    type: int
+    default: 1024
+    min: 16
+    max: 65536
+  - name: memoryLimit
+    title: Memory limit
+    description: The container's hard limit. Keep it above the cache size.
+    type: size
+    default: 512MB
+    min: 64MB
+
+versions:
+  - name: "1.6"
+    release: "1.6.45"
+    default: true
+    image: memcached:1.6.45-alpine3.24
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: memcached -m ${{ params.cacheSizeMB }} -c ${{ params.maxConnections }}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries busybox nc, and the text protocol answers `version` with
+        # `VERSION <x.y.z>` on a healthy server.
+        command: echo version | nc -w 2 127.0.0.1 11211 | grep -q VERSION
+        interval: 10s
+        timeout: 5s
+        startPeriod: 5s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: cache
+      engine: memcached
+      version: "${{ version.name }}"
+      cache:
+        maxMemory: "${{ params.cacheSizeMB }}MB"
+        evictionRule: lru
+        persistenceMode: none
+    routing:
+      port: 11211

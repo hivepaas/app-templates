@@ -1,0 +1,148 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dragonfly
+  title: DragonflyDB
+  tagline: A Redis-compatible store that uses every core of the machine
+  description: |
+    Dragonfly speaks the Redis protocol but is built on a multi-threaded, shared-nothing
+    engine. On a machine with several cores it serves far more operations per second than
+    a single-threaded Redis, and it holds more data in the same amount of memory.
+
+    Existing Redis clients work unchanged. Most commands are supported; a few - Lua
+    scripting corners, modules, some cluster commands - are not, so check the compatibility
+    page before moving an application that uses the unusual parts of Redis.
+
+    **This template sets up**
+
+    - a generated password, required on every connection
+    - a memory ceiling, with cache-style eviction when it is reached
+    - snapshots on a volume, written on a schedule and on shutdown
+    - the image's own health check
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (6379)
+    and `HIVEPAAS_PASSWORD`: `redis://default:PASSWORD@HOST:6379`.
+
+    **Threads and memory**
+
+    Dragonfly refuses to start unless the memory ceiling covers 256MB for every thread it
+    runs, so the two settings move together: two threads need at least 512MB, eight need
+    2GB. Left to itself it would take one thread per core of the machine, which is why
+    this template asks for the number instead of guessing.
+
+    **Persistence**
+
+    Dragonfly writes a snapshot of the whole dataset rather than an append-only log. The
+    default schedule here is every 30 minutes, plus one on a clean shutdown, so a crash can
+    cost up to half an hour of writes. For a cache that is the right trade; for data you
+    cannot lose, use a database.
+  categories: [databases/cache]
+  tags: [cache, key-value, in-memory, redis-compatible, open-source]
+  aliases: [dragonflydb, dfly]
+  icon: icons/dragonfly.svg
+  links:
+    website: https://www.dragonflydb.io
+    documentation: https://www.dragonflydb.io/docs
+    source: https://github.com/dragonflydb/dragonfly
+  license: BUSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: maxMemory
+    title: Memory ceiling
+    description: >-
+      How much of the container's memory Dragonfly fills with data before it starts
+      evicting. At least 256MB per thread, and below the memory limit.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: threads
+    title: Threads
+    description: >-
+      How many cores Dragonfly uses. It reserves 256MB of the memory ceiling per thread,
+      so the ceiling must be at least 256MB times this number. More threads mean more
+      throughput on a machine that has the cores to spare.
+    type: int
+    default: 2
+    min: 1
+    max: 32
+  - name: snapshotCron
+    title: Snapshot schedule
+    description: >-
+      An ordinary five-field crontab expression. The snapshot is written to the data
+      volume. (Dragonfly rejects other forms with a message about six fields; five is
+      what it accepts.)
+    type: select
+    default: "*/30 * * * *"
+    options:
+      - {value: "*/30 * * * *", title: "Every 30 minutes"}
+      - {value: "*/5 * * * *", title: "Every 5 minutes"}
+      - {value: "0 * * * *", title: "Every hour"}
+      - {value: "0 3 * * *", title: "Once a day, at 03:00"}
+  - name: memoryLimit
+    title: Memory limit
+    description: The container's hard limit. Keep it above the memory ceiling.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the snapshots are kept on.
+    type: volume
+
+versions:
+  - name: "1.40"
+    release: "1.40.2"
+    default: true
+    image: ghcr.io/dragonflydb/dragonfly:v1.40.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Arguments that start with a dash are appended to the image's own
+      # `dragonfly --logtostderr`. The password is not among them: every flag can also
+      # be given as DFLY_<flag>, so it stays out of the stored command and out of `ps`.
+      command: >-
+        --maxmemory=${{ params.maxMemory }} --proactor_threads=${{ params.threads }} --cache_mode=true
+        --dir=/data --dbfilename=dump --snapshot_cron="${{ params.snapshotCron }}"
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own script, which the port below tells where to connect.
+        command: /usr/local/bin/healthcheck.sh
+        interval: 10s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: cache
+      engine: dragonfly
+      version: "${{ version.name }}"
+      cache:
+        password: "${{ params.password }}"
+        maxMemory: "${{ params.maxMemory }}"
+        evictionRule: cache_mode
+        persistenceMode: snapshot
+    envVars:
+      data:
+        - {k: DFLY_requirepass, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: HEALTHCHECK_PORT, v: "6379"}
+    routing:
+      port: 6379

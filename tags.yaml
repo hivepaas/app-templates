@@ -17,3 +17,7 @@ tags:
   - {id: ai, title: AI}
   - {id: messaging, title: Messaging}
   - {id: amqp, title: AMQP}
+  - {id: cache, title: Cache}
+  - {id: key-value, title: Key-Value}
+  - {id: in-memory, title: In-Memory}
+  - {id: redis-compatible, title: Redis Compatible}

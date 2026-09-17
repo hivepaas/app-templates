@@ -147,6 +147,22 @@
     {
       "id": "amqp",
       "title": "AMQP"
+    },
+    {
+      "id": "cache",
+      "title": "Cache"
+    },
+    {
+      "id": "key-value",
+      "title": "Key-Value"
+    },
+    {
+      "id": "in-memory",
+      "title": "In-Memory"
+    },
+    {
+      "id": "redis-compatible",
+      "title": "Redis Compatible"
     }
   ],
   "templates": [
@@ -219,6 +235,43 @@
         {
           "name": "3.5",
           "release": "3.5.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "dragonfly",
+      "file": {
+        "path": "templates/dragonfly.yaml",
+        "sha256": "37e00720732e012e890d41b37f36777bca1fd0a134190075675d1b19730ce06e"
+      },
+      "icon": {
+        "path": "icons/dragonfly.svg",
+        "sha256": "531dfd55e2bbe7eb48b52b17fad0f9c117fe2813a6f883c4fa167b86ed84c515"
+      },
+      "title": "DragonflyDB",
+      "tagline": "A Redis-compatible store that uses every core of the machine",
+      "categories": [
+        "databases/cache"
+      ],
+      "tags": [
+        "cache",
+        "key-value",
+        "in-memory",
+        "redis-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "dragonflydb",
+        "dfly"
+      ],
+      "versions": [
+        {
+          "name": "1.40",
+          "release": "1.40.2",
           "default": true
         }
       ],
@@ -326,6 +379,41 @@
         {
           "name": "1.53",
           "release": "1.53.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "memcached",
+      "file": {
+        "path": "templates/memcached.yaml",
+        "sha256": "8e6c5667054104979cb27c2ff229f783da76e87dc8e621bcbb3b25f474b8228d"
+      },
+      "icon": {
+        "path": "icons/memcached.svg",
+        "sha256": "7b8b5472fb268321ea4fd985613c35cfde0aec50ece2d2365f411de4983a638f"
+      },
+      "title": "Memcached",
+      "tagline": "A plain, fast memory cache with nothing else in it",
+      "categories": [
+        "databases/cache"
+      ],
+      "tags": [
+        "cache",
+        "key-value",
+        "in-memory",
+        "open-source"
+      ],
+      "aliases": [
+        "memcache"
+      ],
+      "versions": [
+        {
+          "name": "1.6",
+          "release": "1.6.45",
           "default": true
         }
       ],
@@ -604,6 +692,86 @@
           "name": "4.3",
           "release": "4.3.6",
           "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "redis",
+      "file": {
+        "path": "templates/redis.yaml",
+        "sha256": "e8a88f2a1e2659e5ae045d7537823f5b0c2460678c4beec66a796a92fbd01b04"
+      },
+      "icon": {
+        "path": "icons/redis.svg",
+        "sha256": "0588a304be52b7a96f531268ea68624d504d4c93175e41d2feba7bce9ae22fbb"
+      },
+      "title": "Redis",
+      "tagline": "The in-memory data store behind most caches, queues and session stores",
+      "categories": [
+        "databases/cache"
+      ],
+      "tags": [
+        "cache",
+        "key-value",
+        "in-memory",
+        "open-source"
+      ],
+      "aliases": [
+        "redis-server",
+        "redis-stack"
+      ],
+      "versions": [
+        {
+          "name": "8.10",
+          "release": "8.10.1",
+          "default": true
+        },
+        {
+          "name": "7.4",
+          "release": "7.4.11"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "valkey",
+      "file": {
+        "path": "templates/valkey.yaml",
+        "sha256": "9baf2fb44697928d197c3d6e5f3671b0e2998810edc95fe921038d0e72b09624"
+      },
+      "icon": {
+        "path": "icons/valkey.svg",
+        "sha256": "44c2d6795e58ef11430ec616dc6b5d2ffe3a81a8fb4ad8d87d3dd217483cc58d"
+      },
+      "title": "Valkey",
+      "tagline": "The BSD-licensed fork of Redis, maintained by the Linux Foundation",
+      "categories": [
+        "databases/cache"
+      ],
+      "tags": [
+        "cache",
+        "key-value",
+        "in-memory",
+        "redis-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "valkey-server"
+      ],
+      "versions": [
+        {
+          "name": "9.1",
+          "release": "9.1.2",
+          "default": true
+        },
+        {
+          "name": "8.1",
+          "release": "8.1.10"
         }
       ],
       "requires": {

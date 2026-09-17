@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: redis
+  title: Redis
+  tagline: The in-memory data store behind most caches, queues and session stores
+  description: |
+    Redis keeps its data in memory and answers in microseconds. It is a cache, a session
+    store, a job queue, a rate limiter and a pub/sub bus, depending on which of its data
+    types you reach for.
+
+    **This template sets up**
+
+    - a generated password, required on every connection
+    - a memory ceiling and an eviction policy you choose
+    - append-only persistence on a volume, so the data survives a restart
+    - a health check that authenticates and sends `PING`
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (6379)
+    and `HIVEPAAS_PASSWORD`: `redis://default:PASSWORD@HOST:6379`. There is no user name to
+    set - Redis authenticates as its built-in `default` user.
+
+    **Memory**
+
+    The eviction policy decides what happens when the data reaches the memory ceiling.
+    `allkeys-lru` drops the least recently used key, which is what a cache wants;
+    `noeviction` refuses writes instead, which is what a queue or a session store wants,
+    since silently dropping a job is worse than failing loudly. Keep the container's memory
+    limit above the ceiling: Redis needs room for replication buffers and for the copy it
+    makes while rewriting the append-only file.
+
+    Redis 8 is licensed under AGPLv3 (also available under RSALv2 and SSPLv1). Valkey is a
+    BSD-licensed fork of Redis 7.2 maintained by the Linux Foundation, and this repository
+    carries a template for it too.
+  categories: [databases/cache]
+  tags: [cache, key-value, in-memory, open-source]
+  aliases: [redis-server, redis-stack]
+  icon: icons/redis.svg
+  links:
+    website: https://redis.io
+    documentation: https://redis.io/docs/latest
+    source: https://github.com/redis/redis
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: maxMemory
+    title: Memory ceiling
+    description: >-
+      How much of the container's memory Redis fills with data before it starts evicting.
+      Leave room below the memory limit.
+    type: size
+    default: 256MB
+    min: 16MB
+  - name: evictionPolicy
+    title: Eviction policy
+    description: What Redis does when the data reaches the ceiling.
+    type: select
+    default: allkeys-lru
+    options:
+      - {value: allkeys-lru, title: "Evict the least recently used key (cache)"}
+      - {value: allkeys-lfu, title: "Evict the least frequently used key (cache)"}
+      - {value: volatile-lru, title: "Evict the least recently used key that has a TTL"}
+      - {value: volatile-ttl, title: "Evict the key closest to expiry"}
+      - {value: noeviction, title: "Refuse writes (queue, session store)"}
+  - name: memoryLimit
+    title: Memory limit
+    description: The container's hard limit. Keep it above the memory ceiling.
+    type: size
+    default: 512MB
+    min: 64MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the append-only file is kept on.
+    type: volume
+
+versions:
+  - name: "8.10"
+    release: "8.10.1"
+    default: true
+    image: redis:8.10.1-alpine3.23
+  - name: "7.4"
+    release: "7.4.11"
+    image: redis:7.4.11-alpine3.21
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The password reaches the server through the environment rather than the command
+      # line: the command is stored in plain text on the app, the variable is not, and
+      # `ps` inside the container would show the argument to every process.
+      command: >-
+        sh -c 'exec redis-server --requirepass "$HIVEPAAS_PASSWORD"
+        --maxmemory ${{ params.maxMemory }}
+        --maxmemory-policy ${{ params.evictionPolicy }}
+        --appendonly yes --dir /data'
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: redis-cli --no-auth-warning -a "$HIVEPAAS_PASSWORD" ping | grep -q PONG
+        interval: 10s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: cache
+      engine: redis
+      version: "${{ version.name }}"
+      cache:
+        password: "${{ params.password }}"
+        maxMemory: "${{ params.maxMemory }}"
+        evictionRule: "${{ params.evictionPolicy }}"
+        persistenceMode: aof
+    routing:
+      port: 6379
