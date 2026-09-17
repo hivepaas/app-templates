@@ -192,6 +192,7 @@
         "ch",
         "clickhouse-server"
       ],
+      "license": "Apache-2.0",
       "versions": [
         {
           "name": "26.8",
@@ -231,6 +232,7 @@
         "couch",
         "apache-couchdb"
       ],
+      "license": "Apache-2.0",
       "versions": [
         {
           "name": "3.5",
@@ -267,6 +269,7 @@
         "dolthub",
         "doltdb"
       ],
+      "license": "Apache-2.0",
       "versions": [
         {
           "name": "2.3",
@@ -304,6 +307,7 @@
         "dragonflydb",
         "dfly"
       ],
+      "license": "BUSL-1.1",
       "versions": [
         {
           "name": "1.40",
@@ -338,6 +342,7 @@
         "influx",
         "tsdb"
       ],
+      "license": "MIT",
       "versions": [
         {
           "name": "2.9",
@@ -373,6 +378,7 @@
       "aliases": [
         "mysql"
       ],
+      "license": "GPL-2.0",
       "versions": [
         {
           "name": "11.8",
@@ -411,6 +417,7 @@
       "aliases": [
         "meili"
       ],
+      "license": "MIT",
       "versions": [
         {
           "name": "1.53",
@@ -446,6 +453,7 @@
       "aliases": [
         "memcache"
       ],
+      "license": "BSD-3-Clause",
       "versions": [
         {
           "name": "1.6",
@@ -479,6 +487,7 @@
       "aliases": [
         "mongo"
       ],
+      "license": "SSPL-1.0",
       "versions": [
         {
           "name": "8.0",
@@ -513,6 +522,7 @@
       "aliases": [
         "mysql-server"
       ],
+      "license": "GPL-2.0",
       "versions": [
         {
           "name": "8.4",
@@ -551,6 +561,7 @@
         "cypher",
         "graph-database"
       ],
+      "license": "GPL-3.0",
       "versions": [
         {
           "name": "5.26",
@@ -588,6 +599,7 @@
         "postgres-vector",
         "postgresql-pgvector"
       ],
+      "license": "PostgreSQL",
       "variants": [
         {
           "name": "pg18",
@@ -641,6 +653,7 @@
         "psql",
         "postgresql"
       ],
+      "license": "PostgreSQL",
       "variants": [
         {
           "name": "alpine",
@@ -706,6 +719,7 @@
         "vector-database",
         "embeddings"
       ],
+      "license": "Apache-2.0",
       "versions": [
         {
           "name": "1.19",
@@ -741,6 +755,7 @@
       "aliases": [
         "tsdb"
       ],
+      "license": "Apache-2.0",
       "versions": [
         {
           "name": "10.0",
@@ -777,6 +792,7 @@
         "message-broker",
         "amqp-broker"
       ],
+      "license": "MPL-2.0",
       "versions": [
         {
           "name": "4.3",
@@ -813,6 +829,7 @@
         "redis-server",
         "redis-stack"
       ],
+      "license": "AGPL-3.0-only",
       "versions": [
         {
           "name": "8.10",
@@ -853,6 +870,7 @@
       "aliases": [
         "timescale"
       ],
+      "license": "Timescale-License",
       "variants": [
         {
           "name": "pg18",
@@ -906,6 +924,7 @@
       "aliases": [
         "valkey-server"
       ],
+      "license": "BSD-3-Clause",
       "versions": [
         {
           "name": "9.1",
