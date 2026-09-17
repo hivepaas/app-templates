@@ -1,0 +1,141 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dolt
+  title: Dolt
+  tagline: A SQL database with branches, diffs and merges
+  description: |
+    Dolt is a SQL database that versions your data the way git versions files. Every write
+    lands in a commit, and you can branch, diff, merge and roll back the contents of a
+    table with SQL:
+
+    ```sql
+    CALL DOLT_CHECKOUT('-b', 'import-june');
+    -- load, fix, check
+    CALL DOLT_COMMIT('-Am', 'June import');
+    CALL DOLT_CHECKOUT('main');
+    CALL DOLT_MERGE('import-june');
+    SELECT * FROM dolt_diff_orders WHERE to_commit = 'HEAD';
+    ```
+
+    **This template sets up**
+
+    - a database, a user and a root password, all generated or chosen by you
+    - a persistent data volume
+    - a health check on the SQL port
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (3306),
+    `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and `HIVEPAAS_DATABASE_NAME`. It speaks the MySQL
+    wire protocol, so ordinary MySQL drivers and clients connect to it unchanged.
+
+    **What Dolt is and is not**
+
+    It is not MySQL with a feature added: it is a different engine that answers the same
+    protocol, and it keeps every version of every row. That costs space and write throughput,
+    and some MySQL behaviour is missing or differs. Reach for it when the history of the data
+    is part of the problem - reference data, imported datasets, configuration that several
+    people edit, anything you would want to review before it goes live. For a high-volume
+    transactional workload, the MySQL or PostgreSQL template is the better tool.
+
+    The user and the root account are both reachable from other containers in the project,
+    as with the MySQL template. Nothing is published outside the project network.
+  categories: [databases/sql]
+  tags: [sql, relational, mysql-compatible, open-source]
+  aliases: [dolthub, doltdb]
+  icon: icons/dolt.svg
+  links:
+    website: https://www.dolthub.com
+    documentation: https://docs.dolthub.com
+    source: https://github.com/dolthub/dolt
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,31}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: rootPassword
+    title: Root password
+    description: >-
+      The administrator account. It is never shared with other apps. Leave empty to
+      generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files and their history are kept on.
+    type: volume
+
+versions:
+  - name: "2.3"
+    release: "2.3.5"
+    default: true
+    image: dolthub/dolt-sql-server:2.3.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/dolt: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither a MySQL client nor wget, and `dolt sql` would answer
+        # from the data directory even with the server down. Reading the server's greeting
+        # off the socket is what proves it is listening and talking.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/3306 && head -c 4 <&3 | grep -q .'
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: dolt
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+        rootPassword: "${{ params.rootPassword }}"
+    envVars:
+      data:
+        - {k: DOLT_DATABASE, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: DOLT_USER, v: "${HIVEPAAS_USER}"}
+        - {k: DOLT_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: DOLT_ROOT_PASSWORD, v: "${HIVEPAAS_ROOT_PASSWORD}"}
+        # Without these the image creates both accounts as `@localhost`, and every
+        # connection from another container is refused.
+        - {k: DOLT_ROOT_HOST, v: "%"}
+        - {k: DOLT_USER_HOST, v: "%"}
+    routing:
+      port: 3306

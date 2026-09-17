@@ -243,6 +243,42 @@
       }
     },
     {
+      "name": "dolt",
+      "file": {
+        "path": "templates/dolt.yaml",
+        "sha256": "175c68b6f572e3b4150779257cff3018fd92c8c53d988295dae603a80607a886"
+      },
+      "icon": {
+        "path": "icons/dolt.svg",
+        "sha256": "e5abab02feb8875df06146ead64c9f29a6b8679ded934a062fbdf699f955c386"
+      },
+      "title": "Dolt",
+      "tagline": "A SQL database with branches, diffs and merges",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "mysql-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "dolthub",
+        "doltdb"
+      ],
+      "versions": [
+        {
+          "name": "2.3",
+          "release": "2.3.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "dragonfly",
       "file": {
         "path": "templates/dragonfly.yaml",
