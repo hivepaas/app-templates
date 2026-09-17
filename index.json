@@ -158,7 +158,7 @@
       },
       "icon": {
         "path": "icons/clickhouse.svg",
-        "sha256": "17ae24f211b2568d7a2e1f6ff7dab8fee90f1fe4c5f7c69efa694825f3f9d882"
+        "sha256": "56b721320616172170bb817a949dd88f71a52254b07caeec6589d0ff9d363cb5"
       },
       "title": "ClickHouse",
       "tagline": "A column-oriented database for real-time analytics",
@@ -199,7 +199,7 @@
       },
       "icon": {
         "path": "icons/couchdb.svg",
-        "sha256": "4eb1b20248c263d556c6a35706bb63be990734200bb3ff41591be6edb6c13822"
+        "sha256": "7038ad2ca6eaae7710f2d992d10dc32b723c2fe33c34fb24168bcf2c09d92edf"
       },
       "title": "CouchDB",
       "tagline": "A document database that speaks HTTP and replicates anywhere",
@@ -234,7 +234,7 @@
       },
       "icon": {
         "path": "icons/influxdb.svg",
-        "sha256": "94a315c7f9c244f13773ca52904565dca76b2f13e75924428582fd3fd121e36a"
+        "sha256": "1b58e02a49baf272eb7effbfa29d7641ba7166ad049564ba13eb919302b7409a"
       },
       "title": "InfluxDB",
       "tagline": "A time series database for metrics, events and sensor data",
@@ -268,7 +268,7 @@
       },
       "icon": {
         "path": "icons/mariadb.svg",
-        "sha256": "315906a758dd3bf289fe02c5e1147bc2728a40a196b8d68b36d7a35f29df65b5"
+        "sha256": "89951d6e8abc9786602859be82605ba1b1a8003409eebf15037a5620e6ea2fd4"
       },
       "title": "MariaDB",
       "tagline": "A community-developed fork of MySQL, fast and open source",
@@ -307,7 +307,7 @@
       },
       "icon": {
         "path": "icons/meilisearch.svg",
-        "sha256": "151fe00c28452eae767f56ca6341d57d664b89e9ba35d9f1e6bf4459d0d4f7bf"
+        "sha256": "bcae3c1eeb142376c8c8924d292703395a4d29423ea15b35866dc1d494866d74"
       },
       "title": "Meilisearch",
       "tagline": "A lightning-fast search engine with typo tolerance out of the box",
@@ -341,7 +341,7 @@
       },
       "icon": {
         "path": "icons/mongodb.svg",
-        "sha256": "c3a8b4afaf139f553f18e07147bef928b1340a4ed4860e18d165083d795f12f1"
+        "sha256": "cf259f556e99f2df9056e60f34ef0eed3eeb4d096dec34f251b0f7a3a5c76fdd"
       },
       "title": "MongoDB",
       "tagline": "A document database with flexible JSON-like documents",
@@ -374,7 +374,7 @@
       },
       "icon": {
         "path": "icons/mysql.svg",
-        "sha256": "2193c557fafd1107b247cdb0e0abf959ed98542a80d87718dfdc8683b25a4680"
+        "sha256": "a6b4206adaaf2e56e842df3f9a93b1c174c01f23439cab71e9412520d5a610da"
       },
       "title": "MySQL",
       "tagline": "The world's most widely used open source relational database",
@@ -412,7 +412,7 @@
       },
       "icon": {
         "path": "icons/neo4j.svg",
-        "sha256": "4363514c42903e6b2d4a3b01c6ab41ecee1b3069d48298f3b095a19e69d1a735"
+        "sha256": "2997fd7204a968e45b151832b43318aee5947902734376aa4be0a6830ea0594b"
       },
       "title": "Neo4j",
       "tagline": "A graph database for connected data, queried with Cypher",
@@ -446,7 +446,7 @@
       },
       "icon": {
         "path": "icons/postgres.svg",
-        "sha256": "c36cec49ed584ff4b766567949952a4e09f44bb2db8db2d2df718551f3af6a64"
+        "sha256": "bc45b1c56d0b1501dea387dbec4fda450d2ebc35244a620791815509d8c41dba"
       },
       "title": "PostgreSQL",
       "tagline": "The world's most advanced open source relational database",
@@ -511,7 +511,7 @@
       },
       "icon": {
         "path": "icons/qdrant.svg",
-        "sha256": "c68a7124c2bee1ff3e8114161e5399ab9fa47fcb9b5d5a47c34df18085fb1fcd"
+        "sha256": "e620b07335d021791abe6e1c8d46c4c64f1113d0717e79bb46e7228a6b3f8e1c"
       },
       "title": "Qdrant",
       "tagline": "A vector database for similarity search and AI applications",
@@ -547,7 +547,7 @@
       },
       "icon": {
         "path": "icons/questdb.svg",
-        "sha256": "0b378a72decd54821ea32810738dd6f83cbb3926931a1e27405f3da038f4adab"
+        "sha256": "eba4e84b1bac370c05db068427e63dcdd57763b0a4bac125a80cf182f59bb859"
       },
       "title": "QuestDB",
       "tagline": "A fast time series database you query with SQL",
@@ -582,7 +582,7 @@
       },
       "icon": {
         "path": "icons/rabbitmq.svg",
-        "sha256": "f232ebcb1d0edc6ea9b005a966679c4aa0a74dfeb1567e1df52470e2619d71f4"
+        "sha256": "449b269ad68813ee98dc472d8aa5c15a0c42111030fdb0cddcdb6ec42308cedf"
       },
       "title": "RabbitMQ",
       "tagline": "A reliable message broker for queues, routing and pub/sub",
