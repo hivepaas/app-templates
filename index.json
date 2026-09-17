@@ -1,0 +1,190 @@
+{
+  "apiVersion": "hivepaas.com/v1",
+  "kind": "TemplateIndex",
+  "categories": [
+    {
+      "id": "databases",
+      "title": "Databases",
+      "children": [
+        {
+          "id": "sql",
+          "title": "SQL"
+        },
+        {
+          "id": "nosql",
+          "title": "NoSQL"
+        },
+        {
+          "id": "cache",
+          "title": "Cache & Queues"
+        }
+      ]
+    },
+    {
+      "id": "webapps",
+      "title": "Web Apps",
+      "children": [
+        {
+          "id": "dev-tools",
+          "title": "Developer Tools"
+        },
+        {
+          "id": "productivity",
+          "title": "Productivity"
+        },
+        {
+          "id": "cms",
+          "title": "CMS & Blogging"
+        }
+      ]
+    },
+    {
+      "id": "observability",
+      "title": "Observability",
+      "children": [
+        {
+          "id": "monitoring",
+          "title": "Monitoring"
+        },
+        {
+          "id": "analytics",
+          "title": "Analytics"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "Storage",
+      "children": [
+        {
+          "id": "object-storage",
+          "title": "Object Storage"
+        }
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "id": "sql",
+      "title": "SQL"
+    },
+    {
+      "id": "relational",
+      "title": "Relational"
+    },
+    {
+      "id": "open-source",
+      "title": "Open Source"
+    },
+    {
+      "id": "mysql-compatible",
+      "title": "MySQL Compatible"
+    }
+  ],
+  "templates": [
+    {
+      "name": "mariadb",
+      "file": {
+        "path": "templates/mariadb.yaml",
+        "sha256": "b6a57f7a983c84b39a3e4d96c7b33016124cfd4f67b8b62ce209e789e13b2a37"
+      },
+      "icon": {
+        "path": "icons/mariadb.svg",
+        "sha256": "315906a758dd3bf289fe02c5e1147bc2728a40a196b8d68b36d7a35f29df65b5"
+      },
+      "title": "MariaDB",
+      "tagline": "A community-developed fork of MySQL, fast and open source",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source",
+        "mysql-compatible"
+      ],
+      "aliases": [
+        "mysql"
+      ],
+      "versions": [
+        {
+          "name": "11.8",
+          "release": "11.8.9",
+          "default": true
+        },
+        {
+          "name": "11.4",
+          "release": "11.4.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "postgres",
+      "file": {
+        "path": "templates/postgres.yaml",
+        "sha256": "7dede1728bd98c8023b0bc457be02efc1ca9c2cffe5e2d83280e5ef2c365f5af"
+      },
+      "icon": {
+        "path": "icons/postgres.svg",
+        "sha256": "c36cec49ed584ff4b766567949952a4e09f44bb2db8db2d2df718551f3af6a64"
+      },
+      "title": "PostgreSQL",
+      "tagline": "The world's most advanced open source relational database",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "pg",
+        "psql",
+        "postgresql"
+      ],
+      "variants": [
+        {
+          "name": "alpine",
+          "default": true
+        },
+        {
+          "name": "debian"
+        }
+      ],
+      "versions": [
+        {
+          "name": "18",
+          "release": "18.6",
+          "default": true,
+          "variants": [
+            "alpine",
+            "debian"
+          ]
+        },
+        {
+          "name": "17",
+          "release": "17.11",
+          "variants": [
+            "alpine",
+            "debian"
+          ]
+        },
+        {
+          "name": "16",
+          "release": "16.15",
+          "variants": [
+            "alpine",
+            "debian"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    }
+  ]
+}

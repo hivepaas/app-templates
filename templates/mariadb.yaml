@@ -1,0 +1,112 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mariadb
+  title: MariaDB
+  tagline: A community-developed fork of MySQL, fast and open source
+  description: |
+    MariaDB Server is one of the most popular open source relational databases,
+    made by the original developers of MySQL and compatible with it.
+
+    **This template sets up**
+
+    - a database, a user, and generated user and root passwords
+    - a persistent data volume
+    - a health check with the image's `healthcheck.sh`
+    - a memory limit you choose
+
+    Other apps in the same environment reach it by the app's name on port 3306,
+    with the credentials HivePaaS shares as `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD`
+    and `HIVEPAAS_DATABASE_NAME`. The root password stays with this app.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source, mysql-compatible]
+  aliases: [mysql]
+  icon: icons/mariadb.svg
+  links:
+    website: https://mariadb.org
+    documentation: https://mariadb.com/kb/en/documentation/
+    source: https://github.com/MariaDB/server
+  license: GPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,79}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: rootPassword
+    title: Root password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "11.8"
+    release: "11.8.9"
+    default: true
+    image: mariadb:11.8.9-noble
+  - name: "11.4"
+    release: "11.4.13"
+    image: mariadb:11.4.13-noble
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/mysql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: healthcheck.sh --connect --innodb_initialized
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mariadb
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+        rootPassword: "${{ params.rootPassword }}"
+    envVars:
+      data:
+        - {k: MARIADB_DATABASE, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: MARIADB_USER, v: "${HIVEPAAS_USER}"}
+        - {k: MARIADB_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: MARIADB_ROOT_PASSWORD, v: "${HIVEPAAS_ROOT_PASSWORD}"}
+    routing:
+      port: 3306

@@ -1,0 +1,24 @@
+apiVersion: hivepaas.com/v1
+kind: TemplateCategories
+categories:
+  - id: databases
+    title: Databases
+    children:
+      - {id: sql, title: SQL}
+      - {id: nosql, title: NoSQL}
+      - {id: cache, title: Cache & Queues}
+  - id: webapps
+    title: Web Apps
+    children:
+      - {id: dev-tools, title: Developer Tools}
+      - {id: productivity, title: Productivity}
+      - {id: cms, title: CMS & Blogging}
+  - id: observability
+    title: Observability
+    children:
+      - {id: monitoring, title: Monitoring}
+      - {id: analytics, title: Analytics}
+  - id: storage
+    title: Storage
+    children:
+      - {id: object-storage, title: Object Storage}

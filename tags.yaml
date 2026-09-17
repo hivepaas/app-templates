@@ -1,0 +1,7 @@
+apiVersion: hivepaas.com/v1
+kind: TemplateTags
+tags:
+  - {id: sql, title: SQL}
+  - {id: relational, title: Relational}
+  - {id: open-source, title: Open Source}
+  - {id: mysql-compatible, title: MySQL Compatible}

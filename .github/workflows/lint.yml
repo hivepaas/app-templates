@@ -1,0 +1,36 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app-templates
+
+      - uses: actions/checkout@v4
+        with:
+          repository: hivepaas/hivepaas
+          # The HivePaaS commit whose parser checks these templates. Pinned, so a
+          # template is checked by the code that will read it; move it when HivePaaS
+          # gains a block or a parameter type.
+          ref: 2f5330659be92597972e3471a47b4102c38ef342
+          path: hivepaas
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: hivepaas/go.mod
+          cache-dependency-path: hivepaas/go.sum
+
+      - name: Lint templates
+        working-directory: hivepaas
+        run: go run ./tools/apptemplate lint ../app-templates
+
+      - name: Check index.json is current
+        working-directory: hivepaas
+        run: go run ./tools/apptemplate index -check ../app-templates
