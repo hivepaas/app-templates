@@ -19,7 +19,7 @@ jobs:
           # The HivePaaS commit whose parser checks these templates. Pinned, so a
           # template is checked by the code that will read it; move it when HivePaaS
           # gains a block or a parameter type.
-          ref: 2f5330659be92597972e3471a47b4102c38ef342
+          ref: 7d87744c919fef7708c48a1ae04f06a812dfbbe9
           path: hivepaas
 
       - uses: actions/setup-go@v5

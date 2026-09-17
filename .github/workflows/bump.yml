@@ -1,0 +1,63 @@
+name: bump
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app-templates
+
+      - uses: actions/checkout@v4
+        with:
+          repository: hivepaas/hivepaas
+          # The HivePaaS commit whose bump tool rewrites these templates. Pinned for
+          # the same reason lint.yml is: templates are checked and changed by the
+          # code that will read them.
+          ref: 7d87744c919fef7708c48a1ae04f06a812dfbbe9
+          path: hivepaas
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: hivepaas/go.mod
+          cache-dependency-path: hivepaas/go.sum
+
+      - name: Bump pinned images
+        working-directory: hivepaas
+        run: go run ./tools/apptemplate bump ../app-templates
+
+      # The pull request is opened with GITHUB_TOKEN, and GitHub does not run
+      # workflows on what that token pushes - so lint runs here instead of waiting
+      # for a check that will never start.
+      - name: Lint what was produced
+        working-directory: hivepaas
+        run: |
+          go run ./tools/apptemplate lint ../app-templates
+          go run ./tools/apptemplate index -check ../app-templates
+
+      - name: Open a pull request
+        working-directory: app-templates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "every template is current"
+            exit 0
+          fi
+          branch="bump/$(date -u +%Y-%m-%d)"
+          git config user.name "hivepaas-bot"
+          git config user.email "bot@hivepaas.com"
+          git checkout -b "$branch"
+          git commit -am "Bump pinned images"
+          git push -u origin "$branch"
+          gh pr create --fill --title "Bump pinned images" \
+            --body "Opened by the scheduled bump job. Each version line moved to the newest release every variant publishes, within the line the template declares."
