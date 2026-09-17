@@ -5,3 +5,15 @@ tags:
   - {id: relational, title: Relational}
   - {id: open-source, title: Open Source}
   - {id: mysql-compatible, title: MySQL Compatible}
+  - {id: document, title: Document}
+  - {id: json, title: JSON}
+  - {id: graph, title: Graph}
+  - {id: time-series, title: Time Series}
+  - {id: analytics, title: Analytics}
+  - {id: olap, title: OLAP}
+  - {id: search, title: Search}
+  - {id: full-text, title: Full-text Search}
+  - {id: vector, title: Vector}
+  - {id: ai, title: AI}
+  - {id: messaging, title: Messaging}
+  - {id: amqp, title: AMQP}

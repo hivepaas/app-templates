@@ -1,0 +1,94 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: qdrant
+  title: Qdrant
+  tagline: A vector database for similarity search and AI applications
+  description: |
+    Qdrant stores vector embeddings with payloads and answers similarity queries with
+    filtering, which makes it a common base for semantic search and retrieval for AI.
+
+    **This template sets up**
+
+    - an API key with a generated value
+    - a persistent storage volume
+    - a health check on the `/readyz` endpoint
+    - a memory limit you choose
+
+    Other apps in the same environment reach the REST API with `HIVEPAAS_HOST`,
+    `HIVEPAAS_PORT` (6333) and the API key as `HIVEPAAS_PASSWORD`, sent in the `api-key`
+    header. gRPC listens on port 6334.
+
+    Qdrant upgrades one minor version at a time, so this template moves only between patch
+    releases of 1.19.
+  categories: [databases/vector]
+  tags: [vector, ai, search, open-source]
+  aliases: [vector-database, embeddings]
+  icon: icons/qdrant.svg
+  links:
+    website: https://qdrant.tech
+    documentation: https://qdrant.tech/documentation/
+    source: https://github.com/qdrant/qdrant
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: apiKey
+    title: API key
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume collections are kept on.
+    type: volume
+
+versions:
+  - name: "1.19"
+    release: "1.19.1"
+    default: true
+    image: qdrant/qdrant:v1.19.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /qdrant/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither curl nor wget, so bash speaks HTTP over /dev/tcp.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 &&
+          printf "GET /readyz HTTP/1.0\r\n\r\n" >&3 && head -n 1 <&3 | grep -q " 200 "'
+        interval: 10s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: qdrant
+      version: "${{ version.name }}"
+      database:
+        password: "${{ params.apiKey }}"
+    envVars:
+      data:
+        - {k: QDRANT__SERVICE__API_KEY, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: QDRANT__TELEMETRY_DISABLED, v: "true"}
+    routing:
+      port: 6333

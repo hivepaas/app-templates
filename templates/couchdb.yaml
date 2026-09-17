@@ -1,0 +1,101 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: couchdb
+  title: CouchDB
+  tagline: A document database that speaks HTTP and replicates anywhere
+  description: |
+    Apache CouchDB stores JSON documents and exposes everything - reads, writes, queries and
+    replication - through a plain HTTP API.
+
+    **This template sets up**
+
+    - an administrator with a generated password
+    - a persistent data volume
+    - a health check on the `/_up` endpoint
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (5984),
+    `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`: `http://USER:PASSWORD@HOST:5984`.
+
+    The node starts without the `_users` and `_replicator` system databases. The administrator
+    and every database an app creates work without them; create both once with a `PUT` if you
+    need CouchDB's own user accounts or replication.
+
+    Login sessions (`/_session` cookies) end when the container is replaced: the image stores the
+    administrator's password with a fresh salt on every start. Clients using basic auth are not
+    affected; clients using cookies log in again.
+  categories: [databases/nosql]
+  tags: [document, json, open-source]
+  aliases: [couch, apache-couchdb]
+  icon: icons/couchdb.svg
+  links:
+    website: https://couchdb.apache.org
+    documentation: https://docs.couchdb.org
+    source: https://github.com/apache/couchdb
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: password
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "3.5"
+    release: "3.5.2.1"
+    default: true
+    image: couchdb:3.5.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /opt/couchdb/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS http://127.0.0.1:5984/_up
+        interval: 10s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: couchdb
+      version: "${{ version.name }}"
+      database:
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: COUCHDB_USER, v: "${HIVEPAAS_USER}"}
+        - {k: COUCHDB_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+    routing:
+      port: 5984

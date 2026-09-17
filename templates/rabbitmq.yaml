@@ -1,0 +1,102 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rabbitmq
+  title: RabbitMQ
+  tagline: A reliable message broker for queues, routing and pub/sub
+  description: |
+    RabbitMQ is a message broker: apps publish messages to exchanges, and RabbitMQ routes them
+    to queues that other apps consume, with acknowledgements and persistence.
+
+    **This template sets up**
+
+    - a user and virtual host with a generated password
+    - the management plugin
+    - a persistent data volume
+    - a health check with `rabbitmq-diagnostics`
+    - a memory limit you choose
+
+    Other apps in the same environment connect over AMQP with `HIVEPAAS_HOST`, `HIVEPAAS_PORT`
+    (5672), `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and the virtual host as
+    `HIVEPAAS_DATABASE_NAME`. The management UI listens on port 15672.
+  categories: [databases/messaging]
+  tags: [messaging, amqp, open-source]
+  aliases: [rabbit, message-broker, amqp-broker]
+  icon: icons/rabbitmq.svg
+  links:
+    website: https://www.rabbitmq.com
+    documentation: https://www.rabbitmq.com/docs
+    source: https://github.com/rabbitmq/rabbitmq-server
+  license: MPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_.-]{0,63}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: vhost
+    title: Virtual host
+    type: string
+    default: /
+    pattern: '^[A-Za-z0-9_/.-]{1,63}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume messages and definitions are kept on.
+    type: volume
+
+versions:
+  - name: "4.3"
+    release: "4.3.6"
+    default: true
+    image: rabbitmq:4.3.6-management-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/rabbitmq: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: rabbitmq-diagnostics -q ping
+        interval: 15s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: rabbitmq
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.vhost }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: RABBITMQ_DEFAULT_USER, v: "${HIVEPAAS_USER}"}
+        - {k: RABBITMQ_DEFAULT_PASS, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: RABBITMQ_DEFAULT_VHOST, v: "${HIVEPAAS_DATABASE_NAME}"}
+    routing:
+      port: 5672

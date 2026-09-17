@@ -1,0 +1,116 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mysql
+  title: MySQL
+  tagline: The world's most widely used open source relational database
+  description: |
+    MySQL is a fast, reliable relational database used by a large share of the web.
+
+    **This template sets up**
+
+    - a database, a user, and generated user and root passwords
+    - a persistent data volume
+    - a health check with `mysqladmin ping`
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with the credentials HivePaaS shares as
+    `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (3306), `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and
+    `HIVEPAAS_DATABASE_NAME`. The root password stays with this app.
+
+    Version 8.4 is the long-term support release. 9.7 is an innovation release with newer
+    features and a shorter support window.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source]
+  aliases: [mysql-server]
+  icon: icons/mysql.svg
+  links:
+    website: https://www.mysql.com
+    documentation: https://dev.mysql.com/doc/
+    source: https://github.com/mysql/mysql-server
+  license: GPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,31}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: rootPassword
+    title: Root password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "8.4"
+    release: "8.4.11"
+    default: true
+    image: mysql:8.4.11
+  - name: "9.7"
+    release: "9.7.2"
+    image: mysql:9.7.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/mysql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Over TCP on purpose: the server the image runs while it initializes listens
+        # on the socket only, so this passes once the real server is up.
+        command: mysqladmin ping -h 127.0.0.1 --silent
+        interval: 10s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mysql
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+        rootPassword: "${{ params.rootPassword }}"
+    envVars:
+      data:
+        - {k: MYSQL_DATABASE, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: MYSQL_USER, v: "${HIVEPAAS_USER}"}
+        - {k: MYSQL_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: MYSQL_ROOT_PASSWORD, v: "${HIVEPAAS_ROOT_PASSWORD}"}
+    routing:
+      port: 3306

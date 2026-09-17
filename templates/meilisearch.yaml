@@ -1,0 +1,92 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: meilisearch
+  title: Meilisearch
+  tagline: A lightning-fast search engine with typo tolerance out of the box
+  description: |
+    Meilisearch is a search engine for building search-as-you-type experiences, with
+    relevancy, typo tolerance, filtering and facets working without tuning.
+
+    **This template sets up**
+
+    - production mode with a generated master key
+    - a persistent data volume
+    - a health check on the `/health` endpoint
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (7700)
+    and the master key as `HIVEPAAS_PASSWORD`. Create narrower API keys from the master key
+    for anything that runs in a browser.
+
+    Meilisearch cannot open data written by an older minor version without a migration, so
+    this template moves only between patch releases of 1.53.
+  categories: [databases/search]
+  tags: [search, full-text, open-source]
+  aliases: [meili]
+  icon: icons/meilisearch.svg
+  links:
+    website: https://www.meilisearch.com
+    documentation: https://www.meilisearch.com/docs
+    source: https://github.com/meilisearch/meilisearch
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: masterKey
+    title: Master key
+    description: At least 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the indexes are kept on.
+    type: volume
+
+versions:
+  - name: "1.53"
+    release: "1.53.2"
+    default: true
+    image: getmeili/meilisearch:v1.53.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /meili_data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS http://127.0.0.1:7700/health
+        interval: 10s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: meilisearch
+      version: "${{ version.name }}"
+      database:
+        password: "${{ params.masterKey }}"
+    envVars:
+      data:
+        - {k: MEILI_MASTER_KEY, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: MEILI_ENV, v: production}
+        - {k: MEILI_NO_ANALYTICS, v: "true"}
+    routing:
+      port: 7700

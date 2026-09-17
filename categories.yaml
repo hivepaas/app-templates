@@ -6,7 +6,12 @@ categories:
     children:
       - {id: sql, title: SQL}
       - {id: nosql, title: NoSQL}
-      - {id: cache, title: Cache & Queues}
+      - {id: cache, title: Cache}
+      - {id: time-series, title: Time Series}
+      - {id: analytics, title: Analytics}
+      - {id: search, title: Search}
+      - {id: vector, title: Vector}
+      - {id: messaging, title: Messaging}
   - id: webapps
     title: Web Apps
     children:

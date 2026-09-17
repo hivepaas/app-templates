@@ -1,0 +1,91 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: neo4j
+  title: Neo4j
+  tagline: A graph database for connected data, queried with Cypher
+  description: |
+    Neo4j stores data as nodes and relationships, which makes queries over connected data -
+    recommendations, networks, dependencies - direct instead of a chain of joins.
+
+    **This template sets up**
+
+    - the `neo4j` user with a generated password
+    - a persistent data volume
+    - a health check on the HTTP endpoint
+    - a memory limit you choose
+
+    Other apps in the same environment reach it over Bolt with `HIVEPAAS_HOST`,
+    `HIVEPAAS_PORT` (7687), `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`:
+    `neo4j://HOST:7687`. The HTTP interface and browser listen on port 7474.
+
+    This is Neo4j Community Edition, the long-term support line 5.26.
+  categories: [databases/nosql]
+  tags: [graph, open-source]
+  aliases: [cypher, graph-database]
+  icon: icons/neo4j.svg
+  links:
+    website: https://neo4j.com
+    documentation: https://neo4j.com/docs/
+    source: https://github.com/neo4j/neo4j
+  license: GPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: password
+    title: Password
+    description: The password of the neo4j user. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "5.26"
+    release: "5.26.30"
+    default: true
+    image: neo4j:5.26.30-community-trixie
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q --spider http://127.0.0.1:7474
+        interval: 10s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: neo4j
+      version: "${{ version.name }}"
+      database:
+        # Community Edition's initial user is always neo4j.
+        username: neo4j
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: NEO4J_AUTH, v: "neo4j/${HIVEPAAS_PASSWORD}"}
+    routing:
+      port: 7687

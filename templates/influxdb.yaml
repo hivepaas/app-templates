@@ -1,0 +1,113 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: influxdb
+  title: InfluxDB
+  tagline: A time series database for metrics, events and sensor data
+  description: |
+    InfluxDB is built for time-stamped data - metrics, events, IoT readings - with fast
+    ingestion, retention policies and queries shaped around time.
+
+    **This template sets up**
+
+    - an initial user, organization and bucket
+    - an administrator API token
+    - a persistent data volume
+    - a health check on the `/health` endpoint
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (8086)
+    and `HIVEPAAS_DATABASE_NAME` (the bucket). The administrator token is the same value as
+    `HIVEPAAS_PASSWORD`, so an app authenticates with `Authorization: Token PASSWORD`.
+    The organization is the one you choose below.
+
+    This is InfluxDB 2.
+  categories: [databases/time-series]
+  tags: [time-series, open-source]
+  aliases: [influx, tsdb]
+  icon: icons/influxdb.svg
+  links:
+    website: https://www.influxdata.com
+    documentation: https://docs.influxdata.com/influxdb/v2/
+    source: https://github.com/influxdata/influxdb
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z_][A-Za-z0-9_.-]{0,63}$'
+  - name: password
+    title: Password and API token
+    description: Also the administrator API token. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: org
+    title: Organization
+    type: string
+    default: app
+    pattern: '^[A-Za-z0-9_][A-Za-z0-9_ .-]{0,63}$'
+  - name: bucket
+    title: Bucket
+    type: string
+    default: app
+    pattern: '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "2.9"
+    release: "2.9.1"
+    default: true
+    image: influxdb:2.9.1-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/influxdb2: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS http://127.0.0.1:8086/health
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: influxdb
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.bucket }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: DOCKER_INFLUXDB_INIT_MODE, v: setup}
+        - {k: DOCKER_INFLUXDB_INIT_USERNAME, v: "${HIVEPAAS_USER}"}
+        - {k: DOCKER_INFLUXDB_INIT_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: DOCKER_INFLUXDB_INIT_ADMIN_TOKEN, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: DOCKER_INFLUXDB_INIT_ORG, v: "${{ params.org }}"}
+        - {k: DOCKER_INFLUXDB_INIT_BUCKET, v: "${HIVEPAAS_DATABASE_NAME}"}
+    routing:
+      port: 8086

@@ -1,0 +1,100 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: questdb
+  title: QuestDB
+  tagline: A fast time series database you query with SQL
+  description: |
+    QuestDB is a column-oriented time series database with SQL extensions for time, high
+    ingestion rates, and the PostgreSQL wire protocol for clients.
+
+    **This template sets up**
+
+    - a user with a generated password for the PostgreSQL protocol and the web console
+    - a persistent data volume
+    - a health check on the health endpoint
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with any PostgreSQL client using
+    `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (8812), `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`, database
+    `qdb`. The REST API and web console listen on port 9000, InfluxDB line protocol on 9009.
+  categories: [databases/time-series, databases/sql]
+  tags: [time-series, sql, open-source]
+  aliases: [tsdb]
+  icon: icons/questdb.svg
+  links:
+    website: https://questdb.com
+    documentation: https://questdb.com/docs/
+    source: https://github.com/questdb/questdb
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "10.0"
+    release: "10.0.1"
+    default: true
+    image: questdb/questdb:10.0.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/questdb: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The minimal health server, on by default at 9003. It asks for the HTTP credentials
+        # once they are set, so the check sends them; the shell expands them in the container.
+        command: curl -fsS -o /dev/null -u "$QDB_HTTP_USER:$QDB_HTTP_PASSWORD" http://127.0.0.1:9003
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: questdb
+      version: "${{ version.name }}"
+      database:
+        dbName: qdb
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: QDB_PG_USER, v: "${HIVEPAAS_USER}"}
+        - {k: QDB_PG_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: QDB_HTTP_USER, v: "${HIVEPAAS_USER}"}
+        - {k: QDB_HTTP_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: QDB_TELEMETRY_ENABLED, v: "false"}
+    routing:
+      port: 8812

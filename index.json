@@ -16,7 +16,27 @@
         },
         {
           "id": "cache",
-          "title": "Cache & Queues"
+          "title": "Cache"
+        },
+        {
+          "id": "time-series",
+          "title": "Time Series"
+        },
+        {
+          "id": "analytics",
+          "title": "Analytics"
+        },
+        {
+          "id": "search",
+          "title": "Search"
+        },
+        {
+          "id": "vector",
+          "title": "Vector"
+        },
+        {
+          "id": "messaging",
+          "title": "Messaging"
         }
       ]
     },
@@ -79,9 +99,167 @@
     {
       "id": "mysql-compatible",
       "title": "MySQL Compatible"
+    },
+    {
+      "id": "document",
+      "title": "Document"
+    },
+    {
+      "id": "json",
+      "title": "JSON"
+    },
+    {
+      "id": "graph",
+      "title": "Graph"
+    },
+    {
+      "id": "time-series",
+      "title": "Time Series"
+    },
+    {
+      "id": "analytics",
+      "title": "Analytics"
+    },
+    {
+      "id": "olap",
+      "title": "OLAP"
+    },
+    {
+      "id": "search",
+      "title": "Search"
+    },
+    {
+      "id": "full-text",
+      "title": "Full-text Search"
+    },
+    {
+      "id": "vector",
+      "title": "Vector"
+    },
+    {
+      "id": "ai",
+      "title": "AI"
+    },
+    {
+      "id": "messaging",
+      "title": "Messaging"
+    },
+    {
+      "id": "amqp",
+      "title": "AMQP"
     }
   ],
   "templates": [
+    {
+      "name": "clickhouse",
+      "file": {
+        "path": "templates/clickhouse.yaml",
+        "sha256": "c323c8ffe2f59c288e850d548099ab2ff8c77f1ba7054a6f3d922b68bef873a9"
+      },
+      "icon": {
+        "path": "icons/clickhouse.svg",
+        "sha256": "17ae24f211b2568d7a2e1f6ff7dab8fee90f1fe4c5f7c69efa694825f3f9d882"
+      },
+      "title": "ClickHouse",
+      "tagline": "A column-oriented database for real-time analytics",
+      "categories": [
+        "databases/analytics",
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "analytics",
+        "olap",
+        "open-source"
+      ],
+      "aliases": [
+        "ch",
+        "clickhouse-server"
+      ],
+      "versions": [
+        {
+          "name": "26.8",
+          "release": "26.8.2.7",
+          "default": true
+        },
+        {
+          "name": "26.3",
+          "release": "26.3.33.24"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "couchdb",
+      "file": {
+        "path": "templates/couchdb.yaml",
+        "sha256": "88c2b56a01c928c20152d93c39cc1514b7a091dc8a0e44d83c724b9052d37bda"
+      },
+      "icon": {
+        "path": "icons/couchdb.svg",
+        "sha256": "4eb1b20248c263d556c6a35706bb63be990734200bb3ff41591be6edb6c13822"
+      },
+      "title": "CouchDB",
+      "tagline": "A document database that speaks HTTP and replicates anywhere",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "document",
+        "json",
+        "open-source"
+      ],
+      "aliases": [
+        "couch",
+        "apache-couchdb"
+      ],
+      "versions": [
+        {
+          "name": "3.5",
+          "release": "3.5.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "influxdb",
+      "file": {
+        "path": "templates/influxdb.yaml",
+        "sha256": "73c4bea0cdbcfcce5e11ccc0106cdb13b01d27ab6cfbf9e638142ff24ee3e42a"
+      },
+      "icon": {
+        "path": "icons/influxdb.svg",
+        "sha256": "94a315c7f9c244f13773ca52904565dca76b2f13e75924428582fd3fd121e36a"
+      },
+      "title": "InfluxDB",
+      "tagline": "A time series database for metrics, events and sensor data",
+      "categories": [
+        "databases/time-series"
+      ],
+      "tags": [
+        "time-series",
+        "open-source"
+      ],
+      "aliases": [
+        "influx",
+        "tsdb"
+      ],
+      "versions": [
+        {
+          "name": "2.9",
+          "release": "2.9.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
     {
       "name": "mariadb",
       "file": {
@@ -115,6 +293,145 @@
         {
           "name": "11.4",
           "release": "11.4.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "meilisearch",
+      "file": {
+        "path": "templates/meilisearch.yaml",
+        "sha256": "c86dc1f36525e4b9dc6cfe1c203b9894f567ee5525771dac9e05457bbf29e575"
+      },
+      "icon": {
+        "path": "icons/meilisearch.svg",
+        "sha256": "151fe00c28452eae767f56ca6341d57d664b89e9ba35d9f1e6bf4459d0d4f7bf"
+      },
+      "title": "Meilisearch",
+      "tagline": "A lightning-fast search engine with typo tolerance out of the box",
+      "categories": [
+        "databases/search"
+      ],
+      "tags": [
+        "search",
+        "full-text",
+        "open-source"
+      ],
+      "aliases": [
+        "meili"
+      ],
+      "versions": [
+        {
+          "name": "1.53",
+          "release": "1.53.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mongodb",
+      "file": {
+        "path": "templates/mongodb.yaml",
+        "sha256": "61aa666f4b99592442a630efdd5dafc0ae72e6ca5f7087382bfc518045c5bf0b"
+      },
+      "icon": {
+        "path": "icons/mongodb.svg",
+        "sha256": "c3a8b4afaf139f553f18e07147bef928b1340a4ed4860e18d165083d795f12f1"
+      },
+      "title": "MongoDB",
+      "tagline": "A document database with flexible JSON-like documents",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "document",
+        "json"
+      ],
+      "aliases": [
+        "mongo"
+      ],
+      "versions": [
+        {
+          "name": "8.0",
+          "release": "8.0.32",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mysql",
+      "file": {
+        "path": "templates/mysql.yaml",
+        "sha256": "ef021810dc20ca37908015383986b811c61be69cb504adb9c7ee89a663907896"
+      },
+      "icon": {
+        "path": "icons/mysql.svg",
+        "sha256": "2193c557fafd1107b247cdb0e0abf959ed98542a80d87718dfdc8683b25a4680"
+      },
+      "title": "MySQL",
+      "tagline": "The world's most widely used open source relational database",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "mysql-server"
+      ],
+      "versions": [
+        {
+          "name": "8.4",
+          "release": "8.4.11",
+          "default": true
+        },
+        {
+          "name": "9.7",
+          "release": "9.7.2"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "neo4j",
+      "file": {
+        "path": "templates/neo4j.yaml",
+        "sha256": "8e6c760e78225afab623bff1999ab1bbf2182c8609ea29c4309d18acf079bb82"
+      },
+      "icon": {
+        "path": "icons/neo4j.svg",
+        "sha256": "4363514c42903e6b2d4a3b01c6ab41ecee1b3069d48298f3b095a19e69d1a735"
+      },
+      "title": "Neo4j",
+      "tagline": "A graph database for connected data, queried with Cypher",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "graph",
+        "open-source"
+      ],
+      "aliases": [
+        "cypher",
+        "graph-database"
+      ],
+      "versions": [
+        {
+          "name": "5.26",
+          "release": "5.26.30",
+          "default": true
         }
       ],
       "requires": {
@@ -180,6 +497,113 @@
             "alpine",
             "debian"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "qdrant",
+      "file": {
+        "path": "templates/qdrant.yaml",
+        "sha256": "87eb574c09ce20b9fb0adf2a083b261ec2b3e7624ba158660dc877821e315012"
+      },
+      "icon": {
+        "path": "icons/qdrant.svg",
+        "sha256": "c68a7124c2bee1ff3e8114161e5399ab9fa47fcb9b5d5a47c34df18085fb1fcd"
+      },
+      "title": "Qdrant",
+      "tagline": "A vector database for similarity search and AI applications",
+      "categories": [
+        "databases/vector"
+      ],
+      "tags": [
+        "vector",
+        "ai",
+        "search",
+        "open-source"
+      ],
+      "aliases": [
+        "vector-database",
+        "embeddings"
+      ],
+      "versions": [
+        {
+          "name": "1.19",
+          "release": "1.19.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "questdb",
+      "file": {
+        "path": "templates/questdb.yaml",
+        "sha256": "965bab4e62468b30e80a5a8846d20adf54f169f702a869192a2b51f2824fcfeb"
+      },
+      "icon": {
+        "path": "icons/questdb.svg",
+        "sha256": "0b378a72decd54821ea32810738dd6f83cbb3926931a1e27405f3da038f4adab"
+      },
+      "title": "QuestDB",
+      "tagline": "A fast time series database you query with SQL",
+      "categories": [
+        "databases/time-series",
+        "databases/sql"
+      ],
+      "tags": [
+        "time-series",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "tsdb"
+      ],
+      "versions": [
+        {
+          "name": "10.0",
+          "release": "10.0.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "rabbitmq",
+      "file": {
+        "path": "templates/rabbitmq.yaml",
+        "sha256": "ff401e1f54564d33d78973cd599cb5ca9b93c4d4dab606c6d270f47a7184e185"
+      },
+      "icon": {
+        "path": "icons/rabbitmq.svg",
+        "sha256": "f232ebcb1d0edc6ea9b005a966679c4aa0a74dfeb1567e1df52470e2619d71f4"
+      },
+      "title": "RabbitMQ",
+      "tagline": "A reliable message broker for queues, routing and pub/sub",
+      "categories": [
+        "databases/messaging"
+      ],
+      "tags": [
+        "messaging",
+        "amqp",
+        "open-source"
+      ],
+      "aliases": [
+        "rabbit",
+        "message-broker",
+        "amqp-broker"
+      ],
+      "versions": [
+        {
+          "name": "4.3",
+          "release": "4.3.6",
+          "default": true
         }
       ],
       "requires": {

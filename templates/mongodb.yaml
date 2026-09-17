@@ -1,0 +1,114 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mongodb
+  title: MongoDB
+  tagline: A document database with flexible JSON-like documents
+  description: |
+    MongoDB stores data as flexible, JSON-like documents, so fields can vary from document
+    to document and the structure can change over time.
+
+    **This template sets up**
+
+    - an administrative user with a generated password
+    - a persistent data volume
+    - a health check with `mongosh`
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (27017),
+    `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`, authenticating against the `admin` database:
+    `mongodb://USER:PASSWORD@HOST:27017/DATABASE?authSource=admin`.
+
+    The shared user is the administrative user. Creating a separate, less privileged user for
+    an app needs an initialization script, which templates cannot carry yet - create one from
+    `mongosh` if the app should not run as the administrator.
+
+    **Storage.** MongoDB runs as a non-root user and its storage engine opens data files only
+    as their owner, so the data volume must keep file ownership: a local disk, a Docker volume,
+    or NFS without `root_squash`. A bind mount that presents every file as root-owned - Docker
+    Desktop on macOS does - lets MongoDB start once and fails every start after that.
+
+    MongoDB is published under the Server Side Public License.
+  categories: [databases/nosql]
+  tags: [document, json]
+  aliases: [mongo]
+  icon: icons/mongodb.svg
+  links:
+    website: https://www.mongodb.com
+    documentation: https://www.mongodb.com/docs/manual/
+    source: https://github.com/mongodb/mongo
+  license: SSPL-1.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    description: The database apps are pointed at. MongoDB creates it on the first write.
+    type: string
+    default: app
+    pattern: '^[A-Za-z0-9_-]{1,63}$'
+  - name: username
+    title: Administrator username
+    type: string
+    default: root
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: password
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "8.0"
+    release: "8.0.32"
+    default: true
+    image: mongo:8.0.32-noble
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data/db: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: >-
+          mongosh --quiet --norc --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'
+        interval: 10s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mongodb
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: MONGO_INITDB_ROOT_USERNAME, v: "${HIVEPAAS_USER}"}
+        - {k: MONGO_INITDB_ROOT_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: MONGO_INITDB_DATABASE, v: "${HIVEPAAS_DATABASE_NAME}"}
+    routing:
+      port: 27017
