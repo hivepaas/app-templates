@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wordpress
+  title: WordPress
+  tagline: The publishing platform behind a large share of the web
+  description: |
+    WordPress runs blogs, company sites and shops, extended by tens of thousands of themes and
+    plugins.
+
+    **This template creates two apps**
+
+    - **WordPress**, on a volume for its code, themes, plugins and uploads
+    - **a MySQL database** for it, named after the app with `-db` added - `blog-db` for an app
+      called `blog` - with generated credentials
+
+    The two are wired together through environment references, so the database password is
+    never copied into WordPress's settings. Open the app's address after the first deployment
+    to run the installer.
+
+    **Deleting**
+
+    Deleting the WordPress app leaves its database where it is: it holds your content, and a
+    click aimed at one app should not destroy another's data. Delete the database separately
+    once you no longer need it.
+
+    **Starting up**
+
+    WordPress may start before its database accepts connections. It answers with a database
+    error until then, fails its health check, and is restarted until the database is ready -
+    usually within a minute of creating both.
+  categories: [webapps/cms]
+  tags: [cms, open-source]
+  aliases: [wp]
+  icon: icons/wordpress.svg
+  links:
+    website: https://wordpress.org
+    documentation: https://wordpress.org/documentation/
+    source: https://github.com/WordPress/WordPress
+  license: GPL-2.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Site files
+    description: The volume WordPress keeps its code, themes, plugins and uploads on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mysql
+    version: "8.4"
+    params:
+      dbName: wordpress
+      username: wordpress
+
+versions:
+  - name: "7.1"
+    release: "7.1.0"
+    default: true
+    image: wordpress:7.1.0-php8.2-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Before installation this redirects to the installer, which curl -f accepts;
+        # without a database WordPress answers 500, which it does not.
+        command: curl -fsS -o /dev/null http://127.0.0.1/wp-login.php
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: wordpress
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: WORDPRESS_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: WORDPRESS_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: WORDPRESS_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: WORDPRESS_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+    routing:
+      port: 80

@@ -179,6 +179,10 @@
     {
       "id": "backup",
       "title": "Backup"
+    },
+    {
+      "id": "cms",
+      "title": "CMS"
     }
   ],
   "templates": [
@@ -1022,6 +1026,47 @@
         {
           "name": "8.1",
           "release": "8.1.10"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "wordpress",
+      "file": {
+        "path": "templates/wordpress.yaml",
+        "sha256": "10b9eae43c7b34c5efe3b76e6dc0b4940a9090c6a220dc8add234d0f7e141eb8"
+      },
+      "icon": {
+        "path": "icons/wordpress.svg",
+        "sha256": "0d45778b7cb89372dd4710f38874c5b87045a8bbc8aba5bb7f40fbaf5fcb8808"
+      },
+      "title": "WordPress",
+      "tagline": "The publishing platform behind a large share of the web",
+      "categories": [
+        "webapps/cms"
+      ],
+      "tags": [
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "wp"
+      ],
+      "license": "GPL-2.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mysql"
+        }
+      ],
+      "versions": [
+        {
+          "name": "7.1",
+          "release": "7.1.0",
+          "default": true
         }
       ],
       "requires": {

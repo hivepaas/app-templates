@@ -24,3 +24,4 @@ tags:
   - {id: object-storage, title: Object Storage}
   - {id: s3, title: S3}
   - {id: backup, title: Backup}
+  - {id: cms, title: CMS}

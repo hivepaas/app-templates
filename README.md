@@ -50,6 +50,37 @@ Placeholders are `${{ params.<name> }}`, `${{ version.name }}`,
 `${...}` references are HivePaaS's own environment variables and pass through
 untouched.
 
+## Dependencies
+
+A template can create other templates' apps alongside its own - a web app and its database:
+
+```yaml
+dependencies:
+  - name: db              # the role, and the suffix of the app name: blog-db
+    title: Database
+    template: mysql       # a template in this repository
+    version: "8.4"        # optional
+    params:               # what this template fixes; the rest is defaulted or asked
+      dbName: wordpress
+```
+
+The app refers to what a dependency shares with `${{ deps.db.ref.HIVEPAAS_PASSWORD }}`, which
+renders to an ordinary reference, `${blog_db.HIVEPAAS_PASSWORD}`, resolved at deploy time.
+`${{ deps.db.key }}` is the dependency app's key alone.
+
+The rules, all checked by `apptemplate lint`:
+
+- at most three dependencies, one level deep - a dependency cannot have dependencies;
+- the named template, version, variant and parameters must exist in this repository;
+- `ref.` names only what the dependency's kind shares - a database shares `HIVEPAAS_USER`,
+  `HIVEPAAS_PASSWORD`, `HIVEPAAS_DATABASE_NAME` and `HIVEPAAS_SSL_MODE` besides the variables
+  every app shares;
+- `params` may use this template's parameters, but not its secrets.
+
+A dependency parameter the template does not fix, with no default, not optional and not a
+generated secret, is asked of the person creating the app - for a database, its data volume.
+Deleting the app never deletes its dependencies.
+
 ## Working on templates
 
 The tool lives in the [hivepaas](https://github.com/hivepaas/hivepaas) repository,
