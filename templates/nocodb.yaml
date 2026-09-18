@@ -1,0 +1,117 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: nocodb
+  title: NocoDB
+  tagline: A spreadsheet over a real database, with forms, views and an API
+  description: |
+    NocoDB turns a database into something a team can work in: grid, gallery, kanban and
+    calendar views over the same tables, forms to collect rows, and a REST API over
+    everything. Tables it creates are ordinary SQL tables, and it can also be pointed at a
+    database that already exists.
+
+    **This template creates two apps**
+
+    - **NocoDB**, on a volume for uploaded attachments
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    That database holds NocoDB's own bases and its metadata. To work on data that lives
+    somewhere else, add the other database as a connection from inside NocoDB - the app key
+    of a database app in this project is its host name.
+
+    **After the first deployment**
+
+    Open the app and create the first account. It becomes the super administrator, and
+    whoever gets there first takes it, so do not leave the page for someone else.
+
+    **Backups are the database and the volume**
+
+    Everything except attachments is in PostgreSQL, so both the database app and the volume
+    are what there is to back up.
+  categories: [webapps/low-code]
+  tags: [low-code, spreadsheet, sql, open-source]
+  aliases: [airtable, spreadsheet, baserow]
+  icon: icons/nocodb.svg
+  links:
+    website: https://nocodb.com
+    documentation: https://docs.nocodb.com
+    source: https://github.com/nocodb/nocodb
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: jwtSecret
+    title: Token secret
+    description: What signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded attachments are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: nocodb
+      username: nocodb
+
+versions:
+  - name: "2026.09"
+    release: "2026.09.0"
+    default: true
+    image: nocodb/nocodb:2026.09.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /usr/app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: nocodb
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # NocoDB takes its metadata database as one connection string. Generated passwords
+        # are letters and digits only, so nothing here needs escaping.
+        - k: NC_DB
+          v: >-
+            pg://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}?u=${{
+            deps.db.ref.HIVEPAAS_USER }}&p=${{ deps.db.ref.HIVEPAAS_PASSWORD }}&d=${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: NC_AUTH_JWT_SECRET, v: "${secrets.NC_AUTH_JWT_SECRET}"}
+        # Telemetry is off unless somebody turns it on.
+        - {k: NC_DISABLE_TELE, v: "true"}
+    secrets:
+      NC_AUTH_JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 8080

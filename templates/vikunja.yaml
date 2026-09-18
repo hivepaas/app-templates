@@ -1,0 +1,128 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: vikunja
+  title: Vikunja
+  tagline: Lists, kanban boards, gantt and a calendar over the same set of tasks
+  description: |
+    Vikunja keeps to-do lists the way you want to look at them: the same tasks as a list, a
+    kanban board, a table, a gantt chart or a calendar. Tasks take labels, assignees,
+    reminders, attachments and sub-tasks, and projects can be shared with a team or linked
+    to a calendar app over CalDAV.
+
+    **This template creates two apps**
+
+    - **Vikunja**, on a volume for the files people attach to tasks
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Registration is open so that you can create the first account, and there is no owner to
+    claim - whoever registers first is simply the first user. Create yours, then set
+    "Registration" to closed in this app's settings if it is not meant to be public.
+
+    **Email**
+
+    Reminders and invitations need an SMTP server, which this template does not set up.
+    Until you configure one under `VIKUNJA_MAILER_` environment variables, Vikunja sends
+    nothing. The links in those messages are built from `VIKUNJA_SERVICE_PUBLICURL`, so add
+    that too, with the full address, once the app has a domain.
+  categories: [webapps/project-management]
+  tags: [tasks, project-management, open-source]
+  aliases: [todo, tasks, kanban]
+  icon: icons/vikunja.svg
+  links:
+    website: https://vikunja.io
+    documentation: https://vikunja.io/docs/
+    source: https://code.vikunja.io/vikunja
+  license: AGPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: jwtSecret
+    title: Token secret
+    description: What signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: registration
+    title: Registration
+    description: Leave open until you have created your account, then close it.
+    type: select
+    default: "true"
+    options:
+      - {value: "true", title: "Open - anybody who reaches the app can register"}
+      - {value: "false", title: "Closed - no new accounts"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the files attached to tasks are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: vikunja
+      username: vikunja
+
+versions:
+  - name: "2.6"
+    release: "2.6.0"
+    default: true
+    image: vikunja/vikunja:2.6.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/vikunja/files: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image holds the Vikunja binary and nothing else - no shell, no curl - so the
+        # check is an argv rather than a shell line, and it is Vikunja checking itself.
+        mode: CMD
+        command: /app/vikunja/vikunja healthcheck
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: vikunja
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: VIKUNJA_DATABASE_TYPE, v: postgres}
+        - {k: VIKUNJA_DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: VIKUNJA_DATABASE_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: VIKUNJA_DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: VIKUNJA_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: VIKUNJA_FILES_BASEPATH, v: /app/vikunja/files}
+        - {k: VIKUNJA_SERVICE_ENABLEREGISTRATION, v: "${{ params.registration }}"}
+        - {k: VIKUNJA_SERVICE_SECRET, v: "${secrets.VIKUNJA_SERVICE_SECRET}"}
+        # The image serves the web app and the API from one address, so nothing is ever
+        # asked for across origins. Vikunja refuses to start with CORS on and no public URL
+        # configured, and the public URL is not known until the app has a domain.
+        - {k: VIKUNJA_CORS_ENABLE, v: "false"}
+    secrets:
+      VIKUNJA_SERVICE_SECRET:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 3456

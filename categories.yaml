@@ -21,6 +21,8 @@ categories:
       - {id: knowledge, title: Wikis & Notes}
       - {id: cms, title: CMS & Blogging}
       - {id: security, title: Identity & Passwords}
+      - {id: project-management, title: Projects & Tasks}
+      - {id: low-code, title: Low-Code & Databases}
   - id: observability
     title: Observability
     children:

@@ -67,6 +67,14 @@
         {
           "id": "security",
           "title": "Identity & Passwords"
+        },
+        {
+          "id": "project-management",
+          "title": "Projects & Tasks"
+        },
+        {
+          "id": "low-code",
+          "title": "Low-Code & Databases"
         }
       ]
     },
@@ -247,6 +255,30 @@
     {
       "id": "privacy",
       "title": "Privacy"
+    },
+    {
+      "id": "tasks",
+      "title": "Tasks"
+    },
+    {
+      "id": "project-management",
+      "title": "Project Management"
+    },
+    {
+      "id": "low-code",
+      "title": "Low-Code"
+    },
+    {
+      "id": "spreadsheet",
+      "title": "Spreadsheet"
+    },
+    {
+      "id": "email",
+      "title": "Email"
+    },
+    {
+      "id": "testing",
+      "title": "Testing"
     }
   ],
   "templates": [
@@ -605,6 +637,43 @@
       }
     },
     {
+      "name": "mailpit",
+      "file": {
+        "path": "templates/mailpit.yaml",
+        "sha256": "a6237e79e7230911091d0f293e648f772b06423563e68904f895a113c150af2f"
+      },
+      "icon": {
+        "path": "icons/mailpit.svg",
+        "sha256": "f827c83ede076cd3eb25bec3c831a2f92723cc83e0858bcf6e720dd636dbc9e9"
+      },
+      "title": "Mailpit",
+      "tagline": "Catches the mail your apps send so you can read it instead of delivering it",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "email",
+        "testing",
+        "open-source"
+      ],
+      "aliases": [
+        "mailhog",
+        "smtp",
+        "mail-catcher"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.31",
+          "release": "1.31.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mariadb",
       "file": {
         "path": "templates/mariadb.yaml",
@@ -856,6 +925,51 @@
         {
           "name": "5.26",
           "release": "5.26.30",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "nocodb",
+      "file": {
+        "path": "templates/nocodb.yaml",
+        "sha256": "54334f012c76a70dd6a9ebd21a579e7471d7b5ae17a2e91533bb94ca90d66f6d"
+      },
+      "icon": {
+        "path": "icons/nocodb.svg",
+        "sha256": "0028d168816c4944d8e481e54ef19f29b4942030b9f2ccc08c7260add0a312f1"
+      },
+      "title": "NocoDB",
+      "tagline": "A spreadsheet over a real database, with forms, views and an API",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "spreadsheet",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "airtable",
+        "spreadsheet",
+        "baserow"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.09",
+          "release": "2026.09.0",
           "default": true
         }
       ],
@@ -1484,6 +1598,50 @@
         {
           "name": "1.37",
           "release": "1.37.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "vikunja",
+      "file": {
+        "path": "templates/vikunja.yaml",
+        "sha256": "388990e25f44169c612634dde1f2805962788b52fa674455d25cf44109e8eccc"
+      },
+      "icon": {
+        "path": "icons/vikunja.svg",
+        "sha256": "eeac55a58e38c7ec501df4f31a72b354f240d60a381675fcc4f019573263109a"
+      },
+      "title": "Vikunja",
+      "tagline": "Lists, kanban boards, gantt and a calendar over the same set of tasks",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "tasks",
+        "project-management",
+        "open-source"
+      ],
+      "aliases": [
+        "todo",
+        "tasks",
+        "kanban"
+      ],
+      "license": "AGPL-3.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.0",
           "default": true
         }
       ],

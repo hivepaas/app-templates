@@ -38,3 +38,9 @@ tags:
   - {id: uptime, title: Uptime}
   - {id: web-analytics, title: Web Analytics}
   - {id: privacy, title: Privacy}
+  - {id: tasks, title: Tasks}
+  - {id: project-management, title: Project Management}
+  - {id: low-code, title: Low-Code}
+  - {id: spreadsheet, title: Spreadsheet}
+  - {id: email, title: Email}
+  - {id: testing, title: Testing}

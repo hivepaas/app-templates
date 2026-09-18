@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mailpit
+  title: Mailpit
+  tagline: Catches the mail your apps send so you can read it instead of delivering it
+  description: |
+    Mailpit is an SMTP server that accepts everything and delivers nothing. Point an app at
+    it and every message it would have sent - password resets, invitations, newsletters -
+    lands in a web inbox you can read, search, and check for broken HTML or spam scoring.
+
+    **Pointing an app at it**
+
+    Other apps in this project reach it by this app's key on port 1025, with no
+    authentication and no TLS:
+
+    ```
+    host: <this app's key>
+    port: 1025
+    ```
+
+    So a Ghost or a Wiki.js next to it gets working email in development without a mail
+    provider, and without any risk of a test message reaching a real person.
+
+    **Read the inbox with a password**
+
+    The web inbox holds whatever those apps send, which includes password-reset links, so
+    this template puts it behind a username and password. They are in this app's settings;
+    the password is under Secrets as `MP_UI_PASSWORD`.
+
+    **Not for production mail**
+
+    Nothing Mailpit accepts is ever delivered. It is for development and staging - an app
+    that has to send real mail needs a real provider.
+  categories: [webapps/dev-tools]
+  tags: [email, testing, open-source]
+  aliases: [mailhog, smtp, mail-catcher]
+  icon: icons/mailpit.svg
+  links:
+    website: https://mailpit.axllent.org
+    documentation: https://mailpit.axllent.org/docs/
+    source: https://github.com/axllent/mailpit
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: uiUsername
+    title: Inbox username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: uiPassword
+    title: Inbox password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: maxMessages
+    title: Keep at most
+    description: The oldest messages are dropped once the inbox is this long.
+    type: select
+    default: "500"
+    options:
+      - {value: "500", title: "500 messages"}
+      - {value: "2000", title: "2000 messages"}
+      - {value: "10000", title: "10000 messages"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 64MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the caught messages are kept on.
+    type: volume
+
+versions:
+  - name: "1.31"
+    release: "1.31.1"
+    default: true
+    image: axllent/mailpit:v1.31.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image holds the Mailpit binary and nothing else, and it can answer for
+        # itself, which is what the image's own check does too.
+        mode: CMD
+        command: /mailpit readyz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mailpit
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Without this the messages are only in memory, and a restart loses the inbox.
+        - {k: MP_DATABASE, v: /data/mailpit.db}
+        - {k: MP_MAX_MESSAGES, v: "${{ params.maxMessages }}"}
+        # Basic authentication on the web inbox. The SMTP port stays open to the project
+        # network, which is what the apps sending to it need.
+        - {k: MP_UI_AUTH, v: "${{ params.uiUsername }}:${secrets.MP_UI_PASSWORD}"}
+    secrets:
+      MP_UI_PASSWORD:
+        value: "${{ params.uiPassword }}"
+    routing:
+      port: 8025
