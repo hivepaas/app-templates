@@ -1,0 +1,106 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: adminer
+  title: Adminer
+  tagline: One small page for browsing any database in the project
+  description: |
+    Adminer is a database client in a single page: tables, rows, indexes, a SQL console,
+    import and export. It speaks PostgreSQL, MySQL and MariaDB, SQLite, MongoDB,
+    Elasticsearch and more, so one small app covers every database you run here.
+
+    **This template sets up**
+
+    - Adminer on its own, with nothing to configure and nothing to store
+    - the server field filled in with whatever you put in "Default server"
+    - a memory limit you choose
+
+    **Signing in**
+
+    Adminer has no accounts of its own: you sign in with a database's own credentials. For an
+    app in this project, the server is `<the database app's key>` - a port only if it is not
+    the usual one - and the username, password and database are that app's, under its
+    Secrets.
+
+    **Think before you give it a domain**
+
+    On a domain it is a database console on the internet, and its only lock is the database
+    password behind it. Left without one it is reachable from inside the project - which,
+    since the databases are too, is usually where you want it. If you do publish it, put
+    basic authentication in front of it in the app's routing settings.
+
+    **It keeps nothing**
+
+    No volume, no database, no history. Delete it and nothing is lost; create it again when
+    you next need it.
+  categories: [webapps/dev-tools]
+  tags: [sql, open-source]
+  aliases: [phpmyadmin, database-client, sql-console, dbadmin]
+  icon: icons/adminer.svg
+  links:
+    website: https://www.adminer.org
+    documentation: https://www.adminer.org/en/
+    source: https://github.com/adminerevo/adminerevo
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leaving it empty keeps the console inside the
+      project, which is where the databases are.
+    type: domain
+    optional: true
+  - name: defaultServer
+    title: Default server
+    description: >-
+      Fills in the server field on the sign-in page - the app key of the database you open
+      most. Leave it as it is to type the server each time.
+    type: string
+    optional: true
+    pattern: '^[A-Za-z0-9._:-]{1,120}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "6.0"
+    release: "6.0.1"
+    default: true
+    image: adminer:6.0.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: adminer
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ADMINER_DEFAULT_SERVER, v: "${{ params.defaultServer }}"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

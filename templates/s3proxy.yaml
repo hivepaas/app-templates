@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: s3proxy
+  title: S3Proxy
+  tagline: An S3 API in front of a plain volume
+  description: |
+    S3Proxy speaks the S3 API and keeps the objects as ordinary files on a volume. Apps that
+    can only talk to S3 - and many can only talk to S3 - get an endpoint in this project
+    without an account anywhere, and what they store stays a directory tree you can look at,
+    copy or back up with anything.
+
+    **This template sets up**
+
+    - the S3 endpoint on port 80, with a generated access key and secret
+    - the objects on a volume you choose, a directory per bucket
+    - a memory limit you choose
+
+    **Connecting**
+
+    Another app in the same environment uses `http://<this app's key>:80` as its endpoint,
+    with the key as `HIVEPAAS_USER` and the secret as `HIVEPAAS_PASSWORD`. Almost every
+    client needs **path-style** addressing turned on - `s3.forcePathStyle`,
+    `--addressing-style path`, `AWS_S3_FORCE_PATH_STYLE=true` - because a bucket cannot be a
+    subdomain of an app key. The region can be anything; `us-east-1` is the safe answer.
+
+    **What it is and is not**
+
+    It is an adapter, not a storage system: no replication, no erasure coding, no versioning,
+    no lifecycle rules, no web console. It stores what you send on one volume, and if the
+    volume is gone so is the data. For a backup destination, a media store or an app that
+    insists on S3, that is usually the whole requirement.
+
+    **One thing clients trip on**
+
+    An upload whose length is not known in advance - a stream piped into the client, which
+    sends it as a chunked signed body - is refused. Ordinary uploads, of a file or of bytes
+    in memory, work. If a client fails only when piping, give it a file.
+  categories: [storage/object-storage]
+  tags: [object-storage, s3, open-source]
+  aliases: [minio-alternative, buckets, object-store]
+  icon: icons/s3proxy.svg
+  links:
+    website: https://github.com/gaul/s3proxy
+    documentation: https://github.com/gaul/s3proxy/blob/master/README.md
+    source: https://github.com/gaul/s3proxy
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: accessKey
+    title: Access key
+    description: The identity clients send. Leave empty to generate one.
+    type: string
+    default: hivepaas
+    pattern: '^[A-Za-z0-9._-]{3,64}$'
+  - name: secretKey
+    title: Secret key
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 40}
+  - name: memoryLimit
+    title: Memory limit
+    description: It runs on the JVM, which wants a little room even when idle.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the buckets and their objects are kept on.
+    type: volume
+
+versions:
+  - name: "4.1"
+    release: "4.1.1"
+    default: true
+    image: andrewgaul/s3proxy:4.1.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither curl nor wget, so bash speaks HTTP over /dev/tcp. An
+        # unsigned request is answered 403 by a server that is up, and by nothing at all by
+        # one that is not.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/80 &&
+          printf "GET / HTTP/1.0\r\n\r\n" >&3 && head -n 1 <&3 | grep -q " 403 "'
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: s3proxy
+      version: "${{ version.name }}"
+      database:
+        username: "${{ params.accessKey }}"
+        password: "${{ params.secretKey }}"
+    envVars:
+      data:
+        - {k: S3PROXY_ENDPOINT, v: "http://0.0.0.0:80"}
+        - {k: S3PROXY_AUTHORIZATION, v: aws-v4}
+        - {k: S3PROXY_IDENTITY, v: "${HIVEPAAS_USER}"}
+        - {k: S3PROXY_CREDENTIAL, v: "${HIVEPAAS_PASSWORD}"}
+        # The objects are files under this directory, one directory per bucket.
+        - {k: JCLOUDS_PROVIDER, v: filesystem}
+        - {k: JCLOUDS_FILESYSTEM_BASEDIR, v: /data}
+    routing:
+      port: 80

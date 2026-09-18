@@ -323,6 +323,43 @@
   ],
   "templates": [
     {
+      "name": "adminer",
+      "file": {
+        "path": "templates/adminer.yaml",
+        "sha256": "dfcb5624672e72e011a681b7d18bfc5b68c764fb18d2a518497589b01eec1a08"
+      },
+      "icon": {
+        "path": "icons/adminer.svg",
+        "sha256": "a64e18a15879420e9d70700b328f5f91715b35f9467e917ceb6efacb0cd40b34"
+      },
+      "title": "Adminer",
+      "tagline": "One small page for browsing any database in the project",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "phpmyadmin",
+        "database-client",
+        "sql-console",
+        "dbadmin"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "6.0",
+          "release": "6.0.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "anythingllm",
       "file": {
         "path": "templates/anythingllm.yaml",
@@ -1831,6 +1868,45 @@
       }
     },
     {
+      "name": "node-red",
+      "file": {
+        "path": "templates/node-red.yaml",
+        "sha256": "52a8431ce17eb8e7d74e7e4443078113da9ad6c47b383433eeffafa16457f6ed"
+      },
+      "icon": {
+        "path": "icons/node-red.svg",
+        "sha256": "200050e90d7afdd33921b3bf5b10b8cd3b0417a652c85f9fa53ee49981a22e6f"
+      },
+      "title": "Node-RED",
+      "tagline": "Wires services together on a canvas, with code where you need it",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "flows",
+        "iot",
+        "mqtt",
+        "nodered",
+        "integration"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "4.1",
+          "release": "4.1.15",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "ntfy",
       "file": {
         "path": "templates/ntfy.yaml",
@@ -2375,6 +2451,43 @@
         {
           "name": "0.14",
           "release": "0.14.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "s3proxy",
+      "file": {
+        "path": "templates/s3proxy.yaml",
+        "sha256": "87c2144220b8bcb43303faee123702aff06669409f5a8167082f7047f3efba93"
+      },
+      "icon": {
+        "path": "icons/s3proxy.svg",
+        "sha256": "3763f4f1637a1e5752a7d473e2075ea64e55106bfaa11e703e12d5a9ab4ada1c"
+      },
+      "title": "S3Proxy",
+      "tagline": "An S3 API in front of a plain volume",
+      "categories": [
+        "storage/object-storage"
+      ],
+      "tags": [
+        "object-storage",
+        "s3",
+        "open-source"
+      ],
+      "aliases": [
+        "minio-alternative",
+        "buckets",
+        "object-store"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "4.1",
+          "release": "4.1.1",
           "default": true
         }
       ],

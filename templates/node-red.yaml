@@ -1,0 +1,167 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: node-red
+  title: Node-RED
+  tagline: Wires services together on a canvas, with code where you need it
+  description: |
+    Node-RED joins things that speak HTTP, MQTT, a database or a shell command by dragging
+    nodes onto a canvas and wiring them up. A webhook arrives, a flow reshapes it, a message
+    goes out - and where a wire is not enough, a function node is a few lines of JavaScript.
+    It is the quickest way to put logic between two systems without standing up a service for
+    it.
+
+    **This template sets up**
+
+    - the editor and the runtime on a volume, holding your flows and installed nodes
+    - a login for the editor, made from the username and password here
+    - a key that encrypts the credentials your flows store
+    - a memory limit you choose
+
+    **Reaching other apps**
+
+    Anything in the same environment is reachable by its app key:
+    `http://<its key>:<port>`. A flow can query a PostgreSQL app, publish to a NATS app, or
+    call a LiteLLM app - each with the node for it, installed from the palette.
+
+    **Flows run as soon as they are deployed**
+
+    There is no staging step: pressing Deploy in the editor makes the flow live. A flow that
+    sends email, spends money or writes to a database does so from that moment, which is
+    worth remembering when experimenting on a running system.
+
+    **The credential key matters**
+
+    Credentials inside flows are encrypted with the key here and stored next to the flows.
+    Changing it makes the stored ones unreadable and they have to be entered again; losing
+    the volume loses both.
+  categories: [webapps/automation]
+  tags: [automation, low-code, open-source]
+  aliases: [flows, iot, mqtt, nodered, integration]
+  icon: icons/node-red.svg
+  links:
+    website: https://nodered.org
+    documentation: https://nodered.org/docs/
+    source: https://github.com/node-red/node-red
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Editor username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Editor password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: credentialSecret
+    title: Credential key
+    description: >-
+      Encrypts the credentials your flows hold - changing it later makes them unreadable.
+      Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume flows, credentials and installed nodes are kept on.
+    type: volume
+
+versions:
+  - name: "4.1"
+    release: "4.1.15"
+    default: true
+    image: nodered/node-red:4.1.15-22
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The editor answers 401 without a session once a login is configured, so this asks
+        # for the page that is public either way.
+        command: curl -fsS -o /dev/null http://127.0.0.1:1880/auth/login
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: node-red
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NODE_RED_ADMIN_USER, v: "${{ params.adminUsername }}"}
+        - {k: NODE_RED_ADMIN_PASSWORD, v: "${secrets.NODE_RED_ADMIN_PASSWORD}"}
+        - {k: NODE_RED_CREDENTIAL_SECRET, v: "${secrets.NODE_RED_CREDENTIAL_SECRET}"}
+        - {k: TZ, v: UTC}
+    secrets:
+      NODE_RED_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      NODE_RED_CREDENTIAL_SECRET:
+        value: "${{ params.credentialSecret }}"
+    configFiles:
+      settings.js:
+        # Node-RED reads its settings as JavaScript, which is what makes a password from a
+        # parameter possible at all: it wants a bcrypt hash and nothing here can produce one,
+        # so the file hashes the plain password itself at every start, with the bcryptjs that
+        # Node-RED already carries. Without a password the editor would be open to whoever
+        # reaches it.
+        content: |
+          const bcrypt = require("bcryptjs");
+
+          const adminPassword = process.env.NODE_RED_ADMIN_PASSWORD || "";
+
+          module.exports = {
+              uiPort: process.env.PORT || 1880,
+              flowFile: "flows.json",
+              credentialSecret: process.env.NODE_RED_CREDENTIAL_SECRET,
+              adminAuth: adminPassword && {
+                  type: "credentials",
+                  users: [
+                      {
+                          username: process.env.NODE_RED_ADMIN_USER || "admin",
+                          password: bcrypt.hashSync(adminPassword, 8),
+                          permissions: "*",
+                      },
+                  ],
+              },
+              functionGlobalContext: {},
+              logging: {console: {level: "info", metrics: false, audit: false}},
+          };
+        swarmRef:
+          file: {name: /data/settings.js, mode: 444}
+    routing:
+      port: 1880
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
