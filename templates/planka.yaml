@@ -1,0 +1,166 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: planka
+  title: Planka
+  tagline: Boards, lists and cards for a team that wants them on its own server
+  description: |
+    Planka is a kanban board: projects with boards, lists of cards, labels, due dates,
+    checklists, attachments and comments, updated live for everyone looking at the same
+    board. It is the shape of work most teams already know, without an account somewhere else.
+
+    **This template creates two apps**
+
+    - **Planka** itself, with a volume for the files people attach to cards
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    Both are needed to restore it: the boards are in the database, the attachments are on the
+    volume.
+
+    **Your account is made at the first start**
+
+    The email and password here become the administrator, created before anybody can reach
+    the app. The password is under this app's Secrets, as `DEFAULT_ADMIN_PASSWORD`. Other
+    people get accounts from inside the app, under Users.
+
+    The first sign-in asks you to accept the terms before it lets you in - the password is
+    already right at that point, which is worth knowing if you are signing in from a script
+    rather than a browser and get "Terms acceptance required" back.
+
+    **The address has to be right**
+
+    Planka builds links, and the websocket the live updates arrive on, from the address you
+    give here - so it has to be the one people's browsers use.
+  categories: [webapps/project-management]
+  tags: [project-management, tasks, collaboration, open-source]
+  aliases: [kanban, board, trello, tasks]
+  icon: icons/planka.svg
+  links:
+    website: https://planka.app
+    documentation: https://docs.planka.cloud
+    source: https://github.com/plankanban/planka
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: baseUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://boards.example.com. Links and
+      live updates are built from it, so the default only works for other apps in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:1337
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email address
+    description: The account you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,32}$'
+  - name: adminName
+    title: Administrator display name
+    type: string
+    default: Admin
+    pattern: '^[^\n\r]{1,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: At least 8 characters. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: Signs the sessions people sign in with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume attachments, avatars and background images are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: planka
+      username: planka
+
+versions:
+  - name: "2.2"
+    release: "2.2.1"
+    default: true
+    image: ghcr.io/plankanban/planka:2.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image brings its own check, which asks the server over HTTP.
+        mode: CMD
+        command: node /app/healthcheck.js
+        interval: 15s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: planka
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: BASE_URL, v: "${{ params.baseUrl }}"}
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: DEFAULT_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: DEFAULT_ADMIN_PASSWORD, v: "${secrets.DEFAULT_ADMIN_PASSWORD}"}
+        - {k: DEFAULT_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: DEFAULT_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      DEFAULT_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 1337
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

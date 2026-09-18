@@ -773,6 +773,44 @@
       }
     },
     {
+      "name": "jaeger",
+      "file": {
+        "path": "templates/jaeger.yaml",
+        "sha256": "6c24bdcf4201c9cf0ba383e77914c1ae3814849abb14e6d23e1c2d41205a9545"
+      },
+      "icon": {
+        "path": "icons/jaeger.svg",
+        "sha256": "b40af8752029f2bfbc0335b64925207316b3f7147fdf31d6e5cd4e2ec18c84eb"
+      },
+      "title": "Jaeger",
+      "tagline": "Follows one request through every service it touched",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "tracing",
+        "traces",
+        "opentelemetry",
+        "otel",
+        "apm"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.21",
+          "release": "2.21.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "keycloak",
       "file": {
         "path": "templates/keycloak.yaml",
@@ -1584,6 +1622,52 @@
       }
     },
     {
+      "name": "planka",
+      "file": {
+        "path": "templates/planka.yaml",
+        "sha256": "23c7c002d67b5e5ff885af9b4f510558caf36a10f112998593d483a54c6670cf"
+      },
+      "icon": {
+        "path": "icons/planka.svg",
+        "sha256": "7164c35b0b1a406ea021127c7e0e8682b9e61f56c00f4a438a106e17c262c325"
+      },
+      "title": "Planka",
+      "tagline": "Boards, lists and cards for a team that wants them on its own server",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "project-management",
+        "tasks",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "kanban",
+        "board",
+        "trello",
+        "tasks"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.2",
+          "release": "2.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "plausible",
       "file": {
         "path": "templates/plausible.yaml",
@@ -2206,6 +2290,43 @@
         {
           "name": "1.37",
           "release": "1.37.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "verdaccio",
+      "file": {
+        "path": "templates/verdaccio.yaml",
+        "sha256": "65754af69237fbf90461122aff037b9d5a1408677ebb42bb62e70120c6a45688"
+      },
+      "icon": {
+        "path": "icons/verdaccio.svg",
+        "sha256": "3feead8ccfe21b794acde5e9f5e6b92be3e535d1d8e8f57895fb7cc626ec288b"
+      },
+      "title": "Verdaccio",
+      "tagline": "A private npm registry that caches the public one",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "npm",
+        "registry",
+        "packages",
+        "proxy",
+        "yarn"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "6.10",
+          "release": "6.10.3",
           "default": true
         }
       ],

@@ -1,0 +1,165 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jaeger
+  title: Jaeger
+  tagline: Follows one request through every service it touched
+  description: |
+    Jaeger collects traces: the record of one request as it moves through your services, with
+    a timing for every step. When something is slow and no single log line says why, a trace
+    shows which call took the time. Services send spans over OpenTelemetry, which most
+    languages have a library for.
+
+    **This template sets up**
+
+    - the collector accepting OpenTelemetry over gRPC (4317) and HTTP (4318)
+    - the query API and the web interface on 16686
+    - storage on a volume you choose, keeping traces for the period you pick
+    - a memory limit you choose
+
+    **Point your services at it**
+
+    Set `OTEL_EXPORTER_OTLP_ENDPOINT` to `http://<this app's key>:4318` in an app that should
+    be traced - or `http://<this app's key>:4317` for the gRPC exporter - and give it an
+    `OTEL_SERVICE_NAME`. Nothing appears in Jaeger until something sends a trace.
+
+    **No password, so keep it inside the project**
+
+    Jaeger has no authentication: whoever reaches the interface reads every trace, and traces
+    carry URLs, query parameters and whatever your code puts in a span. So this template does
+    not put it on a domain.
+
+    **One process, one volume**
+
+    Storage is Badger, an embedded key-value store on the volume, which suits a single server
+    and cannot be shared by two replicas. A larger deployment moves the traces to
+    Elasticsearch or Cassandra, which is a different configuration rather than a bigger
+    limit here.
+  categories: [observability/monitoring]
+  tags: [monitoring, open-source]
+  aliases: [tracing, traces, opentelemetry, otel, apm]
+  icon: icons/jaeger.svg
+  links:
+    website: https://www.jaegertracing.io
+    documentation: https://www.jaegertracing.io/docs/latest/
+    source: https://github.com/jaegertracing/jaeger
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: retention
+    title: Keep traces for
+    description: A trace older than this is dropped by the store itself.
+    type: select
+    default: 168h
+    options:
+      - {value: 24h, title: One day}
+      - {value: 168h, title: One week}
+      - {value: 720h, title: One month}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the traces are kept on.
+    type: volume
+
+versions:
+  - name: "2.21"
+    release: "2.21.0"
+    default: true
+    image: jaegertracing/jaeger:2.21.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the jaeger binary, so this is its flags. Without a
+      # config it runs everything in memory and loses the traces on every restart.
+      command: --config=file:/etc/jaeger/config.yaml
+    storage:
+      mounts:
+        /jaeger: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl and no wget of its own, but busybox has one. The endpoint belongs to the
+        # health extension in the configuration below.
+        command: busybox wget -q -O - http://127.0.0.1:13133/status | grep -q '"healthy":true'
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jaeger
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      config.yaml:
+        # Jaeger v2 is an OpenTelemetry collector: what it receives, where it puts it and
+        # what serves the interface are all pipelines and extensions here.
+        content: |
+          service:
+            extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+            pipelines:
+              traces:
+                receivers: [otlp]
+                processors: [batch]
+                exporters: [jaeger_storage_exporter]
+            telemetry:
+              metrics:
+                level: none
+
+          extensions:
+            healthcheckv2:
+              use_v2: true
+              http:
+                endpoint: 0.0.0.0:13133
+
+            jaeger_query:
+              storage:
+                traces: traces_store
+              http:
+                endpoint: 0.0.0.0:16686
+              grpc:
+                endpoint: 0.0.0.0:16685
+
+            jaeger_storage:
+              backends:
+                traces_store:
+                  badger:
+                    directories:
+                      keys: /jaeger/keys
+                      values: /jaeger/values
+                    ephemeral: false
+                    ttl:
+                      spans: ${{ params.retention }}
+
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                http:
+                  endpoint: 0.0.0.0:4318
+
+          processors:
+            batch: {}
+
+          exporters:
+            jaeger_storage_exporter:
+              trace_storage: traces_store
+        swarmRef:
+          file: {name: /etc/jaeger/config.yaml, mode: 444}
+    routing:
+      port: 16686

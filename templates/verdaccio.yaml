@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: verdaccio
+  title: Verdaccio
+  tagline: A private npm registry that caches the public one
+  description: |
+    Verdaccio is a small npm registry. Publish your own packages to it, and it passes
+    everything else through to npmjs.org and keeps a copy - so a build keeps working when the
+    public registry is slow, and a package that was unpublished upstream is still here.
+
+    **This template sets up**
+
+    - the registry on a volume, holding published packages, the cache and the accounts file
+    - accounts kept in an htpasswd file, with `npm adduser` allowed or refused as you choose
+    - publishing restricted to people with an account; reading left open to the project
+    - a memory limit you choose
+
+    **Using it**
+
+    ```
+    npm config set registry https://<this app's address>/
+    npm adduser --registry https://<this app's address>/
+    npm publish
+    ```
+
+    A build that only installs needs nothing but the registry line. Packages beginning with
+    `@` are treated as yours: they are looked for here first, and published here.
+
+    **Close the door behind you**
+
+    Anybody who can reach it may create an account while "Who may create an account" says so.
+    Create yours, then set it to nobody and redeploy. Existing accounts keep working.
+
+    **What the volume holds**
+
+    Published packages, the cache of what came from npmjs, and the accounts file. It is the
+    whole of the registry: nothing else is kept anywhere.
+  categories: [webapps/dev-tools]
+  tags: [open-source]
+  aliases: [npm, registry, packages, proxy, yarn]
+  icon: icons/verdaccio.svg
+  links:
+    website: https://verdaccio.org
+    documentation: https://verdaccio.org/docs/what-is-verdaccio
+    source: https://github.com/verdaccio/verdaccio
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: maxUsers
+    title: Who may create an account
+    description: Set this to nobody once the accounts you need exist, and redeploy.
+    type: select
+    default: "1000"
+    options:
+      - {value: "1000", title: Anybody who can reach the registry}
+      - {value: "-1", title: Nobody}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume packages, the cache and the accounts file are kept on.
+    type: volume
+
+versions:
+  - name: "6.10"
+    release: "6.10.3"
+    default: true
+    image: verdaccio/verdaccio:6.10.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /verdaccio/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither curl nor wget, but busybox has one.
+        command: busybox wget -q -O /dev/null http://127.0.0.1:4873/-/ping
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: verdaccio
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      config.yaml:
+        # The path the image's own command reads. This is the shipped configuration with
+        # the parts that matter for a private registry spelled out.
+        content: |
+          storage: /verdaccio/storage/data
+          plugins: /verdaccio/plugins
+
+          web:
+            title: Verdaccio
+
+          auth:
+            htpasswd:
+              file: /verdaccio/storage/htpasswd
+              max_users: ${{ params.maxUsers }}
+
+          uplinks:
+            npmjs:
+              url: https://registry.npmjs.org/
+
+          packages:
+            '@*/*':
+              access: $all
+              publish: $authenticated
+              unpublish: $authenticated
+              proxy: npmjs
+            '**':
+              access: $all
+              publish: $authenticated
+              unpublish: $authenticated
+              proxy: npmjs
+
+          server:
+            keepAliveTimeout: 60
+
+          middlewares:
+            audit:
+              enabled: true
+
+          log: {type: stdout, format: pretty, level: http}
+        swarmRef:
+          file: {name: /verdaccio/conf/config.yaml, mode: 444}
+    routing:
+      port: 4873
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
