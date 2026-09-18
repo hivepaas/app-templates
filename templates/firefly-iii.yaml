@@ -1,0 +1,180 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: firefly-iii
+  title: Firefly III
+  tagline: Personal finances on your own server, down to the last transaction
+  description: |
+    Firefly III is a personal finance manager: accounts, transactions, budgets, categories,
+    bills and savings goals, with reports over any period you like. You enter the money that
+    moves - by hand, by importing a bank export, or through its API - and it keeps the books.
+
+    **This template creates two apps**
+
+    - **Firefly III** itself, with a volume for the files you attach to transactions
+    - **a PostgreSQL database** holding everything else, named after the app with `-db` added
+
+    The database is the whole of your financial history. Back it up; the volume only holds
+    attachments.
+
+    **The first account is the owner**
+
+    Nobody exists when it first starts, so it sends every visitor to the registration page.
+    Open it and register straight away: the first account made is the administrator, and
+    registration closes to strangers afterwards only if you turn it off in Administration.
+
+    **Recurring transactions need something to wake them**
+
+    Bills and recurring transactions are only created when Firefly III's cron endpoint is
+    called, which nothing here does on its own. Add a scheduled job on this app that calls
+    `http://<this app's key>:8080/api/v1/cron/<the cron token>` once a day - the token is
+    under this app's Secrets, as `STATIC_CRON_TOKEN`.
+
+    **Importing from a bank**
+
+    The importer is a separate app (`fireflyiii/data-importer`) rather than part of this one.
+    Firefly III alone is complete for entering and reporting; add the importer later if you
+    want statements pulled in automatically.
+  categories: [webapps/business]
+  tags: [business-intelligence, open-source]
+  aliases: [finance, money, budget, accounting, firefly]
+  icon: icons/firefly-iii.svg
+  links:
+    website: https://www.firefly-iii.org
+    documentation: https://docs.firefly-iii.org
+    source: https://github.com/firefly-iii/firefly-iii
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://money.example.com. Links in
+      emails and redirects after signing in are built from it, so the default only works
+      for other apps in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8080
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: siteOwner
+    title: Owner's email address
+    description: Shown to visitors when something goes wrong, as the person to tell.
+    type: string
+    default: owner@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: timezone
+    title: Time zone
+    description: Decides which day a transaction falls on. An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: appKey
+    title: Application key
+    description: >-
+      Encrypts sessions and stored credentials - exactly 32 characters, and changing it later
+      makes what it encrypted unreadable. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: cronToken
+    title: Cron token
+    description: >-
+      The token in the cron address that creates recurring transactions - exactly 32
+      characters. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: uploadVolume
+    title: Attachment volume
+    description: The volume files attached to transactions are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: firefly
+      username: firefly
+
+versions:
+  - name: "6.7"
+    release: "6.7.3"
+    default: true
+    image: fireflyiii/core:version-6.7.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html/storage/upload: {type: volume, source: "${{ params.uploadVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /health comes from the base image, but it goes through PHP and the database
+        # behind it: with the database stopped it answers 500 rather than OK.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: firefly-iii
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        - {k: APP_URL, v: "${{ params.appUrl }}"}
+        - {k: SITE_OWNER, v: "${{ params.siteOwner }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: STATIC_CRON_TOKEN, v: "${secrets.STATIC_CRON_TOKEN}"}
+        # TLS is terminated in front of the app, so Laravel has to be told to believe the
+        # scheme and host the proxy forwards rather than the ones it sees.
+        - {k: TRUSTED_PROXIES, v: "**"}
+        - {k: DB_CONNECTION, v: pgsql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+      STATIC_CRON_TOKEN:
+        value: "${{ params.cronToken }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

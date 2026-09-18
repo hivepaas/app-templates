@@ -1,0 +1,139 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: miniflux
+  title: Miniflux
+  tagline: A feed reader that stays out of the way and keeps what you read
+  description: |
+    Miniflux is a feed reader: one binary, one database, a page that loads instantly and
+    works on a phone. It reads RSS, Atom, JSON feeds and RDF, fetches the original article
+    when a feed only carries a summary, and offers the Fever and Google Reader APIs so mobile
+    apps can sync against it.
+
+    **This template creates two apps**
+
+    - **Miniflux** itself
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    Miniflux keeps nothing on disk: feeds, articles, icons and your reading history are all in
+    PostgreSQL, so that database is the whole backup and this app needs no volume at all.
+
+    **Your account is made at the first start**
+
+    The username and password here become the administrator, created before anybody can
+    reach the app. The password is under this app's Secrets, as `ADMIN_PASSWORD`. Later
+    starts leave the account alone.
+
+    **Feeds are fetched on a schedule of its own**
+
+    A background worker polls feeds roughly every hour, so nothing outside needs to call it.
+    A feed can be refreshed by hand from its page at any time.
+  categories: [webapps/knowledge]
+  tags: [documents, open-source]
+  aliases: [rss, feeds, feed-reader, atom, news]
+  icon: icons/miniflux.svg
+  links:
+    website: https://miniflux.app
+    documentation: https://miniflux.app/docs/index.html
+    source: https://github.com/miniflux/v2
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: baseUrl
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://reader.example.com. Miniflux
+      builds its own links from it, so the default only works for other apps in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8080
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: At least 6 characters. Leave empty to generate one.
+    type: secret
+    minLength: 6
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: miniflux
+      username: miniflux
+
+versions:
+  - name: "2.3"
+    release: "2.3.3"
+    default: true
+    image: miniflux/miniflux:2.3.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The binary can ask itself, and it asks through the database - with the database
+        # stopped it exits 1 rather than reporting the web server alive.
+        mode: CMD
+        command: /usr/bin/miniflux -healthcheck auto
+        interval: 15s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: miniflux
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable
+        # Both are read at every start and both are safe to repeat: migrations stop at the
+        # version the binary knows, and the account is skipped once it exists.
+        - {k: RUN_MIGRATIONS, v: "1"}
+        - {k: CREATE_ADMIN, v: "1"}
+        - {k: ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: BASE_URL, v: "${{ params.baseUrl }}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

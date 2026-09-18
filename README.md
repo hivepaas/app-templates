@@ -41,8 +41,14 @@ reference; the rules are:
   maps merge, `null` deletes a key, lists are replaced.
 - **app** - the app itself, in the shape a HivePaaS configuration spec uses.
   Supported: `deployment.source` (an image), `deployment.storage.mounts`
-  (volumes), `deployment.container.healthcheck`, `deployment.resources`, and
-  `settings.kind`, `settings.envVars`, `settings.routing.port`.
+  (volumes), `deployment.container.healthcheck`, `deployment.container.init`,
+  `deployment.resources`, and `settings.kind`, `settings.envVars`,
+  `settings.secrets`, `settings.configFiles`, `settings.routing` (`port`,
+  `exposePublicly` and up to five `domains`).
+
+  `init: false` turns off the init process an app is otherwise created with.
+  Only an image that brings its own supervisor needs it: an s6-overlay image
+  refuses to start behind another init, saying "can only run as pid 1".
 
 Placeholders are `${{ params.<name> }}`, `${{ version.name }}`,
 `${{ version.release }}`, `${{ version.vars.<name> }}`, `${{ variant.name }}` and

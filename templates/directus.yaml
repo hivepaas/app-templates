@@ -1,0 +1,177 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: directus
+  title: Directus
+  tagline: A REST and GraphQL API over your database, with an editor on top
+  description: |
+    Directus puts an API and an admin interface over a SQL database. You define collections
+    and fields, it serves them over REST and GraphQL with roles and permissions, and gives
+    non-developers a place to edit the content: tables, forms, a file library and flows that
+    run when something changes.
+
+    **This template creates two apps**
+
+    - **Directus** itself, with a volume for uploaded files and installed extensions
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    Both are needed to restore it: the database holds the content and the schema you build,
+    the volume holds the files people upload.
+
+    **Your account is made at the first start**
+
+    The email and password here become the administrator, created while the database is being
+    set up, so there is no open setup page for a stranger to reach. The password is under this
+    app's Secrets, as `ADMIN_PASSWORD`.
+
+    **The key and the secret**
+
+    `KEY` identifies this instance and `SECRET` signs its tokens. Changing either one signs
+    everybody out; changing `SECRET` also invalidates every API token that was handed out, so
+    keep them as they are unless you mean that.
+
+    **Bring your own database, if you would rather**
+
+    This template pairs it with PostgreSQL, which is what most installations use. Directus
+    also speaks MySQL, SQLite and a few others - to use one of those, create the app from
+    this template and then change `DB_CLIENT` and the `DB_` variables in its environment.
+  categories: [webapps/low-code]
+  tags: [low-code, cms, open-source]
+  aliases: [headless-cms, api, backend, content]
+  icon: icons/directus.svg
+  links:
+    website: https://directus.io
+    documentation: https://directus.io/docs
+    source: https://github.com/directus/directus
+  license: BUSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: publicUrl
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://data.example.com. Links, file
+      URLs and OAuth redirects are built from it, so the default only works for other apps
+      in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8055
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email address
+    description: The account you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: instanceKey
+    title: Instance key
+    description: Identifies this instance. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: instanceSecret
+    title: Token secret
+    description: Signs access tokens - changing it invalidates every one of them.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files and installed extensions are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: directus
+      username: directus
+
+versions:
+  - name: "12.3"
+    release: "12.3.1"
+    default: true
+    image: directus/directus:12.3.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /directus/uploads:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: uploads}
+        /directus/extensions:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: extensions}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /server/health needs a token in this version, so this asks the endpoint that does
+        # not. It reports the server answering rather than the database behind it.
+        command: wget -q -O /dev/null http://127.0.0.1:8055/server/ping
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: directus
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: KEY, v: "${secrets.INSTANCE_KEY}"}
+        - {k: SECRET, v: "${secrets.INSTANCE_SECRET}"}
+        # Read while the database is being set up, and ignored once the account exists.
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: PUBLIC_URL, v: "${{ params.publicUrl }}"}
+        - {k: DB_CLIENT, v: pg}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      INSTANCE_KEY:
+        value: "${{ params.instanceKey }}"
+      INSTANCE_SECRET:
+        value: "${{ params.instanceSecret }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8055
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

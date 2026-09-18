@@ -401,6 +401,51 @@
       }
     },
     {
+      "name": "directus",
+      "file": {
+        "path": "templates/directus.yaml",
+        "sha256": "5513dc4be056428c0984d4e4cbc9bb9b8f5298397a95179c4388e7391524e805"
+      },
+      "icon": {
+        "path": "icons/directus.svg",
+        "sha256": "b57b508bd6ce299dd0dd9f37e6175f5f181578ae95b155ded343f4cbee0e75e4"
+      },
+      "title": "Directus",
+      "tagline": "A REST and GraphQL API over your database, with an editor on top",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "headless-cms",
+        "api",
+        "backend",
+        "content"
+      ],
+      "license": "BUSL-1.1",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "12.3",
+          "release": "12.3.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "docmost",
       "file": {
         "path": "templates/docmost.yaml",
@@ -519,6 +564,51 @@
         {
           "name": "1.40",
           "release": "1.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "firefly-iii",
+      "file": {
+        "path": "templates/firefly-iii.yaml",
+        "sha256": "54f0c51b5ad8670fddb4da053a5f97eea97f84ea0f89a500c9dce98a4b069f0e"
+      },
+      "icon": {
+        "path": "icons/firefly-iii.svg",
+        "sha256": "104ab894b4af6b579d3e43235f06f89348d991e68ad43f1a0b7c810c8ecb7189"
+      },
+      "title": "Firefly III",
+      "tagline": "Personal finances on your own server, down to the last transaction",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "open-source"
+      ],
+      "aliases": [
+        "finance",
+        "money",
+        "budget",
+        "accounting",
+        "firefly"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.7",
+          "release": "6.7.3",
           "default": true
         }
       ],
@@ -959,6 +1049,51 @@
         {
           "name": "0.63",
           "release": "0.63.18",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "miniflux",
+      "file": {
+        "path": "templates/miniflux.yaml",
+        "sha256": "57223badf72c7aa2025521977dd486cd48957a04ba5679da1f8b5c3af499c0b6"
+      },
+      "icon": {
+        "path": "icons/miniflux.svg",
+        "sha256": "b367954568c2f17d62aaafe5e4f4797b0f95a15450549179fb502212adb84430"
+      },
+      "title": "Miniflux",
+      "tagline": "A feed reader that stays out of the way and keeps what you read",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "rss",
+        "feeds",
+        "feed-reader",
+        "atom",
+        "news"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.3",
+          "release": "2.3.3",
           "default": true
         }
       ],
