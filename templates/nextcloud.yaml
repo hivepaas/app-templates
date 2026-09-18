@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: nextcloud
+  title: Nextcloud
+  tagline: Your files on your own server, synced to every desktop and phone
+  description: |
+    Nextcloud keeps files on a server you run and syncs them to desktop and phone clients,
+    with sharing links, versions, a trash bin and a web interface to work in. Calendars,
+    contacts, notes and an office suite are apps you add to it afterwards.
+
+    **This template creates two apps**
+
+    - **Nextcloud**, on a volume for the files and the installation itself
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **The administrator account**
+
+    It is created on the first start from the parameters here, so there is no setup page
+    for a stranger to reach first. The password is under this app's Secrets, as
+    `NEXTCLOUD_ADMIN_PASSWORD`.
+
+    **Add the domain before you sync anything**
+
+    Nextcloud only answers for addresses it has been told to trust, and this template trusts
+    the one you give it here. If you add a domain later, add it to
+    `NEXTCLOUD_TRUSTED_DOMAINS` as well, or Nextcloud will refuse the request with "access
+    through untrusted domain".
+
+    **The volume is everything**
+
+    Files, thumbnails, the apps you install and Nextcloud's own configuration all live on
+    the data volume, and everything else is in PostgreSQL. Both are needed to restore it,
+    and neither alone is a backup.
+
+    **The first start is slow**
+
+    Nextcloud installs itself the first time it runs against an empty database - a few
+    minutes before it answers is normal.
+  categories: [webapps/documents]
+  tags: [files, documents, collaboration, open-source]
+  aliases: [files, drive, storage, sync]
+  icon: icons/nextcloud.svg
+  links:
+    website: https://nextcloud.com
+    documentation: https://docs.nextcloud.com
+    source: https://github.com/nextcloud/server
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings and in NEXTCLOUD_TRUSTED_DOMAINS.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 10
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the files, the installed apps and the configuration are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: nextcloud
+      username: nextcloud
+
+versions:
+  - name: "32"
+    release: "32.0.2"
+    default: true
+    image: nextcloud:32.0.2-apache
+  - name: "31"
+    release: "31.0.10"
+    image: nextcloud:31.0.10-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # status.php answers before the installation has finished and says so in its body,
+        # which is what makes it a readiness check rather than a liveness one.
+        command: curl -fsS http://127.0.0.1:80/status.php | grep -q '"installed":true'
+        interval: 20s
+        timeout: 10s
+        startPeriod: 300s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: nextcloud
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRES_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The administrator is created on the first start, so the installation is finished
+        # before anybody can reach the app rather than waiting for whoever arrives first.
+        - {k: NEXTCLOUD_ADMIN_USER, v: "${{ params.adminUsername }}"}
+        - {k: NEXTCLOUD_ADMIN_PASSWORD, v: "${secrets.NEXTCLOUD_ADMIN_PASSWORD}"}
+        # Nextcloud refuses any request whose Host it does not trust. localhost is for the
+        # health check above, which asks over the loopback interface; HIVEPAAS_HOST is this
+        # app's key, which is how another app in the project reaches it without a domain.
+        - {k: NEXTCLOUD_TRUSTED_DOMAINS, v: "localhost ${HIVEPAAS_HOST} ${{ params.domain }}"}
+        # TLS is terminated in front of the app, so the links Nextcloud writes have to be
+        # told the scheme the browser used rather than the one it sees.
+        - {k: OVERWRITEPROTOCOL, v: https}
+        - {k: TRUSTED_PROXIES, v: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"}
+    secrets:
+      NEXTCLOUD_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

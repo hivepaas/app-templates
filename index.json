@@ -83,6 +83,10 @@
         {
           "id": "business",
           "title": "Business Intelligence"
+        },
+        {
+          "id": "documents",
+          "title": "Files & Documents"
         }
       ]
     },
@@ -311,6 +315,10 @@
     {
       "id": "team-chat",
       "title": "Team Chat"
+    },
+    {
+      "id": "files",
+      "title": "File Sync"
     }
   ],
   "templates": [
@@ -1100,6 +1108,56 @@
           "name": "5.26",
           "release": "5.26.30",
           "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "nextcloud",
+      "file": {
+        "path": "templates/nextcloud.yaml",
+        "sha256": "7262570a51bfe3a3567ea70397d0f22357486ddafba9f7fb839b7ab20d0cbc21"
+      },
+      "icon": {
+        "path": "icons/nextcloud.svg",
+        "sha256": "aa433216de59b9867d23a152c418f917afaa2f7cffa896343672a7e6e375aab1"
+      },
+      "title": "Nextcloud",
+      "tagline": "Your files on your own server, synced to every desktop and phone",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "files",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "files",
+        "drive",
+        "storage",
+        "sync"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "32",
+          "release": "32.0.2",
+          "default": true
+        },
+        {
+          "name": "31",
+          "release": "31.0.10"
         }
       ],
       "requires": {
