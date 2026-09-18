@@ -1,0 +1,178 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: plausible
+  title: Plausible Analytics
+  tagline: Web analytics that counts visitors without following them around
+  description: |
+    Plausible is a web analytics app: pages, referrers, countries, campaigns and goals, on
+    one screen, from a script of a few kilobytes. It sets no cookies and keeps no identifier
+    for a person, so there is nothing to ask consent for and nothing to leak.
+
+    **This template creates three apps**
+
+    - **Plausible** itself
+    - **a PostgreSQL database** for sites, accounts and settings, named after the app with
+      `-db` added
+    - **a ClickHouse database** for the events themselves, named with `-events` added
+
+    Both are needed. Plausible keeps nothing on disk of its own, so these two databases are
+    the whole of it: back them up together, and neither alone restores anything.
+
+    **The address has to be right**
+
+    Whatever you put in "Public address" is what Plausible builds its tracking script and its
+    links from, so it has to be the address visitors' browsers will reach. Put the same name
+    in "Domain" to have HivePaaS route it there with a certificate.
+
+    **Make your account before anybody else does**
+
+    Registration is open when the app first starts, and the first account is the owner. Open
+    it and register straight away, then set "Who may register" to nobody and redeploy.
+
+    **The first start is slow**
+
+    Every start creates the databases if they are missing and runs migrations, which on an
+    empty database is a few minutes of work before the app answers. Later starts skip what is
+    already done.
+  categories: [observability/analytics]
+  tags: [web-analytics, analytics, privacy, open-source]
+  aliases: [analytics, stats, tracking, plausible-analytics]
+  icon: icons/plausible.svg
+  links:
+    website: https://plausible.io
+    documentation: https://github.com/plausible/community-edition
+    source: https://github.com/plausible/analytics
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: baseUrl
+    title: Public address
+    description: >-
+      The address visitors reach it at, scheme and all - https://stats.example.com. The
+      tracking script and every link in an email are built from this, so the default only
+      works for other apps in this project: put your own address here before you give the
+      script to a website.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8000
+    # A scheme and a host, and nothing after them: Plausible appends its own paths.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: disableRegistration
+    title: Who may register
+    description: Change this to nobody once your own account exists, and redeploy.
+    type: select
+    default: "false"
+    options:
+      - {value: "false", title: Anybody who can reach the app}
+      - {value: invite_only, title: Only people who were invited}
+      - {value: "true", title: Nobody}
+  - name: secretKeyBase
+    title: Secret key
+    description: Signs sessions and cookies. Leave empty to generate one.
+    type: secret
+    minLength: 64
+    generate: {length: 64}
+  - name: totpVaultKey
+    title: Two-factor vault key
+    description: >-
+      Encrypts the two-factor secrets of everyone who turns it on - losing it locks them out.
+      Leave empty to generate one; if you bring your own, it is 43 letters or digits.
+    type: secret
+    minLength: 43
+    maxLength: 43
+    generate: {length: 43}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: plausible
+      username: plausible
+  - name: events
+    title: Event database
+    template: clickhouse
+    params:
+      dbName: plausible_events
+      username: plausible
+
+versions:
+  - name: "3.2"
+    release: "3.2.1"
+    default: true
+    image: ghcr.io/plausible/community-edition:v3.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image starts the app and nothing else: it does not create its databases or run
+      # its migrations on the way. Both are safe to repeat, so they run at every start.
+      command: >-
+        sh -c '/entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries no curl and no wget of its own, but busybox has one. The
+        # endpoint answers for both databases as well as the app, so this is green only
+        # when Plausible can actually record an event.
+        command: >-
+          busybox wget -q -O - http://127.0.0.1:8000/api/health | grep -q '"clickhouse":"ok"'
+        interval: 20s
+        timeout: 10s
+        startPeriod: 300s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: plausible
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: BASE_URL, v: "${{ params.baseUrl }}"}
+        - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}"}
+        # Plausible wants 32 bytes of base64 here. Generated secrets are letters and digits,
+        # so 43 of them plus the padding character are exactly that.
+        - {k: TOTP_VAULT_KEY, v: "${secrets.TOTP_VAULT_KEY}="}
+        - {k: DISABLE_REGISTRATION, v: "${{ params.disableRegistration }}"}
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - k: CLICKHOUSE_DATABASE_URL
+          v: >-
+            http://${{ deps.events.ref.HIVEPAAS_USER }}:${{ deps.events.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.events.ref.HIVEPAAS_HOST }}:${{ deps.events.ref.HIVEPAAS_PORT }}/${{
+            deps.events.ref.HIVEPAAS_DATABASE_NAME }}
+    secrets:
+      SECRET_KEY_BASE:
+        value: "${{ params.secretKeyBase }}"
+      TOTP_VAULT_KEY:
+        value: "${{ params.totpVaultKey }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

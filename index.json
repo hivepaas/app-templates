@@ -1080,6 +1080,43 @@
       }
     },
     {
+      "name": "nats",
+      "file": {
+        "path": "templates/nats.yaml",
+        "sha256": "e235daefcd7f4842a57712df2b19cc413ac45018be752d6fcdc5a3e687f05c2d"
+      },
+      "icon": {
+        "path": "icons/nats.svg",
+        "sha256": "9fa9324d627a1be638c9bf78d45ad878252d1c001494ad918925942b306feaf1"
+      },
+      "title": "NATS",
+      "tagline": "A small, fast broker for services that need to talk to each other",
+      "categories": [
+        "databases/messaging"
+      ],
+      "tags": [
+        "messaging",
+        "open-source"
+      ],
+      "aliases": [
+        "queue",
+        "pubsub",
+        "jetstream",
+        "broker"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.15",
+          "release": "2.15.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "neo4j",
       "file": {
         "path": "templates/neo4j.yaml",
@@ -1246,6 +1283,45 @@
       }
     },
     {
+      "name": "ollama",
+      "file": {
+        "path": "templates/ollama.yaml",
+        "sha256": "4049e30b47d60278f14982f5644e03eb8dcafe12e15176a34ab15e606b02b2a7"
+      },
+      "icon": {
+        "path": "icons/ollama.svg",
+        "sha256": "2f9dcee8d0ca195a63bc733071985f89113ff8121ce40f660f2f54f4aaf4012f"
+      },
+      "title": "Ollama",
+      "tagline": "Run language models on your own machines, on the CPU they already have",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "open-source"
+      ],
+      "aliases": [
+        "llm",
+        "llama",
+        "local-ai",
+        "models",
+        "inference"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.34",
+          "release": "0.34.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "open-webui",
       "file": {
         "path": "templates/open-webui.yaml",
@@ -1329,6 +1405,57 @@
             "pg17",
             "pg16"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "plausible",
+      "file": {
+        "path": "templates/plausible.yaml",
+        "sha256": "f766f3709f1548eb7c5474f3dc5ef3fd57175c30d3c29f6a372da1977e419541"
+      },
+      "icon": {
+        "path": "icons/plausible.svg",
+        "sha256": "78eedb098d1cc4dd3dee9059ae9edc5d841d29b479aa22c3d648fe9fc38a1cf9"
+      },
+      "title": "Plausible Analytics",
+      "tagline": "Web analytics that counts visitors without following them around",
+      "categories": [
+        "observability/analytics"
+      ],
+      "tags": [
+        "web-analytics",
+        "analytics",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "analytics",
+        "stats",
+        "tracking",
+        "plausible-analytics"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "events",
+          "title": "Event database",
+          "template": "clickhouse"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.2",
+          "release": "3.2.1",
+          "default": true
         }
       ],
       "requires": {

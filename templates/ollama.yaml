@@ -1,0 +1,119 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: ollama
+  title: Ollama
+  tagline: Run language models on your own machines, on the CPU they already have
+  description: |
+    Ollama downloads open language models and serves them over an HTTP API, so the machine
+    answering a prompt is one you run rather than somebody else's. It speaks its own API and
+    an OpenAI-compatible one, which is what most libraries and chat front ends already know
+    how to talk to.
+
+    **This template sets up**
+
+    - the server on a persistent volume, which is where the models it downloads are kept
+    - a health check that asks the server for its models
+    - how long a model stays in memory after it was last used
+    - a memory limit you choose
+
+    **No password, so keep it inside the project**
+
+    Ollama has no authentication of any kind: whoever reaches the port can use the models,
+    delete them, and pull new ones. So this template does not put it on a domain. Another app
+    in the same environment reaches it at `http://<this app's key>:11434` - that is what to
+    give Open WebUI under Settings, Connections, and what to put in `OPENAI_BASE_URL` for a
+    library, with `/v1` on the end.
+
+    **It starts with no models**
+
+    Nothing is downloaded until you ask for it. Open a terminal on this app and run
+    `ollama pull llama3.2` - or any name from ollama.com/library - and `ollama list` to see
+    what is already there. Models are large: a small one is 2 GB, and several fill a volume
+    quickly.
+
+    **On the CPU**
+
+    This runs models on the CPU. That works, and is slow in a way that depends on the model:
+    a 1B to 3B model answers at reading speed on a modern server, a 7B model is noticeably
+    slower, and anything larger is for patient batch work rather than a chat window. Give the
+    app more memory than the model's file size - roughly the model plus a gigabyte - or it
+    will be killed while loading.
+  categories: [webapps/ai]
+  tags: [ai, llm, open-source]
+  aliases: [llm, llama, local-ai, models, inference]
+  icon: icons/ollama.svg
+  links:
+    website: https://ollama.com
+    documentation: https://github.com/ollama/ollama/tree/main/docs
+    source: https://github.com/ollama/ollama
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: keepAlive
+    title: Keep a model in memory
+    description: >-
+      How long a model stays loaded after the last request. Longer answers the next prompt
+      immediately; shorter gives the memory back.
+    type: select
+    default: 5m
+    options:
+      - {value: "0", title: Unload as soon as the answer is done}
+      - {value: 5m, title: Five minutes}
+      - {value: 1h, title: One hour}
+      - {value: "-1", title: Keep it loaded}
+  - name: memoryLimit
+    title: Memory limit
+    description: Around the size of the largest model you will run, plus a gigabyte.
+    type: size
+    default: 4GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the downloaded models are kept on.
+    type: volume
+
+versions:
+  - name: "0.34"
+    release: "0.34.2"
+    default: true
+    image: ollama/ollama:0.34.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /root/.ollama: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The client asks the server over the same API a caller would, so this is
+        # green only once the server is actually answering.
+        command: ollama list > /dev/null
+        interval: 15s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: ollama
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The image listens on 127.0.0.1 unless told otherwise, which nothing outside
+        # the container can reach.
+        - {k: OLLAMA_HOST, v: "0.0.0.0:11434"}
+        - {k: OLLAMA_KEEP_ALIVE, v: "${{ params.keepAlive }}"}
+    routing:
+      port: 11434

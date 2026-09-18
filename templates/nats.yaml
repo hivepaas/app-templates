@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: nats
+  title: NATS
+  tagline: A small, fast broker for services that need to talk to each other
+  description: |
+    NATS is a message broker in a single small binary: publish and subscribe, request and
+    reply, queue groups for spreading work across several copies of a service. With JetStream
+    turned on - this template turns it on - messages can also be kept on disk, replayed, and
+    consumed at the consumer's own pace.
+
+    **This template sets up**
+
+    - the client port on 4222, with a generated token every client must send
+    - JetStream, storing streams on a volume you choose
+    - the monitoring endpoint on 8222, which is what the health check asks
+    - a memory limit you choose
+
+    **Connecting**
+
+    Apps in the same environment reach it at `nats://<this app's key>:4222` with the token
+    under this app's Secrets, as `NATS_TOKEN`. Most clients take it as a separate option, and
+    the URL form `nats://<token>@<key>:4222` works too. It is not on a domain: NATS speaks its
+    own protocol rather than HTTP, so a router in front of it would have nothing to do.
+
+    **What the volume holds**
+
+    Only JetStream streams. Plain publish and subscribe keeps nothing: a message nobody is
+    listening for is gone, and that is the point of it. Create streams for the subjects you
+    do want kept, and give this app enough disk for what you tell them to retain.
+
+    **Clustering**
+
+    This is one server. NATS clusters by having servers name each other in their
+    configuration, which is a thing to set up deliberately rather than a checkbox, so it is
+    left out here.
+  categories: [databases/messaging]
+  tags: [messaging, open-source]
+  aliases: [queue, pubsub, jetstream, broker]
+  icon: icons/nats.svg
+  links:
+    website: https://nats.io
+    documentation: https://docs.nats.io
+    source: https://github.com/nats-io/nats-server
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: token
+    title: Token
+    description: Every client sends this to connect. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume JetStream streams are kept on.
+    type: volume
+
+versions:
+  - name: "2.15"
+    release: "2.15.0"
+    default: true
+    image: nats:2.15.0-alpine3.22
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /healthz is green only once JetStream has finished recovering its streams,
+        # which is the state a client can actually be served in.
+        command: wget -q -O /dev/null http://127.0.0.1:8222/healthz
+        interval: 10s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: nats
+      version: "${{ version.name }}"
+      database:
+        password: "${{ params.token }}"
+    envVars:
+      data:
+        - {k: NATS_TOKEN, v: "${HIVEPAAS_PASSWORD}"}
+    configFiles:
+      nats-server.conf:
+        # The image's default command reads this path, so replacing the file is all it
+        # takes. NATS expands $NATS_TOKEN itself, which keeps the token out of the
+        # configuration and out of the process arguments.
+        content: |
+          port: 4222
+          http: 8222
+
+          jetstream {
+            store_dir: "/data"
+          }
+
+          authorization {
+            token: $NATS_TOKEN
+          }
+        swarmRef:
+          file: {name: /etc/nats/nats-server.conf, mode: 444}
+    routing:
+      port: 4222
