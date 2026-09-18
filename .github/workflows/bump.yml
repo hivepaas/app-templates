@@ -23,7 +23,7 @@ jobs:
           # The HivePaaS commit whose bump tool rewrites these templates. Pinned for
           # the same reason lint.yml is: templates are checked and changed by the
           # code that will read them.
-          ref: 7d87744c919fef7708c48a1ae04f06a812dfbbe9
+          ref: a5a72a4238c1864c87bec4d2186d5a1e2fbc9919
           path: hivepaas
 
       - uses: actions/setup-go@v5
