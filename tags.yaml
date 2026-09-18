@@ -32,3 +32,5 @@ tags:
   - {id: identity, title: Identity}
   - {id: sso, title: Single Sign-On}
   - {id: passwords, title: Password Manager}
+  - {id: monitoring, title: Monitoring}
+  - {id: metrics, title: Metrics}

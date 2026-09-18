@@ -223,6 +223,14 @@
     {
       "id": "passwords",
       "title": "Password Manager"
+    },
+    {
+      "id": "monitoring",
+      "title": "Monitoring"
+    },
+    {
+      "id": "metrics",
+      "title": "Metrics"
     }
   ],
   "templates": [
@@ -952,6 +960,43 @@
             "alpine",
             "debian"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "prometheus",
+      "file": {
+        "path": "templates/prometheus.yaml",
+        "sha256": "8cebc23ae8d5ba8be67e83956fc7a85e6b35f1565e70e70b3fdedf8cfc8ec111"
+      },
+      "icon": {
+        "path": "icons/prometheus.svg",
+        "sha256": "2344eef13f3544d28d2adf037ec40f924d4d9e221e55762d22a64deb0f912116"
+      },
+      "title": "Prometheus",
+      "tagline": "Scrapes metrics from your apps and stores them, with a query language to ask",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "metrics",
+        "time-series",
+        "open-source"
+      ],
+      "aliases": [
+        "metrics",
+        "promql"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.14",
+          "release": "3.14.0",
+          "default": true
         }
       ],
       "requires": {

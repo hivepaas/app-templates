@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: prometheus
+  title: Prometheus
+  tagline: Scrapes metrics from your apps and stores them, with a query language to ask
+  description: |
+    Prometheus collects metrics by asking for them: every app that publishes a `/metrics`
+    endpoint gets scraped on a schedule, and what comes back is stored as a time series you
+    can query with PromQL, graph, and alert on.
+
+    **What it scrapes is in its config file**
+
+    This template starts Prometheus scraping only itself. To watch anything else, edit
+    `prometheus.yml` under this app's Config Files and add it to `scrape_configs`:
+
+    ```yaml
+      - job_name: my-api
+        static_configs:
+          - targets: ['my-api:8080']
+    ```
+
+    The target is the other app's key and the port it listens on inside the project network.
+    Saving the file is enough: Prometheus reads its config once at startup, and HivePaaS
+    restarts the app with the new file when you save it.
+
+    **Alerting and dashboards are separate**
+
+    Prometheus evaluates alerting rules but does not send the alerts anywhere on its own;
+    that is Alertmanager's job. For graphs, point Grafana at this app as a data source.
+
+    **Retention is time-based**
+
+    Samples older than the retention window are dropped. The volume has to hold everything
+    inside it, and how much that is depends on how many series you scrape and how often -
+    a few hundred megabytes for a handful of apps, far more for a cluster.
+  categories: [observability/monitoring]
+  tags: [monitoring, metrics, time-series, open-source]
+  aliases: [metrics, promql]
+  icon: icons/prometheus.svg
+  links:
+    website: https://prometheus.io
+    documentation: https://prometheus.io/docs/
+    source: https://github.com/prometheus/prometheus
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: scrapeInterval
+    title: Scrape interval
+    description: How often every target is asked for its metrics.
+    type: select
+    default: 30s
+    options:
+      - {value: 15s, title: "Every 15 seconds"}
+      - {value: 30s, title: "Every 30 seconds"}
+      - {value: 1m, title: "Every minute"}
+  - name: retentionTime
+    title: Keep samples for
+    type: select
+    default: 15d
+    options:
+      - {value: 7d, title: "7 days"}
+      - {value: 15d, title: "15 days"}
+      - {value: 30d, title: "30 days"}
+      - {value: 90d, title: "90 days"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the samples are kept on.
+    type: volume
+
+versions:
+  - name: "3.14"
+    release: "3.14.0"
+    default: true
+    image: prom/prometheus:v3.14.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the prometheus binary, so this is its flags. Repeating
+      # the two the image sets by default is deliberate: giving flags here replaces them.
+      command: >-
+        --config.file=/etc/prometheus/prometheus.yml
+        --storage.tsdb.path=/prometheus
+        --storage.tsdb.retention.time=${{ params.retentionTime }}
+    storage:
+      mounts:
+        /prometheus: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:9090/-/healthy
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: prometheus
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      prometheus.yml:
+        content: |
+          global:
+            scrape_interval: ${{ params.scrapeInterval }}
+            evaluation_interval: ${{ params.scrapeInterval }}
+
+          scrape_configs:
+            # Prometheus scraping itself. Add a job per app you want watched; the target is
+            # the app's key and the port it listens on inside the project network.
+            - job_name: prometheus
+              static_configs:
+                - targets: ['127.0.0.1:9090']
+        swarmRef:
+          file: {name: /etc/prometheus/prometheus.yml, mode: 444}
+    routing:
+      port: 9090
