@@ -1,0 +1,106 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: metabase
+  title: Metabase
+  tagline: Ask questions of your database and get charts, without writing SQL
+  description: |
+    Metabase points at a database you already have and lets people ask it questions - by
+    picking columns and filters, or in SQL when that is easier - then saves the answers as
+    charts and dashboards. It is the reporting layer for data that is already somewhere.
+
+    **This template creates two apps**
+
+    - **Metabase**, which keeps nothing of its own
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    That database holds Metabase's questions, dashboards and accounts. The data you report
+    on lives somewhere else: add it under **Settings → Databases**, where a database app in
+    this project is reached by its app key as the host name.
+
+    **After the first deployment**
+
+    Open the app and create the first account. It becomes the administrator, and whoever
+    gets there first takes it.
+
+    **It needs room**
+
+    Metabase runs on the JVM and is slow to start on less than a gigabyte. A minute before
+    it answers the first time is normal.
+  categories: [webapps/business]
+  tags: [business-intelligence, analytics, sql, open-source]
+  aliases: [bi, dashboards, reporting]
+  icon: icons/metabase.svg
+  links:
+    website: https://www.metabase.com
+    documentation: https://www.metabase.com/docs/latest/
+    source: https://github.com/metabase/metabase
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: metabase
+      username: metabase
+
+versions:
+  - name: "0.63"
+    release: "0.63.18"
+    default: true
+    image: metabase/metabase:v0.63.18
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 180s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: metabase
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MB_DB_TYPE, v: postgres}
+        - {k: MB_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: MB_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: MB_DB_DBNAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: MB_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: MB_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

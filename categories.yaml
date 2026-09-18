@@ -23,6 +23,8 @@ categories:
       - {id: security, title: Identity & Passwords}
       - {id: project-management, title: Projects & Tasks}
       - {id: low-code, title: Low-Code & Databases}
+      - {id: communication, title: Chat & Notifications}
+      - {id: business, title: Business Intelligence}
   - id: observability
     title: Observability
     children:

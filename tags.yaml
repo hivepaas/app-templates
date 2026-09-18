@@ -44,3 +44,8 @@ tags:
   - {id: spreadsheet, title: Spreadsheet}
   - {id: email, title: Email}
   - {id: testing, title: Testing}
+  - {id: notifications, title: Notifications}
+  - {id: chat, title: Chat}
+  - {id: business-intelligence, title: Business Intelligence}
+  - {id: documents, title: Documents}
+  - {id: collaboration, title: Collaboration}

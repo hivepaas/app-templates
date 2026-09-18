@@ -1,0 +1,117 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: ntfy
+  title: ntfy
+  tagline: Send yourself a notification from a script, with one HTTP request
+  description: |
+    ntfy delivers push notifications to your phone and desktop from anything that can make an
+    HTTP request. A backup script, a cron job, an alert rule - `curl -d "backup done"
+    https://your-ntfy/backups` and it arrives. Subscribers pick the topics they want in the
+    phone app or in a browser.
+
+    **It pairs with what you already run**
+
+    Uptime Kuma, Grafana and most alerting tools speak ntfy directly. Inside this project
+    they reach it by this app's key on port 80, without a domain: `http://<this app's key>`.
+
+    **Anyone can use any topic**
+
+    A topic is not created and not owned: publishing to one is what makes it exist, and
+    anybody who knows its name can read it. That is how ntfy is meant to work, and it is
+    fine behind a private address - but on a public domain it means the world can read your
+    alerts by guessing. Set "Access" to closed and add users with `ntfy user add` and
+    `ntfy access` in the app's terminal if it is reachable from the internet.
+
+    **After you add a domain**
+
+    Attachments, the web app's own push and the links inside notifications are built from
+    the address ntfy is configured with. Once the app has a domain, add `NTFY_BASE_URL` as
+    an environment variable with the full URL.
+  categories: [webapps/communication]
+  tags: [notifications, open-source]
+  aliases: [push, notifications, alerts]
+  icon: icons/ntfy.svg
+  links:
+    website: https://ntfy.sh
+    documentation: https://docs.ntfy.sh
+    source: https://github.com/binwiederhier/ntfy
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: access
+    title: Access
+    description: What somebody who has not signed in may do.
+    type: select
+    default: read-write
+    options:
+      - {value: read-write, title: "Open - anyone may publish and subscribe to any topic"}
+      - {value: read-only, title: "Read only - anyone may subscribe, only users may publish"}
+      - {value: deny-all, title: "Closed - only users, added from the app's terminal"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 64MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the message cache and the user database are kept on.
+    type: volume
+
+versions:
+  - name: "2.28"
+    release: "2.28.0"
+    default: true
+    image: binwiederhier/ntfy:v2.28.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the ntfy binary, so this is the sub-command it runs.
+      command: serve
+    storage:
+      mounts:
+        /var/lib/ntfy: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:80/v1/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: ntfy
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Both databases go on the volume. Without these the cache is in memory, so a
+        # restart loses every message a subscriber had not collected yet.
+        - {k: NTFY_CACHE_FILE, v: /var/lib/ntfy/cache.db}
+        - {k: NTFY_AUTH_FILE, v: /var/lib/ntfy/auth.db}
+        - {k: NTFY_AUTH_DEFAULT_ACCESS, v: "${{ params.access }}"}
+        - {k: NTFY_LISTEN_HTTP, v: ":80"}
+        - {k: NTFY_BEHIND_PROXY, v: "true"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

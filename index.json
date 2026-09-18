@@ -75,6 +75,14 @@
         {
           "id": "low-code",
           "title": "Low-Code & Databases"
+        },
+        {
+          "id": "communication",
+          "title": "Chat & Notifications"
+        },
+        {
+          "id": "business",
+          "title": "Business Intelligence"
         }
       ]
     },
@@ -279,6 +287,26 @@
     {
       "id": "testing",
       "title": "Testing"
+    },
+    {
+      "id": "notifications",
+      "title": "Notifications"
+    },
+    {
+      "id": "chat",
+      "title": "Chat"
+    },
+    {
+      "id": "business-intelligence",
+      "title": "Business Intelligence"
+    },
+    {
+      "id": "documents",
+      "title": "Documents"
+    },
+    {
+      "id": "collaboration",
+      "title": "Collaboration"
     }
   ],
   "templates": [
@@ -353,6 +381,57 @@
         {
           "name": "3.5",
           "release": "3.5.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "docmost",
+      "file": {
+        "path": "templates/docmost.yaml",
+        "sha256": "9d1a12a3de243148d7e5586667eb288259e2ce84e20c9514fbdce9113f628878"
+      },
+      "icon": {
+        "path": "icons/docmost.svg",
+        "sha256": "2373fd33525022ee1fee425e337ca4e40675ae4e694ae382f6563a409cf3c544"
+      },
+      "title": "Docmost",
+      "tagline": "A team wiki where several people can type in the same page at once",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "wiki",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "wiki",
+        "notion",
+        "confluence",
+        "docs"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.96",
+          "release": "0.96.0",
           "default": true
         }
       ],
@@ -785,6 +864,51 @@
       }
     },
     {
+      "name": "metabase",
+      "file": {
+        "path": "templates/metabase.yaml",
+        "sha256": "a6b06cbb2bf4045595fcc22bea8f92636a49a156f8d1cf938981cb871e76bda2"
+      },
+      "icon": {
+        "path": "icons/metabase.svg",
+        "sha256": "46b69d21c23abf0325bdfe61f34353d8482a70d87cc421b94f332ca4c8583533"
+      },
+      "title": "Metabase",
+      "tagline": "Ask questions of your database and get charts, without writing SQL",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "analytics",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "bi",
+        "dashboards",
+        "reporting"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.63",
+          "release": "0.63.18",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mongodb",
       "file": {
         "path": "templates/mongodb.yaml",
@@ -970,6 +1094,42 @@
         {
           "name": "2026.09",
           "release": "2026.09.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "ntfy",
+      "file": {
+        "path": "templates/ntfy.yaml",
+        "sha256": "176b300221472b5a6a5fa5bc9d842ca6479f11671d6d4ec06b7f01eee8d7a0e1"
+      },
+      "icon": {
+        "path": "icons/ntfy.svg",
+        "sha256": "1271b8dca7d3da7ad7ae7abea682a60e77274c59a4a4fa6d357e23e912f60a40"
+      },
+      "title": "ntfy",
+      "tagline": "Send yourself a notification from a script, with one HTTP request",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "push",
+        "notifications",
+        "alerts"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.28",
+          "release": "2.28.0",
           "default": true
         }
       ],

@@ -1,0 +1,147 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: docmost
+  title: Docmost
+  tagline: A team wiki where several people can type in the same page at once
+  description: |
+    Docmost is documentation a team writes together: spaces of nested pages, real-time
+    collaborative editing, comments, diagrams and a permission model per space. It is the
+    shape of Notion or Confluence, on a server you run.
+
+    **This template creates three apps**
+
+    - **Docmost**, on a volume for the files people attach to pages
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+    - **a Redis** for it, named after the app with `-cache` added
+
+    Redis is not a cache it can do without: it carries the edits between people typing in
+    the same page, so collaboration needs it running.
+
+    **After the first deployment**
+
+    Open the app and create the first account. It becomes the workspace owner, and whoever
+    gets there first takes it, so do not leave the setup page for somebody else.
+
+    **Email**
+
+    Invitations and password resets need an SMTP server, which this template does not set
+    up. Until you configure one under `MAIL_` environment variables, Docmost sends nothing -
+    a Mailpit app next to it is enough for testing.
+
+    **Backups are the database and the volume**
+
+    Every page and every comment is in PostgreSQL, and the attachments are on the volume.
+    Redis holds only what is in flight.
+  categories: [webapps/knowledge]
+  tags: [wiki, documents, collaboration, open-source]
+  aliases: [wiki, notion, confluence, docs]
+  icon: icons/docmost.svg
+  links:
+    website: https://docmost.com
+    documentation: https://docmost.com/docs
+    source: https://github.com/docmost/docmost
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: appSecret
+    title: Application secret
+    description: What signs the session tokens. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the files attached to pages are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: docmost
+      username: docmost
+  - name: cache
+    title: Cache
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "0.96"
+    release: "0.96.0"
+    default: true
+    image: docmost/docmost:0.96.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Docmost refuses to start without an address, and an app has no domain until
+      # somebody gives it one. This takes the domain when there is one and falls back to
+      # localhost when there is not, then hands over to the image's own command - its entry
+      # point ends in exec "$@", so what is written here replaces that command.
+      command: >-
+        sh -c 'export APP_URL="${HIVEPAAS_DOMAIN:+https://$HIVEPAAS_DOMAIN}";
+        export APP_URL="${APP_URL:-http://localhost:3000}";
+        exec pnpm start'
+    storage:
+      mounts:
+        /app/data/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: docmost
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Both are single connection strings. Generated passwords are letters and digits
+        # only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        # Redis has no user name to set: it authenticates as its built-in `default` user.
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
+        - {k: APP_SECRET, v: "${secrets.APP_SECRET}"}
+        - {k: PORT, v: "3000"}
+    secrets:
+      APP_SECRET:
+        value: "${{ params.appSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
