@@ -1,0 +1,128 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gotify
+  title: Gotify
+  tagline: Sends push notifications to your own phone, from your own server
+  description: |
+    Gotify takes messages over a simple HTTP call and pushes them to the people watching:
+    its Android app, its web interface, or anything holding its websocket open. A backup
+    script, a cron job or an alerting rule sends one line with curl and somebody's phone
+    buzzes - with no third-party push service in between.
+
+    **This template sets up**
+
+    - the server on a volume, holding its database and the images applications use
+    - an administrator account made at the first start
+    - a health check on its own endpoint
+
+    **Sending a message**
+
+    Create an application in the interface, take the token it gives you, and post to it:
+
+    ```
+    curl -X POST "https://<this app's address>/message?token=<app token>" \
+      -F "title=Backup" -F "message=Finished in 4m12s" -F "priority=5"
+    ```
+
+    Tokens come in two kinds: an application token sends messages, a client token receives
+    them. The Android app asks for the second one.
+
+    **What the volume holds**
+
+    An SQLite database with the messages, applications and users, plus the images uploaded
+    for applications. That is the whole of it - nothing else is kept anywhere.
+
+    **Where it should live**
+
+    Its own address is what the phone connects to, so it has to be reachable from wherever
+    the phone is - which for most people means a domain rather than the project network.
+  categories: [webapps/communication]
+  tags: [notifications, open-source]
+  aliases: [push, notify, alerts, messages]
+  icon: icons/gotify.svg
+  links:
+    website: https://gotify.net
+    documentation: https://gotify.net/docs/
+    source: https://github.com/gotify/server
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, and what the phone app connects to. Leave it empty to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and uploaded images are kept on.
+    type: volume
+
+versions:
+  - name: "3.1"
+    release: "3.1.1"
+    default: true
+    image: gotify/server:3.1.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The endpoint answers for the database as well as the server itself.
+        command: curl -fsS -o /dev/null http://127.0.0.1:80/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gotify
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: GOTIFY_DEFAULTUSER_NAME, v: "${{ params.adminUsername }}"}
+        - {k: GOTIFY_DEFAULTUSER_PASS, v: "${secrets.GOTIFY_DEFAULTUSER_PASS}"}
+        # TLS is terminated in front of the app, so its own server speaks plain HTTP.
+        - {k: GOTIFY_SERVER_SSL_ENABLED, v: "false"}
+    secrets:
+      GOTIFY_DEFAULTUSER_PASS:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

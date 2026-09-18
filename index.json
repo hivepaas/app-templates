@@ -701,6 +701,43 @@
       }
     },
     {
+      "name": "gotify",
+      "file": {
+        "path": "templates/gotify.yaml",
+        "sha256": "114f2f38eda45d27076f064d152e89ac971caf2dc4bd5a20e5864d8c0d5be762"
+      },
+      "icon": {
+        "path": "icons/gotify.svg",
+        "sha256": "3a6149a91f177193a1e09ea14eea3f9b7c5241ec00554e5df945e0f9505b9750"
+      },
+      "title": "Gotify",
+      "tagline": "Sends push notifications to your own phone, from your own server",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "push",
+        "notify",
+        "alerts",
+        "messages"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "grafana",
       "file": {
         "path": "templates/grafana.yaml",
@@ -730,6 +767,51 @@
         {
           "name": "13.0",
           "release": "13.0.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "healthchecks",
+      "file": {
+        "path": "templates/healthchecks.yaml",
+        "sha256": "22d70731adb7d7dc67bc726622bbf78c715776b8e4a86d4f63072951e8dda219"
+      },
+      "icon": {
+        "path": "icons/healthchecks.svg",
+        "sha256": "8c4bc1c25d803a386edaf9ffaa06eb7c3ace479981a8271934ae7ee957d3f08d"
+      },
+      "title": "Healthchecks",
+      "tagline": "Notices when a cron job stops running, which nothing else does",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "uptime",
+        "open-source"
+      ],
+      "aliases": [
+        "cron",
+        "dead-man-switch",
+        "heartbeat",
+        "jobs"
+      ],
+      "license": "BSD-3-Clause",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.4",
+          "release": "4.4",
           "default": true
         }
       ],
@@ -848,6 +930,50 @@
         {
           "name": "26.7",
           "release": "26.7.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kimai",
+      "file": {
+        "path": "templates/kimai.yaml",
+        "sha256": "7c669282b22eb4795e13cb928dd1c9a1b53eada9ec3802ef96e3bdbe7399c45d"
+      },
+      "icon": {
+        "path": "icons/kimai.svg",
+        "sha256": "6cf4df16b4063f498bcb4730cd7253b0d9e2be3d6e87fad6381eb798b62cf60e"
+      },
+      "title": "Kimai",
+      "tagline": "Tracks the hours a team spends, and turns them into invoices",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "open-source"
+      ],
+      "aliases": [
+        "time-tracking",
+        "timesheet",
+        "invoicing",
+        "hours"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.67",
+          "release": "2.67.0",
           "default": true
         }
       ],

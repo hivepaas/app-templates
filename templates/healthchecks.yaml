@@ -1,0 +1,162 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: healthchecks
+  title: Healthchecks
+  tagline: Notices when a cron job stops running, which nothing else does
+  description: |
+    Healthchecks watches jobs by waiting to be told they ran. Each check has a URL your job
+    calls when it finishes; if the call does not arrive in the period you set, Healthchecks
+    tells you. That catches the failure mode a monitoring system looking at servers never
+    sees: the backup that quietly stopped being scheduled at all.
+
+    **This template creates two apps**
+
+    - **Healthchecks** itself
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    It keeps nothing on disk of its own, so the database is the whole backup and this app
+    needs no volume.
+
+    **Make your account before anybody else does**
+
+    Registration is open when it first starts and the first account is as good as any other,
+    so open it and register straight away. Then set "Who may register" to nobody and
+    redeploy.
+
+    **Pinging a check**
+
+    Add a check, and it gives you a URL. At the end of the job:
+
+    ```
+    curl -fsS --retry 3 https://<this app's address>/ping/<uuid>
+    ```
+
+    A call to `/ping/<uuid>/fail` marks the run as failed, and `/start` before the work
+    measures how long it took.
+
+    **Notifications need setting up**
+
+    Email needs an SMTP server, which is configured through this app's environment
+    (`EMAIL_HOST` and the rest). Everything else - webhooks, Slack, Telegram, ntfy, Gotify
+    and the others - is configured inside the app and needs nothing here.
+  categories: [observability/monitoring]
+  tags: [monitoring, uptime, open-source]
+  aliases: [cron, dead-man-switch, heartbeat, jobs]
+  icon: icons/healthchecks.svg
+  links:
+    website: https://healthchecks.io
+    documentation: https://healthchecks.io/docs/
+    source: https://github.com/healthchecks/healthchecks
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: siteRoot
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://checks.example.com. The ping URLs
+      it hands out are built from it, so the default only works for other apps in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: registrationOpen
+    title: Who may register
+    description: Change this to nobody once your own account exists, and redeploy.
+    type: select
+    default: "True"
+    options:
+      - {value: "True", title: Anybody who can reach the app}
+      - {value: "False", title: Nobody}
+  - name: secretKey
+    title: Secret key
+    description: Signs sessions and the links sent by email. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 50}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: healthchecks
+      username: healthchecks
+
+versions:
+  - name: "4.4"
+    release: "4.4"
+    default: true
+    image: healthchecks/healthchecks:v4.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image runs its migrations from a uwsgi hook and keeps serving when they fail -
+      # which is what happens when the database app is not resolvable yet, leaving an app
+      # that looks healthy on an empty database. So they run here first, as many times as
+      # it takes, and the server starts only once they are through.
+      command: >-
+        sh -c 'until ./manage.py migrate --skip-checks; do echo "waiting for the database"; sleep 3; done;
+        exec uwsgi /opt/healthchecks/docker/uwsgi.ini'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own probe, which asks /api/v3/status/ - an endpoint that answers only
+        # when the database answers too.
+        command: ./fetchstatus.py
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: healthchecks
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB, v: postgres}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: SITE_ROOT, v: "${{ params.siteRoot }}"}
+        - {k: REGISTRATION_OPEN, v: "${{ params.registrationOpen }}"}
+        - {k: DEBUG, v: "False"}
+        # Django refuses a request whose Host it does not know. The router in front decides
+        # what may reach this app, and it answers on its app key as well as its domain, so
+        # the list it would have to carry is the same as no list at all.
+        - {k: ALLOWED_HOSTS, v: "*"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

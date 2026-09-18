@@ -1,0 +1,146 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kimai
+  title: Kimai
+  tagline: Tracks the hours a team spends, and turns them into invoices
+  description: |
+    Kimai records time against customers, projects and activities: start a timer or enter
+    hours afterwards, put a rate on them, and export the result as a timesheet or an invoice.
+    Teams, permissions and per-customer rates are built in, and everything it records is
+    reachable through its API.
+
+    **This template creates two apps**
+
+    - **Kimai** itself, with a volume for invoices, exports and its own cache
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    Kimai runs on MySQL or MariaDB and nothing else, which is why this pairs it with MariaDB
+    rather than PostgreSQL. The database holds every timesheet: it is what to back up.
+
+    **Your account is made at the first start**
+
+    The email and password here become the super administrator, created before anybody can
+    reach the app. The password is under this app's Secrets, as `ADMINPASS`. Other people get
+    accounts from inside the app, under Users.
+
+    **The first start is slow**
+
+    Kimai builds its database and warms its cache the first time it runs - a couple of
+    minutes before it answers is normal, and later starts are quick.
+  categories: [webapps/business]
+  tags: [business-intelligence, open-source]
+  aliases: [time-tracking, timesheet, invoicing, hours]
+  icon: icons/kimai.svg
+  links:
+    website: https://www.kimai.org
+    documentation: https://www.kimai.org/documentation/
+    source: https://github.com/kimai/kimai
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email address
+    description: The account you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: At least 8 characters. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: appSecret
+    title: Application secret
+    description: Signs sessions and cookies. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume invoices, exports and the cache are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: kimai
+      username: kimai
+
+versions:
+  - name: "2.67"
+    release: "2.67.0"
+    default: true
+    image: kimai/kimai2:2.67.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /opt/kimai/var: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The sign-in page rather than the root, which only redirects to it.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8001/en/login
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kimai
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # One URL rather than separate variables, which is what Doctrine reads. The server
+        # version is left out on purpose: Doctrine asks the database itself, so a patch
+        # release of MariaDB cannot disagree with a number written here. Generated
+        # passwords are letters and digits only, so nothing needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            mysql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?charset=utf8mb4
+        - {k: APP_ENV, v: prod}
+        - {k: APP_SECRET, v: "${secrets.APP_SECRET}"}
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: ADMINMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMINPASS, v: "${secrets.ADMINPASS}"}
+    secrets:
+      APP_SECRET:
+        value: "${{ params.appSecret }}"
+      ADMINPASS:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
