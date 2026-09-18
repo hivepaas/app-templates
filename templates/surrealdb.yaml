@@ -1,0 +1,131 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: surrealdb
+  title: SurrealDB
+  tagline: Documents, graphs and tables in one database, queried over HTTP
+  description: |
+    SurrealDB keeps records like a document store, links them like a graph, and queries them
+    with SurrealQL - a language close enough to SQL to read at a glance, with `->` for
+    following a relation instead of a join. One database that does the work of two or three,
+    reachable over HTTP, WebSocket or its own client libraries.
+
+    **This template sets up**
+
+    - the server on a persistent volume, storing to RocksDB on disk
+    - a root account from the username and password here, created at the first start
+    - a health check the binary performs on itself
+    - a memory limit you choose
+
+    **Connecting**
+
+    Another app in the same environment reaches it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT`
+    (8000), `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`. Over HTTP, a query is a POST to `/sql`
+    with the namespace and database in headers:
+
+    ```
+    curl -u "<user>:<password>" -H "surreal-ns: app" -H "surreal-db: app" \
+      -d "CREATE person SET name = 'ada';" http://<this app's key>:8000/sql
+    ```
+
+    **Namespaces and databases are made by you**
+
+    A fresh server has none: `DEFINE NAMESPACE app; USE NS app; DEFINE DATABASE app;` before
+    anything else. Querying one that does not exist answers "The namespace does not exist"
+    rather than creating it.
+
+    **The root account is only created once**
+
+    The username and password here make the root user on an empty database and are ignored
+    afterwards - changing them later does not change the account, which is done with
+    SurrealQL instead.
+  categories: [databases/nosql]
+  tags: [document, graph, json, open-source]
+  aliases: [surreal, multi-model, surrealql]
+  icon: icons/surrealdb.svg
+  links:
+    website: https://surrealdb.com
+    documentation: https://surrealdb.com/docs
+    source: https://github.com/surrealdb/surrealdb
+  license: BSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Root username
+    type: string
+    default: root
+    pattern: '^[A-Za-z_][A-Za-z0-9_.-]{0,63}$'
+  - name: password
+    title: Root password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  - name: "3.1"
+    release: "3.1.6"
+    default: true
+    image: surrealdb/surrealdb:v3.1.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the surreal binary, so this is its subcommand. What it
+      # starts with - the store, the address, the root account - comes from the environment.
+      command: start
+    storage:
+      mounts:
+        # Not /data, which the image already contains: docker copies an image's directory
+        # into an empty volume the first time it is mounted there, and copies its ownership
+        # with it - root, unwritable by the unprivileged user this image runs as. A path
+        # the image does not have keeps the permissions HivePaaS prepared.
+        /mnt/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image holds the binary and nothing else - no shell - but the binary can ask
+        # the server whether it is ready.
+        mode: CMD
+        command: /surreal isready --endpoint http://127.0.0.1:8000
+        interval: 15s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: surrealdb
+      version: "${{ version.name }}"
+      database:
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        # rocksdb: on the volume rather than the default in-memory store, which would lose
+        # everything on a restart.
+        - {k: SURREAL_PATH, v: "rocksdb:/mnt/data/db"}
+        # The default binds to the loopback address, which nothing outside the container
+        # can reach.
+        - {k: SURREAL_BIND, v: "0.0.0.0:8000"}
+        - {k: SURREAL_USER, v: "${HIVEPAAS_USER}"}
+        - {k: SURREAL_PASS, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: SURREAL_NO_BANNER, v: "true"}
+    routing:
+      port: 8000

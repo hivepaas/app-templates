@@ -1,0 +1,116 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: code-server
+  title: code-server
+  tagline: VS Code in a browser, running on the server your project lives on
+  description: |
+    code-server is Visual Studio Code running on a server and shown in a browser tab. The
+    editor, the terminal and the extensions all run there, so the machine doing the work is
+    the one with the code, the dependencies and the network access - and a tablet, a borrowed
+    laptop or a phone is enough to use it.
+
+    **This template sets up**
+
+    - the editor on a volume, holding your files, settings and installed extensions
+    - a password asked before anything is shown
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **A terminal on the server, and what that means**
+
+    Whoever signs in gets a shell inside this app with its network: every other app in the
+    project is reachable by key, and anything this app's environment holds is readable. That
+    is the point of it, and the reason the password here matters more than most.
+
+    **Installing things**
+
+    The container runs as an unprivileged user without sudo, so `apt install` is not
+    available. Language toolchains are installed under your home directory instead - nvm,
+    rustup, uv, a Go tarball - and those live on the volume, so they survive a redeploy.
+
+    **The volume is your home directory**
+
+    Files, VS Code settings, extensions and shell history are all under `/home/coder` on the
+    volume. Nothing is kept anywhere else, and a project cloned there is gone if the volume
+    is - push your work to a git remote like you would from a laptop.
+  categories: [webapps/dev-tools]
+  tags: [git, open-source]
+  aliases: [vscode, ide, editor, vs-code, workspace]
+  icon: icons/code-server.svg
+  links:
+    website: https://coder.com/docs/code-server
+    documentation: https://coder.com/docs/code-server/FAQ
+    source: https://github.com/coder/code-server
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: password
+    title: Password
+    description: Asked before the editor is shown. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: Language servers and builds are what use it, so give it room for the work.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume your home directory - files, settings and extensions - is kept on.
+    type: volume
+
+versions:
+  - name: "4.137"
+    release: "4.137.0"
+    default: true
+    image: codercom/code-server:4.137.0-trixie
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/coder: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/healthz
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: code-server
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PASSWORD, v: "${secrets.PASSWORD}"}
+    secrets:
+      PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

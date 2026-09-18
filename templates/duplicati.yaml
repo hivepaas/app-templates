@@ -1,0 +1,131 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: duplicati
+  title: Duplicati
+  tagline: Scheduled backups to anywhere, encrypted before they leave
+  description: |
+    Duplicati backs up directories to somewhere else - S3, Backblaze B2, a WebDAV or SFTP
+    server, Google Drive, or another machine - on a schedule you set. Backups are
+    incremental, deduplicated and encrypted with a passphrase you keep, so the destination
+    never sees readable data. Restoring picks a date and pulls back whole directories or one
+    file.
+
+    **This template sets up**
+
+    - Duplicati on a volume holding its configuration and its local index
+    - a password for the web interface, and a key that encrypts the credentials it stores
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **It cannot back up what it cannot see**
+
+    This app starts with only its own volume mounted, which is not what you want to back up.
+    Add the volume that holds an app's data to *this* app's storage settings - read-only is
+    enough - and it appears as a directory Duplicati can select as a source. Adding it
+    read-only also means a restore has to go somewhere else, which is the safer default.
+
+    **Two secrets, and they are not the same thing**
+
+    The password here opens the web interface. The passphrase you choose when creating a
+    backup is what encrypts it - Duplicati cannot recover it, and without it the backup is
+    a directory of unreadable blocks. Write it down somewhere that is not this server.
+
+    **A database backup is not a copy of its files**
+
+    Copying a running database's directory produces something that may not restore. Take a
+    dump into a directory first - the scheduled jobs on the database app can do that - and
+    let Duplicati carry the dump away.
+  categories: [storage/backup]
+  tags: [backup, open-source]
+  aliases: [restore, snapshots, s3-backup, scheduled-backup]
+  icon: icons/duplicati.svg
+  links:
+    website: https://duplicati.com
+    documentation: https://docs.duplicati.com
+    source: https://github.com/duplicati/duplicati
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to reach it from inside the project
+      only, which is enough to set backups up.
+    type: domain
+    optional: true
+  - name: password
+    title: Interface password
+    description: Asked before the interface is shown. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: settingsEncryptionKey
+    title: Settings encryption key
+    description: >-
+      Encrypts the destination credentials Duplicati stores - losing it means entering them
+      again. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume its configuration and local index are kept on.
+    type: volume
+
+versions:
+  - name: "2.4"
+    release: "2.4.0.0"
+    default: true
+    image: duplicati/duplicati:2.4.0.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The sign-in page, which answers without a session; the API itself is behind one.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8200/login.html
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: duplicati
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DUPLICATI__WEBSERVICE_PASSWORD, v: "${secrets.DUPLICATI__WEBSERVICE_PASSWORD}"}
+        - {k: SETTINGS_ENCRYPTION_KEY, v: "${secrets.SETTINGS_ENCRYPTION_KEY}"}
+        # The server binds to the loopback address unless told to answer on the network.
+        - {k: DUPLICATI__WEBSERVICE_INTERFACE, v: any}
+    secrets:
+      DUPLICATI__WEBSERVICE_PASSWORD:
+        value: "${{ params.password }}"
+      SETTINGS_ENCRYPTION_KEY:
+        value: "${{ params.settingsEncryptionKey }}"
+    routing:
+      port: 8200
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

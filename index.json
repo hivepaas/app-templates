@@ -404,6 +404,44 @@
       }
     },
     {
+      "name": "code-server",
+      "file": {
+        "path": "templates/code-server.yaml",
+        "sha256": "5e341672838f7175940a042e7e759e6a7d434744ccfa798c2645307bd24899cc"
+      },
+      "icon": {
+        "path": "icons/code-server.svg",
+        "sha256": "6d0c71d2407876247219d2af9a006d83a72041fe6f5fbd3282f5a7feb6fff49f"
+      },
+      "title": "code-server",
+      "tagline": "VS Code in a browser, running on the server your project lives on",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "vscode",
+        "ide",
+        "editor",
+        "vs-code",
+        "workspace"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "4.137",
+          "release": "4.137.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "couchdb",
       "file": {
         "path": "templates/couchdb.yaml",
@@ -603,6 +641,43 @@
         {
           "name": "1.40",
           "release": "1.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "duplicati",
+      "file": {
+        "path": "templates/duplicati.yaml",
+        "sha256": "cc812022e08f538dc1dabd0d7fbe8c61ed64a3504b0dc55b826e391b0794fb96"
+      },
+      "icon": {
+        "path": "icons/duplicati.svg",
+        "sha256": "53e7df1e0cb0ca9e2f396b2bed1e63c7ba3646f46bed28446baa12199c93f144"
+      },
+      "title": "Duplicati",
+      "tagline": "Scheduled backups to anywhere, encrypted before they leave",
+      "categories": [
+        "storage/backup"
+      ],
+      "tags": [
+        "backup",
+        "open-source"
+      ],
+      "aliases": [
+        "restore",
+        "snapshots",
+        "s3-backup",
+        "scheduled-backup"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.4",
+          "release": "2.4.0.0",
           "default": true
         }
       ],
@@ -2375,6 +2450,44 @@
         {
           "name": "4.47",
           "release": "4.47",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "surrealdb",
+      "file": {
+        "path": "templates/surrealdb.yaml",
+        "sha256": "1141ac021f142b4d5339a82cfbfa058f44c77aa65c1313f233bc0cd8db78f301"
+      },
+      "icon": {
+        "path": "icons/surrealdb.svg",
+        "sha256": "04054db1293c1af20f6a954fa97a47768d00af139f7ca71b7b6e83e1cb41f3c4"
+      },
+      "title": "SurrealDB",
+      "tagline": "Documents, graphs and tables in one database, queried over HTTP",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "document",
+        "graph",
+        "json",
+        "open-source"
+      ],
+      "aliases": [
+        "surreal",
+        "multi-model",
+        "surrealql"
+      ],
+      "license": "BSL-1.1",
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.6",
           "default": true
         }
       ],
