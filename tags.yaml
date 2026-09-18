@@ -29,3 +29,6 @@ tags:
   - {id: git, title: Git}
   - {id: wiki, title: Wiki}
   - {id: llm, title: LLM}
+  - {id: identity, title: Identity}
+  - {id: sso, title: Single Sign-On}
+  - {id: passwords, title: Password Manager}

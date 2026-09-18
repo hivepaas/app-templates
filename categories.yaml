@@ -20,6 +20,7 @@ categories:
       - {id: dev-tools, title: Developer Tools}
       - {id: knowledge, title: Wikis & Notes}
       - {id: cms, title: CMS & Blogging}
+      - {id: security, title: Identity & Passwords}
   - id: observability
     title: Observability
     children:

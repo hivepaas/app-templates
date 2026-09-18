@@ -63,6 +63,10 @@
         {
           "id": "cms",
           "title": "CMS & Blogging"
+        },
+        {
+          "id": "security",
+          "title": "Identity & Passwords"
         }
       ]
     },
@@ -207,6 +211,18 @@
     {
       "id": "llm",
       "title": "LLM"
+    },
+    {
+      "id": "identity",
+      "title": "Identity"
+    },
+    {
+      "id": "sso",
+      "title": "Single Sign-On"
+    },
+    {
+      "id": "passwords",
+      "title": "Password Manager"
     }
   ],
   "templates": [
@@ -475,6 +491,51 @@
         {
           "name": "2.9",
           "release": "2.9.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "keycloak",
+      "file": {
+        "path": "templates/keycloak.yaml",
+        "sha256": "f1a478e34db4d000a3fc6c50f8104e8b612b3a2a8e5d65e386f5dc79d5b8129b"
+      },
+      "icon": {
+        "path": "icons/keycloak.svg",
+        "sha256": "eb1f3b540b7a7feeb5fb8c0207c8c6dc85387b89c0d24c1dcf0127c4a223dd06"
+      },
+      "title": "Keycloak",
+      "tagline": "Single sign-on for your own apps, with users, roles and social logins",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "sso",
+        "oidc",
+        "oauth",
+        "identity-provider"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "26.7",
+          "release": "26.7.4",
           "default": true
         }
       ],
@@ -1209,6 +1270,42 @@
         {
           "name": "8.1",
           "release": "8.1.10"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "vaultwarden",
+      "file": {
+        "path": "templates/vaultwarden.yaml",
+        "sha256": "87288486846bd9a667a1ee7b648847098123a11e83e765cd7a4dce3da413e26b"
+      },
+      "icon": {
+        "path": "icons/vaultwarden.svg",
+        "sha256": "e4a25471bb1342380cc5066e2edf46400fa8f11e7119933783c9a951a368e840"
+      },
+      "title": "Vaultwarden",
+      "tagline": "A password manager the Bitwarden apps talk to, small enough to run anywhere",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "passwords",
+        "open-source"
+      ],
+      "aliases": [
+        "bitwarden",
+        "password-manager",
+        "vault"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.37",
+          "release": "1.37.3",
+          "default": true
         }
       ],
       "requires": {

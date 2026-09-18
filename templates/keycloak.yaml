@@ -1,0 +1,142 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: keycloak
+  title: Keycloak
+  tagline: Single sign-on for your own apps, with users, roles and social logins
+  description: |
+    Keycloak is an identity provider: your apps hand off logging in to it and get back a
+    signed token. It speaks OpenID Connect, OAuth 2.0 and SAML, keeps users, groups and
+    roles, and can federate them from LDAP or from Google, GitHub and the like.
+
+    **This template creates two apps**
+
+    - **Keycloak**, which keeps nothing of its own outside the database
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **The first administrator**
+
+    The password generated for you is under the app's Secrets, as
+    `KC_BOOTSTRAP_ADMIN_PASSWORD`. Sign in with it at `/admin`, then create a real
+    administrator account and delete the bootstrap one: it exists to let you in the first
+    time, and it is not meant to outlive that. Anybody who reaches the app before you do can
+    sign in with it, so do this first.
+
+    **Addresses**
+
+    Keycloak answers on whatever address the request arrived at, so it works before the app
+    has a domain and picks one up as soon as you add it. Tokens are issued against that
+    address, which is what the apps trusting Keycloak check, so settle the domain before you
+    connect anything to it. To pin the issuer to one address instead, add `KC_HOSTNAME` as
+    an environment variable with the full URL.
+
+    **Startup takes a while**
+
+    Keycloak builds its runtime every time it starts, and creates its schema the first time.
+    A minute or two before it answers is normal, and it is not stuck.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [sso, oidc, oauth, identity-provider]
+  icon: icons/keycloak.svg
+  links:
+    website: https://www.keycloak.org
+    documentation: https://www.keycloak.org/documentation
+    source: https://github.com/keycloak/keycloak
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: adminUsername
+    title: Bootstrap admin username
+    description: The account that lets you in the first time.
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Bootstrap admin password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: keycloak
+      username: keycloak
+
+versions:
+  - name: "26.7"
+    release: "26.7.4"
+    default: true
+    image: quay.io/keycloak/keycloak:26.7.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is kc.sh, and this is the sub-command handed to it. It
+      # cannot be wrapped in a shell: what a template writes here becomes the arguments,
+      # never the entry point.
+      command: start
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has no curl and no wget, so this is bash talking to the management port
+        # itself - /bin/sh is bash here, which is what makes /dev/tcp available.
+        #
+        # Only the first "status" of the response counts. It is the one describing Keycloak
+        # as a whole, and the checks listed under it each carry a "status" of their own -
+        # matching anywhere would call Keycloak ready while it was still starting, because
+        # its graceful-shutdown check is up from the first moment.
+        command: >-
+          exec 3<>/dev/tcp/127.0.0.1/9000;
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          grep -m1 '"status"' <&3 | grep -q UP
+        interval: 15s
+        timeout: 10s
+        startPeriod: 240s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: keycloak
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: KC_DB, v: postgres}
+        - {k: KC_DB_URL_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: KC_DB_URL_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: KC_DB_URL_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: KC_DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: KC_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # TLS is terminated in front of the app, so Keycloak serves plain HTTP and reads the
+        # original scheme and host from the headers the proxy sets. Without a hostname of
+        # its own it follows those headers, which is what lets the app work before it is
+        # given a domain and keep working after.
+        - {k: KC_HTTP_ENABLED, v: "true"}
+        - {k: KC_PROXY_HEADERS, v: xforwarded}
+        - {k: KC_HOSTNAME_STRICT, v: "false"}
+        - {k: KC_HEALTH_ENABLED, v: "true"}
+        - {k: KC_BOOTSTRAP_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: KC_BOOTSTRAP_ADMIN_PASSWORD, v: "${secrets.KC_BOOTSTRAP_ADMIN_PASSWORD}"}
+    secrets:
+      KC_BOOTSTRAP_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8080

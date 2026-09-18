@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: vaultwarden
+  title: Vaultwarden
+  tagline: A password manager the Bitwarden apps talk to, small enough to run anywhere
+  description: |
+    Vaultwarden is a compatible re-implementation of the Bitwarden server, written in Rust.
+    The official Bitwarden clients - browser extensions, phone apps, desktop and CLI - work
+    against it unchanged, and the vault stays on a server you run.
+
+    **Add a domain before you store anything in it**
+
+    The clients need an address to be pointed at, and features that identify the server -
+    passkeys, U2F keys and the admin page - are tied to it. Until the app has a domain it
+    answers on `http://localhost`, which is enough to look at and not enough to use. Add the
+    domain in the app's Routing settings; the restart that follows picks it up.
+
+    **The first account**
+
+    Sign-ups are open by default, so create yours as soon as the app is up and then set
+    "Allow sign-ups" to closed in this app's settings. Whoever signs up first is simply the
+    first user - there is no owner account to claim, and nothing stops the next person.
+
+    **The admin page**
+
+    `/admin` is where users, organisations and server settings are managed. The token
+    generated for you is under the app's Secrets, as `ADMIN_TOKEN`.
+
+    **Everything is on the volume**
+
+    The vault, attachments, and the keys that sign the clients' tokens all live on the data
+    volume in SQLite - so that volume is the backup, and losing it is losing the vault. The
+    data is encrypted with each user's own key, which this server never has: a forgotten
+    master password cannot be reset from `/admin`, only the account deleted.
+  categories: [webapps/security]
+  tags: [passwords, open-source]
+  aliases: [bitwarden, password-manager, vault]
+  icon: icons/vaultwarden.svg
+  links:
+    website: https://github.com/dani-garcia/vaultwarden/wiki
+    documentation: https://github.com/dani-garcia/vaultwarden/wiki
+    source: https://github.com/dani-garcia/vaultwarden
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: adminToken
+    title: Admin token
+    description: What signs you in to the /admin page. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: signupsAllowed
+    title: Allow sign-ups
+    description: Leave open until you have created your own account, then close it.
+    type: select
+    default: "true"
+    options:
+      - {value: "true", title: "Open - anybody who reaches the app can create an account"}
+      - {value: "false", title: "Closed - no new accounts"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the vault, attachments and server keys are kept on.
+    type: volume
+
+versions:
+  - name: "1.37"
+    release: "1.37.3"
+    default: true
+    image: vaultwarden/server:1.37.3-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Vaultwarden builds the address it hands to clients from DOMAIN, and an app has no
+      # domain until somebody adds one. This takes the domain when there is one and falls
+      # back to localhost when there is not, then hands over to the image's own start
+      # script.
+      command: >-
+        sh -c 'export DOMAIN="${HIVEPAAS_DOMAIN:+https://$HIVEPAAS_DOMAIN}";
+        export DOMAIN="${DOMAIN:-http://localhost}";
+        exec /start.sh'
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:80/alive
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: vaultwarden
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SIGNUPS_ALLOWED, v: "${{ params.signupsAllowed }}"}
+        - {k: ADMIN_TOKEN, v: "${secrets.ADMIN_TOKEN}"}
+        # The proxy in front of the app terminates TLS and is the only thing that reaches
+        # it, so the address a client is rate-limited by is the one the proxy forwards.
+        - {k: IP_HEADER, v: X-Forwarded-For}
+    secrets:
+      ADMIN_TOKEN:
+        value: "${{ params.adminToken }}"
+    routing:
+      port: 80
