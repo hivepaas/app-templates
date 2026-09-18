@@ -46,6 +46,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: uiUsername
     title: Inbox username
     type: string
@@ -122,3 +129,6 @@ app:
         value: "${{ params.uiPassword }}"
     routing:
       port: 8025
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

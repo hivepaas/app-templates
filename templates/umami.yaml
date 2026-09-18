@@ -21,11 +21,11 @@ metadata:
     account the first start creates, and it is the same on every Umami in the world. Then
     add your website and copy the tracking script it gives you into that site's pages.
 
-    **Add a domain**
+    **It needs a domain**
 
     The tracking script is loaded from this app by the browsers visiting your site, so the
-    app needs an address they can reach. Until it has a domain there is nothing to point a
-    site at.
+    app needs an address they can reach. Until it has one there is nothing to point a site
+    at, so fill the domain in when you create the app if you already know it.
 
     **Backups are the database**
 
@@ -44,6 +44,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: appSecret
     title: Application secret
     description: What signs the session tokens. Leave empty to generate one.
@@ -108,3 +115,6 @@ app:
         value: "${{ params.appSecret }}"
     routing:
       port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

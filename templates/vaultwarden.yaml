@@ -10,12 +10,12 @@ metadata:
     The official Bitwarden clients - browser extensions, phone apps, desktop and CLI - work
     against it unchanged, and the vault stays on a server you run.
 
-    **Add a domain before you store anything in it**
+    **Give it its domain before you store anything in it**
 
     The clients need an address to be pointed at, and features that identify the server -
-    passkeys, U2F keys and the admin page - are tied to it. Until the app has a domain it
-    answers on `http://localhost`, which is enough to look at and not enough to use. Add the
-    domain in the app's Routing settings; the restart that follows picks it up.
+    passkeys, U2F keys and the admin page - are tied to it. Without a domain it answers on
+    `http://localhost`, which is enough to look at and not enough to use. Fill in the domain
+    when you create the app, or add it later in the app's routing settings.
 
     **The first account**
 
@@ -47,6 +47,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: adminToken
     title: Admin token
     description: What signs you in to the /admin page. Leave empty to generate one.
@@ -122,3 +129,6 @@ app:
         value: "${{ params.adminToken }}"
     routing:
       port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

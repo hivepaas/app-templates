@@ -45,6 +45,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: memoryLimit
     title: Memory limit
     type: size
@@ -94,3 +101,6 @@ app:
         - {k: UPTIME_KUMA_DB_TYPE, v: sqlite}
     routing:
       port: 3001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

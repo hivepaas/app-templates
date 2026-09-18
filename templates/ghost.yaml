@@ -14,12 +14,12 @@ metadata:
     - **Ghost**, on a volume for images, themes and uploads
     - **a MySQL database** for it, named after the app with `-db` added
 
-    **Add a domain before you publish**
+    **Give it its domain before you publish**
 
-    Ghost builds every link from the address it is configured with. Until the app has a
-    domain it runs on `http://localhost:2368`, which is enough to look at but not to use:
-    links, feeds and email all point at it. Add the domain in the app's Routing settings, and
-    the restart that follows picks it up.
+    Ghost builds every link from the address it is configured with. Without a domain it runs
+    on `http://localhost:2368`, which is enough to look at but not to use: links, feeds and
+    email all point at it. Fill in the domain when you create the app, or add it later in the
+    app's routing settings - the restart that follows picks it up.
 
     Then open `/ghost/` to create the owner account. Anybody who reaches the site before you
     do can create it instead.
@@ -41,6 +41,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: memoryLimit
     title: Memory limit
     type: size
@@ -116,3 +123,6 @@ app:
         - {k: database__connection__password, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
     routing:
       port: 2368
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

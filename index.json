@@ -439,7 +439,7 @@
       "name": "ghost",
       "file": {
         "path": "templates/ghost.yaml",
-        "sha256": "d0363ee3926f45d85e76f2745c10886d62afeb8fa3138bfa0f584483efc0bc18"
+        "sha256": "8daf6e11c74997fddd4f07c6d7e3f7a0131130a980eddde409b62f8c34b7b8f1"
       },
       "icon": {
         "path": "icons/ghost.svg",
@@ -481,7 +481,7 @@
       "name": "gitea",
       "file": {
         "path": "templates/gitea.yaml",
-        "sha256": "2d91720c5bfdd87f227e87c71a152472ee67d5abd3d4c5a25579f923f33b0767"
+        "sha256": "770d09ea804b95908b1c09b5e33a46082c496c85ada729d0ea52cdfcbbe5fd5e"
       },
       "icon": {
         "path": "icons/gitea.svg",
@@ -523,7 +523,7 @@
       "name": "grafana",
       "file": {
         "path": "templates/grafana.yaml",
-        "sha256": "297f129b80e361d211ec31c2c0a2abe2ecb069ec215a75ec72b9d28057ed9c73"
+        "sha256": "b22a97883f05a8e37093e2cd49e31629c2b3673b2814da0e223f042f10970df3"
       },
       "icon": {
         "path": "icons/grafana.svg",
@@ -595,7 +595,7 @@
       "name": "keycloak",
       "file": {
         "path": "templates/keycloak.yaml",
-        "sha256": "f1a478e34db4d000a3fc6c50f8104e8b612b3a2a8e5d65e386f5dc79d5b8129b"
+        "sha256": "1228c2f1b3ae21f630266be6852901d643e488b51fa08193830a58c47ae30628"
       },
       "icon": {
         "path": "icons/keycloak.svg",
@@ -640,7 +640,7 @@
       "name": "mailpit",
       "file": {
         "path": "templates/mailpit.yaml",
-        "sha256": "a6237e79e7230911091d0f293e648f772b06423563e68904f895a113c150af2f"
+        "sha256": "5f0c3ecd46b1bcf0f49fb335b46801389c3eb18511427dd8fc8a5a5d025c34dc"
       },
       "icon": {
         "path": "icons/mailpit.svg",
@@ -861,7 +861,7 @@
       "name": "n8n",
       "file": {
         "path": "templates/n8n.yaml",
-        "sha256": "8664241b1d5797707397d4367638aba76ef78ebcb0e3a27a649633deddd24b0e"
+        "sha256": "6dc6380b92bcb460e35982978d8018322f1e570ceaa21abcb0a50183419a25dc"
       },
       "icon": {
         "path": "icons/n8n.svg",
@@ -936,7 +936,7 @@
       "name": "nocodb",
       "file": {
         "path": "templates/nocodb.yaml",
-        "sha256": "54334f012c76a70dd6a9ebd21a579e7471d7b5ae17a2e91533bb94ca90d66f6d"
+        "sha256": "506798728e3455e84f08e56186030a23072c106ec4a82813735693e378f8c066"
       },
       "icon": {
         "path": "icons/nocodb.svg",
@@ -981,7 +981,7 @@
       "name": "open-webui",
       "file": {
         "path": "templates/open-webui.yaml",
-        "sha256": "01153520f27f91401c59660411cf4681acf776cb2a0a8a112e151e05d23eb0b1"
+        "sha256": "70cde4d3ebab6362acfd36cca7dba91abec73149bb0ac9cdc924ec0926d4ce5c"
       },
       "icon": {
         "path": "icons/open-webui.svg",
@@ -1137,7 +1137,7 @@
       "name": "prometheus",
       "file": {
         "path": "templates/prometheus.yaml",
-        "sha256": "8cebc23ae8d5ba8be67e83956fc7a85e6b35f1565e70e70b3fdedf8cfc8ec111"
+        "sha256": "b95b637b98dfb36df74d323f9e229857aaeb264d60247d63c59ad6505709e460"
       },
       "icon": {
         "path": "icons/prometheus.svg",
@@ -1451,7 +1451,7 @@
       "name": "umami",
       "file": {
         "path": "templates/umami.yaml",
-        "sha256": "f8d344436943cd387b359b2adb4de2cffe944f64b8051395d89edb99f715a988"
+        "sha256": "d7b6385a104c9d9faae75c769c20bd898cf8dc3b4953c72735c90190c6230946"
       },
       "icon": {
         "path": "icons/umami.svg",
@@ -1495,7 +1495,7 @@
       "name": "uptime-kuma",
       "file": {
         "path": "templates/uptime-kuma.yaml",
-        "sha256": "a0bad624673664dfa6ace24cc7453884fc2a79c880dea86d09faa487ef4dfe6e"
+        "sha256": "d25a5c7612c51887f93edd71637504613659c17e0d63820b97998670dda5aac2"
       },
       "icon": {
         "path": "icons/uptime-kuma.svg",
@@ -1573,7 +1573,7 @@
       "name": "vaultwarden",
       "file": {
         "path": "templates/vaultwarden.yaml",
-        "sha256": "87288486846bd9a667a1ee7b648847098123a11e83e765cd7a4dce3da413e26b"
+        "sha256": "4e2d8480a1fd6035f06a5e835f1a67a8183e73d9f666f33d7db709d5062e0116"
       },
       "icon": {
         "path": "icons/vaultwarden.svg",
@@ -1609,7 +1609,7 @@
       "name": "vikunja",
       "file": {
         "path": "templates/vikunja.yaml",
-        "sha256": "388990e25f44169c612634dde1f2805962788b52fa674455d25cf44109e8eccc"
+        "sha256": "bd7aa732c216a002c72867c883cac6da295e6666e48f7567be4eabb4b0511d7e"
       },
       "icon": {
         "path": "icons/vikunja.svg",
@@ -1653,7 +1653,7 @@
       "name": "wikijs",
       "file": {
         "path": "templates/wikijs.yaml",
-        "sha256": "4f857f89926bf4025829284885b54fe1b4cde587696023433c1c4fc74d308cd8"
+        "sha256": "b10864438fcb1c53534c09a06926c5923edac1bdb5f63061cbbe34a8b090a111"
       },
       "icon": {
         "path": "icons/wikijs.svg",
@@ -1695,7 +1695,7 @@
       "name": "wordpress",
       "file": {
         "path": "templates/wordpress.yaml",
-        "sha256": "10b9eae43c7b34c5efe3b76e6dc0b4940a9090c6a220dc8add234d0f7e141eb8"
+        "sha256": "f3b5937cf92fbafdbdfb2e11882657e54de21221fdd41863a18ca169e607d2d8"
       },
       "icon": {
         "path": "icons/wordpress.svg",

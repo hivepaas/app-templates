@@ -48,6 +48,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: scrapeInterval
     title: Scrape interval
     description: How often every target is asked for its metrics.
@@ -130,3 +137,6 @@ app:
           file: {name: /etc/prometheus/prometheus.yml, mode: 444}
     routing:
       port: 9090
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

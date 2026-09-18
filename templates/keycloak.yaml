@@ -26,10 +26,10 @@ metadata:
     **Addresses**
 
     Keycloak answers on whatever address the request arrived at, so it works before the app
-    has a domain and picks one up as soon as you add it. Tokens are issued against that
-    address, which is what the apps trusting Keycloak check, so settle the domain before you
-    connect anything to it. To pin the issuer to one address instead, add `KC_HOSTNAME` as
-    an environment variable with the full URL.
+    has a domain and picks one up as soon as it gets one. Tokens are issued against that
+    address, which is what the apps trusting Keycloak check, so settle the domain - here,
+    when you create the app - before you connect anything to it. To pin the issuer to one
+    address instead, add `KC_HOSTNAME` as an environment variable with the full URL.
 
     **Startup takes a while**
 
@@ -48,6 +48,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: adminUsername
     title: Bootstrap admin username
     description: The account that lets you in the first time.
@@ -140,3 +147,6 @@ app:
         value: "${{ params.adminPassword }}"
     routing:
       port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

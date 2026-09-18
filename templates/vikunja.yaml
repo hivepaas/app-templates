@@ -41,6 +41,13 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
   - name: jwtSecret
     title: Token secret
     description: What signs the sessions. Leave empty to generate one.
@@ -126,3 +133,6 @@ app:
         value: "${{ params.jwtSecret }}"
     routing:
       port: 3456
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
