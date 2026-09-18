@@ -307,6 +307,10 @@
     {
       "id": "collaboration",
       "title": "Collaboration"
+    },
+    {
+      "id": "team-chat",
+      "title": "Team Chat"
     }
   ],
   "templates": [
@@ -786,6 +790,52 @@
         {
           "name": "11.4",
           "release": "11.4.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mattermost",
+      "file": {
+        "path": "templates/mattermost.yaml",
+        "sha256": "ede0c66a39b5479bc2668a2f2f007120d59eb8c4435d4a3def4ff597bdd1e349"
+      },
+      "icon": {
+        "path": "icons/mattermost.svg",
+        "sha256": "a2c4bb7b186c86e5eab2ff453078e5cc6518c7f218e1e09b3d5e297fea7d3403"
+      },
+      "title": "Mattermost",
+      "tagline": "Team chat in channels, with threads, search and the apps people expect",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "team-chat",
+        "chat",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "chat",
+        "slack",
+        "teams",
+        "messaging"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "11.11",
+          "release": "11.11.0",
+          "default": true
         }
       ],
       "requires": {
