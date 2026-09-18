@@ -1,0 +1,154 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: metamcp
+  title: MetaMCP
+  tagline: Runs your MCP servers and hands them to clients over one address
+  description: |
+    An MCP server is usually a program an assistant starts on your own machine and talks to
+    over its standard input - which is fine on a laptop and impossible on a server. MetaMCP
+    is the piece that closes that gap: it runs those servers itself, groups them into
+    namespaces, and serves each namespace over HTTP and SSE at an address with an API key.
+    Claude, Open WebUI, Cursor or your own agent then connects to one endpoint and sees every
+    tool behind it.
+
+    **This template creates two apps**
+
+    - **MetaMCP** itself
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    The database holds the servers you configure, the namespaces and the keys. It is the
+    whole of it: this app keeps nothing on disk.
+
+    **Adding servers**
+
+    Servers are added in the interface. A `npx`-style server is fetched when it first runs,
+    so the first call to a new server is slow and the one after is not - and a redeploy
+    fetches it again, because nothing is cached between deployments.
+
+    **Make your account before anybody else does**
+
+    Registration is open when it first starts and the first account is as good as any other,
+    so open it and register straight away. Then set "Who may register" to nobody and redeploy.
+
+    **A gateway is as trusted as what it runs**
+
+    An MCP server does real work: reads files, calls APIs, spends money. Everything added
+    here runs inside this app with whatever credentials you give it, and anybody holding a
+    namespace's API key can use those tools. Treat those keys like the credentials they
+    stand in for.
+  categories: [webapps/ai]
+  tags: [ai, llm, automation, open-source]
+  aliases: [mcp, model-context-protocol, tools, gateway, agent]
+  icon: icons/metamcp.svg
+  links:
+    website: https://metamcp.com
+    documentation: https://docs.metamcp.com
+    source: https://github.com/metatool-ai/metamcp
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address clients connect to, scheme and all - https://mcp.example.com. Sign-in and
+      the endpoints it hands out are built from it, so the default only works for other apps
+      in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:12008
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: disableSignup
+    title: Who may register
+    description: Change this to nobody once your own account exists, and redeploy.
+    type: select
+    default: "false"
+    options:
+      - {value: "false", title: Anybody who can reach the app}
+      - {value: "true", title: Nobody}
+  - name: authSecret
+    title: Authentication secret
+    description: Signs the sessions people sign in with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: The servers it runs are processes inside this app, so give it room for them.
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: metamcp
+      username: metamcp
+
+versions:
+  - name: "2.4"
+    release: "2.4.22"
+    default: true
+    image: ghcr.io/metatool-ai/metamcp:2.4.22
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:12008/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: metamcp
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        # Its entry point waits for the database with pg_isready before it migrates, and
+        # that wait reads these rather than the URL above.
+        - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: POSTGRES_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: APP_URL, v: "${{ params.appUrl }}"}
+        - {k: BETTER_AUTH_SECRET, v: "${secrets.BETTER_AUTH_SECRET}"}
+        - {k: DISABLE_SIGNUP, v: "${{ params.disableSignup }}"}
+        - {k: NODE_ENV, v: production}
+    secrets:
+      BETTER_AUTH_SECRET:
+        value: "${{ params.authSecret }}"
+    routing:
+      port: 12008
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

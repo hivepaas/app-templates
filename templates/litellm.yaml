@@ -1,0 +1,181 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: litellm
+  title: LiteLLM
+  tagline: One OpenAI-compatible endpoint in front of every model you use
+  description: |
+    LiteLLM is a gateway for language models. Your apps speak the OpenAI API to it, and it
+    speaks whatever the model behind it needs - OpenAI, Anthropic, Gemini, Bedrock, an Ollama
+    app in this project, or several at once. Swapping a model becomes a line of configuration
+    rather than a change in every app that calls it.
+
+    **This template creates two apps**
+
+    - **LiteLLM** itself
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    The database holds the models you add, the keys you hand out and what they spent. LiteLLM
+    keeps nothing on disk of its own, so that database is the whole of it.
+
+    **Keys, and the one that makes the others**
+
+    The master key is under this app's Secrets, as `LITELLM_MASTER_KEY`. It is for
+    administration, not for applications: sign in to the interface at `/ui` with the username
+    and password here, then create a key per app, with its own models and monthly budget.
+    Revoking one key then stops one app rather than all of them.
+
+    **Adding models**
+
+    Models are added in the interface and kept in the database, so they survive a redeploy.
+    An Ollama app in the same environment is reached at `http://<its app key>:11434` with the
+    provider `ollama` - no API key needed. A hosted provider needs its own key, which LiteLLM
+    stores encrypted with the salt key here; changing that key later makes what it encrypted
+    unreadable.
+
+    **Calling it**
+
+    ```
+    curl https://<this app's address>/v1/chat/completions \
+      -H "Authorization: Bearer <a key you created>" \
+      -H "Content-Type: application/json" \
+      -d '{"model":"<the name you gave it>","messages":[{"role":"user","content":"hello"}]}'
+    ```
+  categories: [webapps/ai]
+  tags: [ai, llm, open-source]
+  aliases: [llm-gateway, proxy, openai, router, litellm-proxy]
+  icon: icons/litellm.svg
+  links:
+    website: https://www.litellm.ai
+    documentation: https://docs.litellm.ai/docs/simple_proxy
+    source: https://github.com/BerriAI/litellm
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: uiUsername
+    title: Interface username
+    description: For signing in to the administration interface at /ui.
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: uiPassword
+    title: Interface password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: masterKey
+    title: Master key
+    description: >-
+      The key that administers the others - never give it to an application. Leave empty to
+      generate one; `sk-` is added in front of whatever is here.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: saltKey
+    title: Salt key
+    description: >-
+      Encrypts the provider keys stored in the database - changing it later makes them
+      unreadable. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: litellm
+      username: litellm
+
+versions:
+  - name: "1.61"
+    release: "1.61.7"
+    default: true
+    image: ghcr.io/berriai/litellm:main-v1.61.7
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is litellm itself, so this is its flags.
+      command: --config /etc/litellm/config.yaml --port 4000
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries wget but no curl. /health/liveliness answers without a key;
+        # /health would need one and reports on the models rather than the proxy.
+        command: wget -q -O /dev/null http://127.0.0.1:4000/health/liveliness
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: litellm
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # LiteLLM requires the master key to begin with sk-, so the generated secret is
+        # what follows it.
+        - {k: LITELLM_MASTER_KEY, v: "sk-${secrets.LITELLM_MASTER_KEY}"}
+        - {k: LITELLM_SALT_KEY, v: "${secrets.LITELLM_SALT_KEY}"}
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: STORE_MODEL_IN_DB, v: "True"}
+        - {k: UI_USERNAME, v: "${{ params.uiUsername }}"}
+        - {k: UI_PASSWORD, v: "${secrets.UI_PASSWORD}"}
+    secrets:
+      LITELLM_MASTER_KEY:
+        value: "${{ params.masterKey }}"
+      LITELLM_SALT_KEY:
+        value: "${{ params.saltKey }}"
+      UI_PASSWORD:
+        value: "${{ params.uiPassword }}"
+    configFiles:
+      config.yaml:
+        # Models are added in the interface and kept in the database rather than written
+        # here, so a redeploy does not undo them.
+        content: |
+          general_settings:
+            store_model_in_db: true
+            store_prompts_in_spend_logs: false
+
+          litellm_settings:
+            drop_params: true
+            telemetry: false
+
+          model_list: []
+        swarmRef:
+          file: {name: /etc/litellm/config.yaml, mode: 444}
+    routing:
+      port: 4000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

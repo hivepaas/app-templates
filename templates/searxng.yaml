@@ -1,0 +1,158 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: searxng
+  title: SearXNG
+  tagline: Searches other engines for you, and tells none of them who asked
+  description: |
+    SearXNG asks other search engines a question and merges what comes back. Nothing about
+    the person asking reaches them: no account, no cookies, no profile built from what you
+    look for. It is a useful search page in its own right, and the usual way to give an
+    assistant the web - Open WebUI, an agent, anything that can call an HTTP endpoint.
+
+    **This template sets up**
+
+    - the search page, with a generated secret of its own
+    - the JSON API turned on, which is what a program needs and what the shipped
+      configuration leaves off
+    - a memory limit you choose
+
+    **Giving it to an assistant**
+
+    In Open WebUI: Settings, Web Search, choose `searxng` and give it
+    `http://<this app's key>:8080/search?q=<query>`. For anything else, ask it directly:
+
+    ```
+    curl "http://<this app's key>:8080/search?q=hivepaas&format=json"
+    ```
+
+    **Engines answer differently from a server**
+
+    Some engines - DuckDuckGo and Wikipedia among them - meet a datacentre address with a
+    captcha or a refusal, and SearXNG simply leaves those out of the results. That is normal
+    and not a fault of the app: the ones that do answer still give you results. Turning
+    engines off or adding others is done in its settings.
+
+    **Nothing is kept**
+
+    No volume, no database: it holds no history and remembers no query. Its whole state is
+    the configuration file this template writes.
+  categories: [webapps/ai]
+  tags: [search, privacy, ai, open-source]
+  aliases: [metasearch, websearch, searx, google]
+  icon: icons/searxng.svg
+  links:
+    website: https://docs.searxng.org
+    documentation: https://docs.searxng.org/admin/installation-docker.html
+    source: https://github.com/searxng/searxng
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: instanceName
+    title: Instance name
+    description: What the page calls itself.
+    type: string
+    default: SearXNG
+    pattern: '^[^\n\r]{1,64}$'
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to use it from inside the project
+      only, which is all an assistant needs.
+    type: domain
+    optional: true
+  - name: secretKey
+    title: Secret key
+    description: Signs its own requests. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: safeSearch
+    title: Safe search
+    type: select
+    default: "0"
+    options:
+      - {value: "0", title: Off}
+      - {value: "1", title: Moderate}
+      - {value: "2", title: Strict}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.18"
+    default: true
+    image: searxng/searxng:2026.9.18-74ffd0115
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The search page itself rather than the front page, so a broken engine list or a
+        # missing secret shows up as unhealthy.
+        command: wget -q -O /dev/null "http://127.0.0.1:8080/search?q=healthcheck&format=json"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: searxng
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SEARXNG_BASE_URL, v: "http://${HIVEPAAS_HOST}:8080/"}
+        # server.secret_key reads this environment variable when it is set
+        # (settings_defaults.py), which keeps the secret out of the configuration file.
+        - {k: SEARXNG_SECRET, v: "${secrets.SEARXNG_SECRET}"}
+    secrets:
+      SEARXNG_SECRET:
+        value: "${{ params.secretKey }}"
+    configFiles:
+      settings.yml:
+        # use_default_settings keeps the engine list the image ships and changes only what
+        # is below it, so an upgrade brings the new engines with it.
+        content: |
+          use_default_settings: true
+
+          general:
+            instance_name: "${{ params.instanceName }}"
+            donation_url: false
+            contact_url: false
+
+          server:
+            # secret_key is not here: it comes from SEARXNG_SECRET, which overrides this
+            # file, and a secret written into a configuration file is refused anyway.
+            # The limiter needs a Redis to count against and refuses requests without one.
+            limiter: false
+            public_instance: false
+            image_proxy: true
+
+          search:
+            safe_search: ${{ params.safeSearch }}
+            # json is what a program reads; the shipped configuration serves html alone.
+            formats:
+              - html
+              - json
+        swarmRef:
+          file: {name: /etc/searxng/settings.yml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

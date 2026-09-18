@@ -982,6 +982,52 @@
       }
     },
     {
+      "name": "litellm",
+      "file": {
+        "path": "templates/litellm.yaml",
+        "sha256": "ce78c6f9902692ec5181789dcdf9bf19afa59f1e78c0db3ffdbec572c1e319f9"
+      },
+      "icon": {
+        "path": "icons/litellm.svg",
+        "sha256": "9878872d2283ba59450edf191109e6f2611b1fa5f6d0f4c0979feaac51c96fcc"
+      },
+      "title": "LiteLLM",
+      "tagline": "One OpenAI-compatible endpoint in front of every model you use",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "open-source"
+      ],
+      "aliases": [
+        "llm-gateway",
+        "proxy",
+        "openai",
+        "router",
+        "litellm-proxy"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.61",
+          "release": "1.61.7",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "loki",
       "file": {
         "path": "templates/loki.yaml",
@@ -1250,6 +1296,53 @@
         {
           "name": "0.63",
           "release": "0.63.18",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "metamcp",
+      "file": {
+        "path": "templates/metamcp.yaml",
+        "sha256": "746a0f925d7f18fc8a79df7632392faf46d129f4e0fdf55c37602162494620d7"
+      },
+      "icon": {
+        "path": "icons/metamcp.svg",
+        "sha256": "5a3e3dd344fa3a18e09007e5bd33fa71e6301664a9688681e82f08f8e08b9c84"
+      },
+      "title": "MetaMCP",
+      "tagline": "Runs your MCP servers and hands them to clients over one address",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "mcp",
+        "model-context-protocol",
+        "tools",
+        "gateway",
+        "agent"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.4",
+          "release": "2.4.22",
           "default": true
         }
       ],
@@ -2127,6 +2220,45 @@
         {
           "name": "0.14",
           "release": "0.14.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "searxng",
+      "file": {
+        "path": "templates/searxng.yaml",
+        "sha256": "16f5647fc696182afafedbe140ebcac160f979d47b7d0c311c3572f1c6fd16d9"
+      },
+      "icon": {
+        "path": "icons/searxng.svg",
+        "sha256": "eb1a7ced9a493bfd11390ca30d14ea1a846f78999ba9f87e4f28b721ad0663ae"
+      },
+      "title": "SearXNG",
+      "tagline": "Searches other engines for you, and tells none of them who asked",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "search",
+        "privacy",
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "metasearch",
+        "websearch",
+        "searx",
+        "google"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.18",
           "default": true
         }
       ],
