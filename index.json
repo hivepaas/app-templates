@@ -2574,7 +2574,7 @@
       "name": "surrealdb",
       "file": {
         "path": "templates/surrealdb.yaml",
-        "sha256": "1141ac021f142b4d5339a82cfbfa058f44c77aa65c1313f233bc0cd8db78f301"
+        "sha256": "2ab600996afab2e8b61bb0244f773180b6be083bb5aedeb879f9560ff6a67d54"
       },
       "icon": {
         "path": "icons/surrealdb.svg",

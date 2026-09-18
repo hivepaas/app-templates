@@ -90,11 +90,13 @@ app:
       command: start
     storage:
       mounts:
-        # Not /data, which the image already contains: docker copies an image's directory
-        # into an empty volume the first time it is mounted there, and copies its ownership
-        # with it - root, unwritable by the unprivileged user this image runs as. A path
-        # the image does not have keeps the permissions HivePaaS prepared.
-        /mnt/data: {type: volume, source: "${{ params.dataVolume }}"}
+        # noCopy because the image contains /data: docker would copy that directory into an
+        # empty volume the first time it is mounted here, ownership included - root, which
+        # the unprivileged user this image runs as cannot write to.
+        /data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
     container:
       healthcheck:
         enabled: true
@@ -120,7 +122,7 @@ app:
       data:
         # rocksdb: on the volume rather than the default in-memory store, which would lose
         # everything on a restart.
-        - {k: SURREAL_PATH, v: "rocksdb:/mnt/data/db"}
+        - {k: SURREAL_PATH, v: "rocksdb:/data/db"}
         # The default binds to the loopback address, which nothing outside the container
         # can reach.
         - {k: SURREAL_BIND, v: "0.0.0.0:8000"}
