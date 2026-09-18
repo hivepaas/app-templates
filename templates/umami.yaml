@@ -1,0 +1,110 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: umami
+  title: Umami
+  tagline: Web analytics that counts visits without following people around
+  description: |
+    Umami tells you which pages are read, where readers came from and what they use, from a
+    small script on your site. It sets no cookies and keeps no identifiers, so there is
+    nothing to ask consent for and nothing to leak.
+
+    **This template creates two apps**
+
+    - **Umami**, which keeps nothing of its own
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `umami` and change it straight away - it is the
+    account the first start creates, and it is the same on every Umami in the world. Then
+    add your website and copy the tracking script it gives you into that site's pages.
+
+    **Add a domain**
+
+    The tracking script is loaded from this app by the browsers visiting your site, so the
+    app needs an address they can reach. Until it has a domain there is nothing to point a
+    site at.
+
+    **Backups are the database**
+
+    Every event, website and account lives in PostgreSQL, so the database app is what there
+    is to back up. Umami itself holds nothing, which is why this template asks for no volume.
+  categories: [observability/analytics]
+  tags: [web-analytics, analytics, privacy, open-source]
+  aliases: [analytics, stats]
+  icon: icons/umami.svg
+  links:
+    website: https://umami.is
+    documentation: https://umami.is/docs
+    source: https://github.com/umami-software/umami
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appSecret
+    title: Application secret
+    description: What signs the session tokens. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: umami
+      username: umami
+
+versions:
+  - name: "3.4"
+    release: "3.4.0"
+    default: true
+    image: ghcr.io/umami-software/umami:3.4.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/heartbeat
+        interval: 15s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: umami
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # One URL rather than separate host and user variables, which is what Prisma reads.
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: DATABASE_TYPE, v: postgresql}
+        - {k: APP_SECRET, v: "${secrets.APP_SECRET}"}
+    secrets:
+      APP_SECRET:
+        value: "${{ params.appSecret }}"
+    routing:
+      port: 3000

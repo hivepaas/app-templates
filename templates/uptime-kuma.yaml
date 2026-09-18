@@ -1,0 +1,96 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: uptime-kuma
+  title: Uptime Kuma
+  tagline: Watches your sites and services and tells you the moment one stops answering
+  description: |
+    Uptime Kuma checks whether things are up: HTTP endpoints, TCP ports, ping, DNS records,
+    certificates about to expire. When one fails it notifies you - by email, Telegram, Slack,
+    a webhook, and about ninety other ways - and keeps a history you can publish as a status
+    page.
+
+    **After the first deployment**
+
+    Open the app and create the administrator account. There is no default password: the
+    first person to reach the setup page becomes the administrator, so do not leave it for
+    someone else to find.
+
+    Uptime Kuma can keep its data in SQLite or in a MariaDB, and normally asks which before
+    anything else. This template answers that for you - SQLite, on the data volume - so the
+    setup page it opens on is the one asking for your account.
+
+    **What it can reach**
+
+    Checks run from inside the container, so anything public works, and so does any other
+    app in this project by its key - `http://<its app key>:8080`, no domain needed. Watching
+    the app it runs next to tells you little, though: if the machine goes down, so does the
+    thing that was meant to notice.
+
+    **Everything is on the volume**
+
+    Monitors, notification settings, the account and the whole history live on the data
+    volume, so that volume is what there is to back up.
+  categories: [observability/monitoring]
+  tags: [uptime, monitoring, open-source]
+  aliases: [uptime, status-page, monitoring]
+  icon: icons/uptime-kuma.svg
+  links:
+    website: https://uptime.kuma.pet
+    documentation: https://github.com/louislam/uptime-kuma/wiki
+    source: https://github.com/louislam/uptime-kuma
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the monitors, settings and history are kept on.
+    type: volume
+
+versions:
+  - name: "2.5"
+    release: "2.5.5"
+    default: true
+    image: louislam/uptime-kuma:2.5.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3001
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: uptime-kuma
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Answering this here skips the screen that asks where to keep the data, and makes
+        # sure the answer is the volume this app was given rather than a database somebody
+        # picks by accident.
+        - {k: UPTIME_KUMA_DB_TYPE, v: sqlite}
+    routing:
+      port: 3001

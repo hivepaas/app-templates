@@ -34,3 +34,7 @@ tags:
   - {id: passwords, title: Password Manager}
   - {id: monitoring, title: Monitoring}
   - {id: metrics, title: Metrics}
+  - {id: dashboards, title: Dashboards}
+  - {id: uptime, title: Uptime}
+  - {id: web-analytics, title: Web Analytics}
+  - {id: privacy, title: Privacy}

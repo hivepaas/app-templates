@@ -1,0 +1,113 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: grafana
+  title: Grafana
+  tagline: Dashboards over whatever you already store, metrics, logs or a database
+  description: |
+    Grafana draws dashboards from data it does not hold: you point it at a source - a
+    Prometheus, a PostgreSQL, a log store - and build panels and alerts on top. It is the
+    front end for the numbers other apps collect.
+
+    **Add a data source first**
+
+    A new Grafana has no data in it. Under **Connections → Data sources**, add one; for a
+    Prometheus app in this project the URL is `http://<its app key>:9090`, reachable inside
+    the project network without a domain of its own. The same holds for a database: the
+    other app's key is its host name.
+
+    **The first sign-in**
+
+    The administrator password generated for you is under this app's Secrets, as
+    `GF_SECURITY_ADMIN_PASSWORD`. Grafana asks you to change it on first sign-in; the
+    secret here is not updated when you do, so it records how the app started rather than
+    the password in force.
+
+    **Absolute links need the domain**
+
+    Grafana builds links in alert notifications and invitation emails from its configured
+    root URL, which it does not know until you tell it. Once the app has a domain, add
+    `GF_SERVER_ROOT_URL` as an environment variable with the full address. Everything you
+    do in the browser works without it.
+
+    **Everything is on the volume**
+
+    Dashboards, users, alert rules and the SQLite database holding them all live on the
+    data volume, so that volume is what there is to back up.
+  categories: [observability/monitoring]
+  tags: [dashboards, monitoring, metrics, open-source]
+  aliases: [dashboard, graphs]
+  icon: icons/grafana.svg
+  links:
+    website: https://grafana.com/oss/grafana/
+    documentation: https://grafana.com/docs/grafana/latest/
+    source: https://github.com/grafana/grafana
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: adminUser
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume dashboards, users and alert rules are kept on.
+    type: volume
+
+versions:
+  - name: "13.0"
+    release: "13.0.2"
+    default: true
+    image: grafana/grafana-oss:13.0.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/grafana: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: grafana
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: GF_SECURITY_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: GF_SECURITY_ADMIN_PASSWORD, v: "${secrets.GF_SECURITY_ADMIN_PASSWORD}"}
+        # Nobody but the administrator gets in unless they are invited.
+        - {k: GF_USERS_ALLOW_SIGN_UP, v: "false"}
+    secrets:
+      GF_SECURITY_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 3000

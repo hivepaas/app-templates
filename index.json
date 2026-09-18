@@ -231,6 +231,22 @@
     {
       "id": "metrics",
       "title": "Metrics"
+    },
+    {
+      "id": "dashboards",
+      "title": "Dashboards"
+    },
+    {
+      "id": "uptime",
+      "title": "Uptime"
+    },
+    {
+      "id": "web-analytics",
+      "title": "Web Analytics"
+    },
+    {
+      "id": "privacy",
+      "title": "Privacy"
     }
   ],
   "templates": [
@@ -464,6 +480,43 @@
         {
           "name": "1.27",
           "release": "1.27.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "grafana",
+      "file": {
+        "path": "templates/grafana.yaml",
+        "sha256": "297f129b80e361d211ec31c2c0a2abe2ecb069ec215a75ec72b9d28057ed9c73"
+      },
+      "icon": {
+        "path": "icons/grafana.svg",
+        "sha256": "0576670432e4443be142f4e5ca6e9df7c3ccb38245acf4c0da4dbcb663656f4c"
+      },
+      "title": "Grafana",
+      "tagline": "Dashboards over whatever you already store, metrics, logs or a database",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "dashboards",
+        "monitoring",
+        "metrics",
+        "open-source"
+      ],
+      "aliases": [
+        "dashboard",
+        "graphs"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "13.0",
+          "release": "13.0.2",
           "default": true
         }
       ],
@@ -1274,6 +1327,87 @@
             "pg17",
             "pg16"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "umami",
+      "file": {
+        "path": "templates/umami.yaml",
+        "sha256": "f8d344436943cd387b359b2adb4de2cffe944f64b8051395d89edb99f715a988"
+      },
+      "icon": {
+        "path": "icons/umami.svg",
+        "sha256": "9123941cac5229fa28c3e739ce93a212107a0609d671785b3fe5869ebebad563"
+      },
+      "title": "Umami",
+      "tagline": "Web analytics that counts visits without following people around",
+      "categories": [
+        "observability/analytics"
+      ],
+      "tags": [
+        "web-analytics",
+        "analytics",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "analytics",
+        "stats"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.4",
+          "release": "3.4.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "uptime-kuma",
+      "file": {
+        "path": "templates/uptime-kuma.yaml",
+        "sha256": "a0bad624673664dfa6ace24cc7453884fc2a79c880dea86d09faa487ef4dfe6e"
+      },
+      "icon": {
+        "path": "icons/uptime-kuma.svg",
+        "sha256": "df9add4327827339712e1bd1ba00775ecf3bc95260b9b3d4388d42e5d94d0ea9"
+      },
+      "title": "Uptime Kuma",
+      "tagline": "Watches your sites and services and tells you the moment one stops answering",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "uptime",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "uptime",
+        "status-page",
+        "monitoring"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.5",
+          "release": "2.5.5",
+          "default": true
         }
       ],
       "requires": {
