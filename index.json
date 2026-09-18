@@ -818,6 +818,43 @@
       }
     },
     {
+      "name": "loki",
+      "file": {
+        "path": "templates/loki.yaml",
+        "sha256": "111fcfef44527d116d2c46c734637cebb964a8692f5c026be8aa4d2b4b723394"
+      },
+      "icon": {
+        "path": "icons/loki.svg",
+        "sha256": "8aab2631ac66bf583734c99346453b3df358caaabfc69f9992fe4036ae0e65b3"
+      },
+      "title": "Loki",
+      "tagline": "Keeps the logs your apps write, and lets Grafana search them",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "logs",
+        "logging",
+        "logql",
+        "grafana-loki"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.7",
+          "release": "3.7.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mailpit",
       "file": {
         "path": "templates/mailpit.yaml",
@@ -1971,6 +2008,47 @@
             "pg17",
             "pg16"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "typesense",
+      "file": {
+        "path": "templates/typesense.yaml",
+        "sha256": "2f7c558a6dfd840def5b7402267656c430448f69c5376c66b9a06b89458f1ef7"
+      },
+      "icon": {
+        "path": "icons/typesense.svg",
+        "sha256": "343fccc244a59879a8f0ac96aa144022599a405bb51ec7dfbec1a04cd2657872"
+      },
+      "title": "Typesense",
+      "tagline": "A search engine that answers as fast as people type, with typo tolerance",
+      "categories": [
+        "databases/search"
+      ],
+      "tags": [
+        "search",
+        "full-text",
+        "open-source"
+      ],
+      "aliases": [
+        "typo",
+        "instant-search",
+        "algolia"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "30",
+          "release": "30.2",
+          "default": true
+        },
+        {
+          "name": "29",
+          "release": "29.1"
         }
       ],
       "requires": {

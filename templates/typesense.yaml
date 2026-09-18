@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: typesense
+  title: Typesense
+  tagline: A search engine that answers as fast as people type, with typo tolerance
+  description: |
+    Typesense is a search engine for search-as-you-type: results in a few milliseconds,
+    typos forgiven, filters and facets, and a schema you declare per collection. It keeps
+    its indexes in memory and writes them to disk, so it is fast on modest hardware and
+    starts from what it wrote last.
+
+    **This template sets up**
+
+    - the server on a persistent volume, holding the indexes and its write-ahead log
+    - a generated admin key, which is the key that can do everything
+    - a health check that asks the server whether it is ready to answer
+    - a memory limit you choose
+
+    **Keys**
+
+    The key here is the admin key: it creates collections, writes documents and makes other
+    keys. Never put it in a browser. Create a search-only key from it - `POST /keys` with
+    `actions: ["documents:search"]` - and use that in front-end code.
+
+    Another app in the same environment reaches it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT`
+    (8108) and the admin key as `HIVEPAAS_PASSWORD`.
+
+    **Memory is the thing to size**
+
+    Every index is held in memory, so the limit here has to fit the collections you load,
+    not just the process. A few hundred thousand small documents are comfortable in a
+    gigabyte; a corpus of long articles is not.
+  categories: [databases/search]
+  tags: [search, full-text, open-source]
+  aliases: [typo, instant-search, algolia]
+  icon: icons/typesense.svg
+  links:
+    website: https://typesense.org
+    documentation: https://typesense.org/docs
+    source: https://github.com/typesense/typesense
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: apiKey
+    title: Admin key
+    description: Can do everything. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: enableCors
+    title: Allow browser requests
+    description: >-
+      Needed when a web page searches directly, which it should only ever do with a
+      search-only key.
+    type: select
+    default: "true"
+    options:
+      - {value: "true", title: "Yes"}
+      - {value: "false", title: "No"}
+  - name: memoryLimit
+    title: Memory limit
+    description: Big enough for the indexes themselves - they are held in memory.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the indexes are kept on.
+    type: volume
+
+versions:
+  - name: "30"
+    release: "30.2"
+    default: true
+    image: typesense/typesense:30.2
+  - name: "29"
+    release: "29.1"
+    image: typesense/typesense:29.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither curl nor wget, so bash speaks HTTP over /dev/tcp.
+        # /health answers false while the server is still loading its indexes.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/8108 &&
+          printf "GET /health HTTP/1.0\r\n\r\n" >&3 && grep -q "\"ok\":true" <&3'
+        interval: 10s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: typesense
+      version: "${{ version.name }}"
+      database:
+        password: "${{ params.apiKey }}"
+    envVars:
+      data:
+        - {k: TYPESENSE_DATA_DIR, v: /data}
+        - {k: TYPESENSE_API_KEY, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: TYPESENSE_ENABLE_CORS, v: "${{ params.enableCors }}"}
+    routing:
+      port: 8108

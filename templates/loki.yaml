@@ -1,0 +1,148 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: loki
+  title: Loki
+  tagline: Keeps the logs your apps write, and lets Grafana search them
+  description: |
+    Loki stores logs and answers queries about them. It indexes only the labels - the app, the
+    environment, the level - and keeps the lines themselves compressed, which is what makes it
+    cheap enough to keep months of them. Grafana queries it with LogQL, next to the metrics
+    Prometheus holds.
+
+    **This template sets up**
+
+    - Loki as a single process, writing chunks and its index to a volume you choose
+    - retention: lines older than the period you pick are deleted by its own compactor
+    - a memory limit you choose
+
+    **Nothing sends it logs yet**
+
+    Loki only stores what something pushes to it. Point a collector at
+    `http://<this app's key>:3100/loki/api/v1/push` - Alloy, Promtail, Fluent Bit or Vector,
+    whichever you run - and add it to Grafana as a Loki data source at
+    `http://<this app's key>:3100`.
+
+    **No password, so keep it inside the project**
+
+    A single-tenant Loki has no authentication: whoever reaches the port can read every line
+    and push anything. So this template does not put it on a domain, and Grafana should reach
+    it by app key rather than through the internet.
+
+    **One process, one volume**
+
+    This is Loki's single-binary mode, which is the right shape for one server: it is also
+    the shape that cannot be scaled to two replicas, because both would write the same files.
+    Growing past it means object storage and separate read and write components, which is a
+    different deployment rather than a bigger one.
+  categories: [observability/monitoring]
+  tags: [monitoring, open-source]
+  aliases: [logs, logging, logql, grafana-loki]
+  icon: icons/loki.svg
+  links:
+    website: https://grafana.com/oss/loki/
+    documentation: https://grafana.com/docs/loki/latest/
+    source: https://github.com/grafana/loki
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: retention
+    title: Keep logs for
+    description: Older lines are deleted by Loki's compactor, a few hours after they expire.
+    type: select
+    default: 744h
+    options:
+      - {value: 168h, title: One week}
+      - {value: 744h, title: One month}
+      - {value: 2232h, title: Three months}
+      - {value: 8760h, title: One year}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the log chunks and the index are kept on.
+    type: volume
+
+versions:
+  - name: "3.7"
+    release: "3.7.8"
+    default: true
+    image: grafana/loki:3.7.8
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /loki: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        # The image holds the loki binary and nothing else - no shell, no curl - so there
+        # is nothing inside the container that could ask /ready. An app that can reach it,
+        # Grafana included, sees the answer at http://<key>:3100/ready.
+        enabled: false
+        mode: NONE
+        command: ""
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: loki
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      loki.yaml:
+        # The path the image's own command reads, so replacing the file is all it takes.
+        # This is the shipped single-binary configuration with retention turned on and the
+        # anonymous usage report turned off.
+        content: |
+          auth_enabled: false
+
+          server:
+            http_listen_port: 3100
+
+          common:
+            instance_addr: 127.0.0.1
+            path_prefix: /loki
+            storage:
+              filesystem:
+                chunks_directory: /loki/chunks
+                rules_directory: /loki/rules
+            replication_factor: 1
+            ring:
+              kvstore:
+                store: inmemory
+
+          schema_config:
+            configs:
+              - from: 2020-10-24
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+
+          limits_config:
+            retention_period: ${{ params.retention }}
+
+          compactor:
+            working_directory: /loki/compactor
+            delete_request_store: filesystem
+            retention_enabled: true
+
+          analytics:
+            reporting_enabled: false
+        swarmRef:
+          file: {name: /etc/loki/local-config.yaml, mode: 444}
+    routing:
+      port: 3100
