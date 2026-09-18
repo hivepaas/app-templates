@@ -1,0 +1,104 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gitea
+  title: Gitea
+  tagline: A Git service that runs on a fraction of what the big ones need
+  description: |
+    Gitea hosts Git repositories with the things a team expects around them: pull requests,
+    issues, releases, a package registry and Actions runners that read the workflow syntax you
+    already know.
+
+    **This template creates two apps**
+
+    - **Gitea**, on a volume for the repositories, avatars and its configuration
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the app and finish the short installation page. The database fields are already
+    filled in from the app it was created with; set the address people will use under "Server
+    and Third-Party Service Settings", then create the administrator account at the bottom of
+    the page. The first account is an administrator whether or not you create it there, so do
+    not leave the page for someone else to find.
+
+    **Git over SSH is not part of this**
+
+    Only the HTTP port is published, so clone and push over HTTPS with a token or password.
+    Gitea's SSH server listens inside the container on port 22 and nothing routes to it, which
+    also means the SSH keys people add are unused for now.
+  categories: [webapps/dev-tools]
+  tags: [git, open-source]
+  aliases: [git, forge]
+  icon: icons/gitea.svg
+  links:
+    website: https://about.gitea.com
+    documentation: https://docs.gitea.com
+    source: https://github.com/go-gitea/gitea
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the repositories and configuration are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: gitea
+      username: gitea
+
+versions:
+  - name: "1.27"
+    release: "1.27.3"
+    default: true
+    image: gitea/gitea:1.27.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gitea
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # GITEA__section__KEY writes app.ini before the server starts, which is what fills
+        # in the installation page.
+        - {k: GITEA__database__DB_TYPE, v: postgres}
+        - {k: GITEA__database__HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: GITEA__database__NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: GITEA__database__USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: GITEA__database__PASSWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 3000

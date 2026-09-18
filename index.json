@@ -45,12 +45,20 @@
       "title": "Web Apps",
       "children": [
         {
+          "id": "ai",
+          "title": "AI & LLM"
+        },
+        {
+          "id": "automation",
+          "title": "Automation"
+        },
+        {
           "id": "dev-tools",
           "title": "Developer Tools"
         },
         {
-          "id": "productivity",
-          "title": "Productivity"
+          "id": "knowledge",
+          "title": "Wikis & Notes"
         },
         {
           "id": "cms",
@@ -183,6 +191,22 @@
     {
       "id": "cms",
       "title": "CMS"
+    },
+    {
+      "id": "automation",
+      "title": "Automation"
+    },
+    {
+      "id": "git",
+      "title": "Git"
+    },
+    {
+      "id": "wiki",
+      "title": "Wiki"
+    },
+    {
+      "id": "llm",
+      "title": "LLM"
     }
   ],
   "templates": [
@@ -332,6 +356,90 @@
         {
           "name": "1.40",
           "release": "1.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "ghost",
+      "file": {
+        "path": "templates/ghost.yaml",
+        "sha256": "d0363ee3926f45d85e76f2745c10886d62afeb8fa3138bfa0f584483efc0bc18"
+      },
+      "icon": {
+        "path": "icons/ghost.svg",
+        "sha256": "dcd1184fe8b566441c2d4f7459fe0ece98936fe67a33070d05bf748a3bcfe199"
+      },
+      "title": "Ghost",
+      "tagline": "Publishing for newsletters and blogs, with paid subscriptions built in",
+      "categories": [
+        "webapps/cms"
+      ],
+      "tags": [
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "blog",
+        "newsletter"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mysql"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.64",
+          "release": "6.64.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gitea",
+      "file": {
+        "path": "templates/gitea.yaml",
+        "sha256": "2d91720c5bfdd87f227e87c71a152472ee67d5abd3d4c5a25579f923f33b0767"
+      },
+      "icon": {
+        "path": "icons/gitea.svg",
+        "sha256": "72e13379b6f0ddfb083558f6c7d0212c311860949f07d7295269bc186f8bf5d8"
+      },
+      "title": "Gitea",
+      "tagline": "A Git service that runs on a fraction of what the big ones need",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "git",
+        "forge"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.27",
+          "release": "1.27.3",
           "default": true
         }
       ],
@@ -559,6 +667,46 @@
       }
     },
     {
+      "name": "n8n",
+      "file": {
+        "path": "templates/n8n.yaml",
+        "sha256": "8664241b1d5797707397d4367638aba76ef78ebcb0e3a27a649633deddd24b0e"
+      },
+      "icon": {
+        "path": "icons/n8n.svg",
+        "sha256": "2a415d5d2dea1903450d0df1b2b76866948d12a704e13378e54ed6896830c2e9"
+      },
+      "title": "n8n",
+      "tagline": "Workflow automation you draw, with code where you need it",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation"
+      ],
+      "aliases": [
+        "n8n-io"
+      ],
+      "license": "Sustainable-Use-License",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.40",
+          "release": "2.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "neo4j",
       "file": {
         "path": "templates/neo4j.yaml",
@@ -586,6 +734,41 @@
         {
           "name": "5.26",
           "release": "5.26.30",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "open-webui",
+      "file": {
+        "path": "templates/open-webui.yaml",
+        "sha256": "01153520f27f91401c59660411cf4681acf776cb2a0a8a112e151e05d23eb0b1"
+      },
+      "icon": {
+        "path": "icons/open-webui.svg",
+        "sha256": "27f0cc3bd2592a245f531f2a4b9e36576d1bd9d9270ba2d11610e6bfc0515d64"
+      },
+      "title": "Open WebUI",
+      "tagline": "A chat interface for the language models you already pay for or host",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm"
+      ],
+      "aliases": [
+        "openwebui",
+        "ollama-webui"
+      ],
+      "license": "BSD-3-Clause",
+      "versions": [
+        {
+          "name": "0.11",
+          "release": "0.11.3",
           "default": true
         }
       ],
@@ -1026,6 +1209,48 @@
         {
           "name": "8.1",
           "release": "8.1.10"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "wikijs",
+      "file": {
+        "path": "templates/wikijs.yaml",
+        "sha256": "4f857f89926bf4025829284885b54fe1b4cde587696023433c1c4fc74d308cd8"
+      },
+      "icon": {
+        "path": "icons/wikijs.svg",
+        "sha256": "ef681ddf73dcc8b7d22199ed932c16f043064fa1fbc5b67cb34b54b155dad1b4"
+      },
+      "title": "Wiki.js",
+      "tagline": "A wiki that writes to a database and reads like a modern site",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "wiki",
+        "open-source"
+      ],
+      "aliases": [
+        "wiki-js",
+        "wiki"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.5",
+          "release": "2.5.314",
+          "default": true
         }
       ],
       "requires": {

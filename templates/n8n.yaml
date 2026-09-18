@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: n8n
+  title: n8n
+  tagline: Workflow automation you draw, with code where you need it
+  description: |
+    n8n connects APIs, databases and files into workflows you build on a canvas, dropping into
+    JavaScript or Python wherever a node is not enough. It is the self-hosted answer to
+    Zapier and Make, with several hundred integrations.
+
+    **This template creates two apps**
+
+    - **n8n**, on a volume for its credentials key, custom nodes and binary data
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the app and create the owner account. Anyone who reaches it before you do can create
+    it instead, so do it before sharing the address.
+
+    Webhooks need the address the outside world uses. Add a domain in the app's Routing
+    settings; n8n picks it up on the restart that follows and builds its webhook URLs from it.
+    Until then the editor works and webhook URLs read `localhost`.
+
+    **The encryption key**
+
+    n8n encrypts stored credentials with a key it generates on first start and keeps on the
+    volume. Keep that volume: without the key, saved credentials cannot be decrypted, and no
+    backup of the database alone will bring them back.
+
+    **Licence**
+
+    n8n is fair-code, not open source: the Sustainable Use License allows internal business
+    use and modification, and forbids reselling n8n itself as a service.
+  categories: [webapps/automation]
+  tags: [automation]
+  aliases: [n8n-io]
+  icon: icons/n8n.svg
+  links:
+    website: https://n8n.io
+    documentation: https://docs.n8n.io
+    source: https://github.com/n8n-io/n8n
+  license: Sustainable-Use-License
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: timezone
+    title: Timezone
+    description: What schedules are relative to, as an IANA name such as Europe/Berlin.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z_]+(/[A-Za-z0-9_+-]+){0,2}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the credentials key, custom nodes and binary data are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: n8n
+      username: n8n
+
+versions:
+  - name: "2.40"
+    release: "2.40.2"
+    default: true
+    image: n8nio/n8n:2.40.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/node/.n8n: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:5678/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: n8n
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_TYPE, v: postgresdb}
+        - {k: DB_POSTGRESDB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_POSTGRESDB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_POSTGRESDB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_POSTGRESDB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_POSTGRESDB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: GENERIC_TIMEZONE, v: "${{ params.timezone }}"}
+        # The address the outside world uses, once a domain is set on the app. It is what
+        # n8n prints as the webhook URL; the editor works without it.
+        - {k: N8N_HOST, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: N8N_PROTOCOL, v: https}
+    routing:
+      port: 5678

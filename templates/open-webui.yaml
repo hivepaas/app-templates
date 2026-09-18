@@ -1,0 +1,90 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: open-webui
+  title: Open WebUI
+  tagline: A chat interface for the language models you already pay for or host
+  description: |
+    Open WebUI is a chat front end for language models: conversations, prompts, documents to
+    ask questions about, and accounts for the people who use them. It talks to any
+    OpenAI-compatible API and to Ollama, so the models can be a provider you pay for, a
+    machine with a GPU, or both at once.
+
+    **This template sets up**
+
+    - the web interface on a persistent volume, holding its database, uploads and settings
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Two things to do after the first deployment**
+
+    The first account created becomes the administrator, and anyone who can reach the app can
+    create it. Open it and sign up before you give the address to anybody else - or turn
+    sign-ups off in Settings once your account exists.
+
+    Then connect a model: Settings, then Connections, for an OpenAI-compatible key or the
+    address of an Ollama app. An Ollama app in the same environment is reachable at
+    `http://<its app key>:11434`.
+
+    **Memory**
+
+    It stores its own data in SQLite on the volume, so nothing else is needed to run it. The
+    default memory limit leaves room for the document indexing it does locally; a deployment
+    that only forwards chats to a hosted model is happy with much less.
+  categories: [webapps/ai]
+  tags: [ai, llm]
+  aliases: [openwebui, ollama-webui]
+  icon: icons/open-webui.svg
+  links:
+    website: https://openwebui.com
+    documentation: https://docs.openwebui.com
+    source: https://github.com/open-webui/open-webui
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume its database, uploads and settings are kept on.
+    type: volume
+
+versions:
+  - name: "0.11"
+    release: "0.11.3"
+    default: true
+    image: ghcr.io/open-webui/open-webui:v0.11.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/backend/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: open-webui
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8080

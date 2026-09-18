@@ -15,8 +15,10 @@ categories:
   - id: webapps
     title: Web Apps
     children:
+      - {id: ai, title: AI & LLM}
+      - {id: automation, title: Automation}
       - {id: dev-tools, title: Developer Tools}
-      - {id: productivity, title: Productivity}
+      - {id: knowledge, title: Wikis & Notes}
       - {id: cms, title: CMS & Blogging}
   - id: observability
     title: Observability

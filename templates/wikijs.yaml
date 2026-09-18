@@ -1,0 +1,94 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wikijs
+  title: Wiki.js
+  tagline: A wiki that writes to a database and reads like a modern site
+  description: |
+    Wiki.js keeps documentation in a database, edits it in markdown or a visual editor, and
+    handles the parts a wiki needs around that: navigation, search, comments, page history and
+    per-page permissions.
+
+    **This template creates two apps**
+
+    - **Wiki.js**, which keeps everything it has in its database
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the app and complete the setup page: it asks for the administrator's email address, a
+    password and the site URL. Nothing is stored until you do, and anybody who reaches the app
+    first can do it instead.
+
+    **Backups are the database**
+
+    Pages, uploads, users and settings all live in PostgreSQL, so the database app is what
+    there is to back up. Wiki.js itself holds nothing worth keeping, which is why this
+    template asks for no volume of its own.
+  categories: [webapps/knowledge]
+  tags: [wiki, open-source]
+  aliases: [wiki-js, wiki]
+  icon: icons/wikijs.svg
+  links:
+    website: https://js.wiki
+    documentation: https://docs.requarks.io
+    source: https://github.com/requarks/wiki
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: wiki
+      username: wiki
+
+versions:
+  - name: "2.5"
+    release: "2.5.314"
+    default: true
+    image: requarks/wiki:2.5.314
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: wikijs
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_TYPE, v: postgres}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 3000

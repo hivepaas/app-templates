@@ -1,0 +1,118 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: ghost
+  title: Ghost
+  tagline: Publishing for newsletters and blogs, with paid subscriptions built in
+  description: |
+    Ghost is a publishing platform: an editor that stays out of the way, a site to read it on,
+    and members with paid subscriptions and newsletters if you want them.
+
+    **This template creates two apps**
+
+    - **Ghost**, on a volume for images, themes and uploads
+    - **a MySQL database** for it, named after the app with `-db` added
+
+    **Add a domain before you publish**
+
+    Ghost builds every link from the address it is configured with. Until the app has a
+    domain it runs on `http://localhost:2368`, which is enough to look at but not to use:
+    links, feeds and email all point at it. Add the domain in the app's Routing settings, and
+    the restart that follows picks it up.
+
+    Then open `/ghost/` to create the owner account. Anybody who reaches the site before you
+    do can create it instead.
+
+    **Email**
+
+    Newsletters and password resets need an SMTP server, which this template does not set up:
+    Ghost sends nothing until you configure one under `mail__` environment variables.
+  categories: [webapps/cms]
+  tags: [cms, open-source]
+  aliases: [blog, newsletter]
+  icon: icons/ghost.svg
+  links:
+    website: https://ghost.org
+    documentation: https://ghost.org/docs/
+    source: https://github.com/TryGhost/Ghost
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Content volume
+    description: The volume images, themes and uploads are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mysql
+    version: "8.4"
+    params:
+      dbName: ghost
+      username: ghost
+
+versions:
+  - name: "6.64"
+    release: "6.64.0"
+    default: true
+    image: ghost:6.64.0-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Ghost refuses to start without a valid address, and an app has no domain until
+      # somebody adds one. This takes the domain when there is one and falls back to
+      # localhost when there is not, then hands over to the image's own entrypoint - which
+      # seeds the content directory and drops privileges only for this exact command.
+      command: >-
+        sh -c 'export url="${HIVEPAAS_DOMAIN:+https://$HIVEPAAS_DOMAIN}";
+        export url="${url:-http://localhost:2368}";
+        exec docker-entrypoint.sh node current/index.js'
+    storage:
+      mounts:
+        /var/lib/ghost/content: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Ghost answers every request that does not match its configured address with a
+        # redirect to it, and busybox wget would follow that to a name this container
+        # cannot resolve. Reading the status line is what proves Ghost is up, whether it
+        # answers 200 or 301.
+        command: >-
+          printf 'GET /ghost/api/admin/site/ HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n'
+          | nc -w 3 127.0.0.1 2368 | head -n 1 | grep -q '^HTTP/' 
+        interval: 15s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: ghost
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NODE_ENV, v: production}
+        - {k: database__client, v: mysql}
+        - {k: database__connection__host, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: database__connection__port, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: database__connection__database, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: database__connection__user, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: database__connection__password, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 2368
