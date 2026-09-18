@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: weaviate
+  title: Weaviate
+  tagline: A vector database that can make the vectors itself
+  description: |
+    Weaviate stores objects together with their vectors and answers questions by meaning
+    rather than by keyword - the store behind retrieval-augmented generation, recommendations
+    and semantic search. It speaks REST and GraphQL, filters on ordinary properties while it
+    searches, and can combine the two into a hybrid search.
+
+    **This template sets up**
+
+    - the database on a volume you choose, with a generated API key
+    - anonymous access turned off, so a key is required for everything but the health endpoint
+    - the Ollama modules turned on, so an Ollama app in this project can make the vectors
+    - a memory limit you choose
+
+    **Connecting**
+
+    Another app in the same environment reaches it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT`
+    (8080) and the key as `HIVEPAAS_PASSWORD`, sent as `Authorization: Bearer <key>`.
+
+    **Who makes the vectors**
+
+    Two ways, and the choice belongs to each collection:
+
+    - **you do** - `vectorizer: none`, and every object arrives with its vector. Anything
+      that can embed works, including a LiteLLM app in this project.
+    - **Weaviate does** - `text2vec-ollama` with `apiEndpoint: http://<your ollama app
+      key>:11434` and a model that app has pulled. Then you send text and it embeds.
+
+    **Memory is the thing to size**
+
+    The index is held in memory while it serves, so the limit here has to fit the vectors,
+    not just the process. A hundred thousand objects at 768 dimensions is a few hundred
+    megabytes before anything else.
+  categories: [databases/vector]
+  tags: [vector, search, ai, open-source]
+  aliases: [vectordb, embeddings, semantic-search, rag]
+  icon: icons/weaviate.svg
+  links:
+    website: https://weaviate.io
+    documentation: https://docs.weaviate.io
+    source: https://github.com/weaviate/weaviate
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: apiKey
+    title: API key
+    description: Required for every request but the health endpoint. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: Big enough for the vectors themselves - the index is held in memory.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the objects and their vectors are kept on.
+    type: volume
+
+versions:
+  - name: "1.38"
+    release: "1.38.16"
+    default: true
+    image: cr.weaviate.io/semitechnologies/weaviate:1.38.16
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/weaviate: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries wget but no curl. /v1/.well-known/ready answers without a key,
+        # and only once the shards it has are loaded.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/v1/.well-known/ready
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: weaviate
+      version: "${{ version.name }}"
+      database:
+        username: admin
+        password: "${{ params.apiKey }}"
+    envVars:
+      data:
+        - {k: PERSISTENCE_DATA_PATH, v: /var/lib/weaviate}
+        - {k: AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED, v: "false"}
+        - {k: AUTHENTICATION_APIKEY_ENABLED, v: "true"}
+        - {k: AUTHENTICATION_APIKEY_ALLOWED_KEYS, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: AUTHENTICATION_APIKEY_USERS, v: "${HIVEPAAS_USER}"}
+        - {k: AUTHORIZATION_ADMINLIST_ENABLED, v: "true"}
+        - {k: AUTHORIZATION_ADMINLIST_USERS, v: "${HIVEPAAS_USER}"}
+        # The modules are in the image; this is what makes them available to a collection.
+        - {k: ENABLE_MODULES, v: "text2vec-ollama,generative-ollama"}
+        - {k: DEFAULT_VECTORIZER_MODULE, v: none}
+        - {k: DISABLE_TELEMETRY, v: "true"}
+        - {k: QUERY_DEFAULTS_LIMIT, v: "25"}
+    routing:
+      port: 8080

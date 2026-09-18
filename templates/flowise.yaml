@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: flowise
+  title: Flowise
+  tagline: Builds chatbots and agents by dragging nodes, not by writing code
+  description: |
+    Flowise is a visual builder for language-model applications. You drag nodes onto a canvas
+    - a model, a prompt, a vector store, a tool, a memory - wire them together, and get a
+    chatbot or an agent with an API endpoint and an embeddable widget. What would be a few
+    hundred lines of LangChain becomes a diagram somebody else on the team can read.
+
+    **This template sets up**
+
+    - Flowise on a volume, holding its database, uploaded files and the key that encrypts
+      your credentials
+    - an account made at the first start from the username and password here
+    - a memory limit you choose
+
+    **What it connects to**
+
+    Everything it talks to is a node you configure inside it. In this project that can be an
+    Ollama app for models, a LiteLLM app for one endpoint in front of several providers, a
+    Weaviate or Qdrant app as the vector store, and a SearXNG app for web search - each
+    reached at `http://<its app key>:<port>`.
+
+    **Credentials live on the volume**
+
+    Provider keys you enter are encrypted with a key kept on the same volume, so that volume
+    is both the data and the means to read it. Losing it means re-entering every credential;
+    copying it elsewhere carries them along.
+
+    **Chatflows are not automatically public**
+
+    An endpoint you publish is reachable by anybody who can reach this app unless you give
+    the chatflow its own API key inside Flowise. Do that before you put a flow behind a
+    domain.
+  categories: [webapps/ai]
+  tags: [ai, llm, low-code, automation, open-source]
+  aliases: [langchain, chatbot, agents, no-code, rag]
+  icon: icons/flowise.svg
+  links:
+    website: https://flowiseai.com
+    documentation: https://docs.flowiseai.com
+    source: https://github.com/FlowiseAI/Flowise
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._@-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: At least 8 characters. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume its database, uploads and encryption key are kept on.
+    type: volume
+
+versions:
+  # 3.1.2 rather than the newest: the 3.1.4 image fails to start, with its own components
+  # failing to load ("Package subpath './utils/uuid' is not defined by exports") and the
+  # process exiting. Checked on this exact image, both architectures published.
+  - name: "3.1"
+    release: "3.1.2"
+    default: true
+    image: flowiseai/flowise:3.1.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/v1/ping
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: flowise
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Everything it writes goes to the volume: the SQLite database, the logs, the files
+        # people upload, and the key its credentials are encrypted with.
+        - {k: DATABASE_PATH, v: /data}
+        - {k: SECRETKEY_PATH, v: /data}
+        - {k: LOG_PATH, v: /data/logs}
+        - {k: BLOB_STORAGE_PATH, v: /data/storage}
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: FLOWISE_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: FLOWISE_PASSWORD, v: "${secrets.FLOWISE_PASSWORD}"}
+        - {k: DISABLE_FLOWISE_TELEMETRY, v: "true"}
+    secrets:
+      FLOWISE_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

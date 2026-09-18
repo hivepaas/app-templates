@@ -323,6 +323,45 @@
   ],
   "templates": [
     {
+      "name": "anythingllm",
+      "file": {
+        "path": "templates/anythingllm.yaml",
+        "sha256": "15177f8ed32466b6f68dd46b987a5a21c2658895c93bed3682ac8fc83ec7deba"
+      },
+      "icon": {
+        "path": "icons/anythingllm.svg",
+        "sha256": "74153f03ceebbb48486ba9de524c7752b40c14f06a326df75e1e16eb3941734a"
+      },
+      "title": "AnythingLLM",
+      "tagline": "Chats with your own documents, and keeps them where you put them",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "rag",
+        "chat-with-docs",
+        "knowledge-base",
+        "embeddings"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.16",
+          "release": "1.16.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "clickhouse",
       "file": {
         "path": "templates/clickhouse.yaml",
@@ -609,6 +648,47 @@
         {
           "name": "6.7",
           "release": "6.7.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "flowise",
+      "file": {
+        "path": "templates/flowise.yaml",
+        "sha256": "b83fce3747800e34f19f28933a8b5abcabcb24a0353630558d2e78e68ecbbd28"
+      },
+      "icon": {
+        "path": "icons/flowise.svg",
+        "sha256": "5dc7230821d8582b58b0d9a31faa043f8aae1b4164bfd81d5ef0614062b7cf5d"
+      },
+      "title": "Flowise",
+      "tagline": "Builds chatbots and agents by dragging nodes, not by writing code",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "low-code",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "langchain",
+        "chatbot",
+        "agents",
+        "no-code",
+        "rag"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.2",
           "default": true
         }
       ],
@@ -2629,6 +2709,45 @@
         {
           "name": "2.6",
           "release": "2.6.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "weaviate",
+      "file": {
+        "path": "templates/weaviate.yaml",
+        "sha256": "51eb440f764ca9c1039e9c524d03a850a93591b911abfbad418d8d78a0d24b3b"
+      },
+      "icon": {
+        "path": "icons/weaviate.svg",
+        "sha256": "43dec416c7eae3419bf9ce53ffd386848950dbb5e088c79308e301c78e887bbb"
+      },
+      "title": "Weaviate",
+      "tagline": "A vector database that can make the vectors itself",
+      "categories": [
+        "databases/vector"
+      ],
+      "tags": [
+        "vector",
+        "search",
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "vectordb",
+        "embeddings",
+        "semantic-search",
+        "rag"
+      ],
+      "license": "BSD-3-Clause",
+      "versions": [
+        {
+          "name": "1.38",
+          "release": "1.38.16",
           "default": true
         }
       ],

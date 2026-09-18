@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: anythingllm
+  title: AnythingLLM
+  tagline: Chats with your own documents, and keeps them where you put them
+  description: |
+    AnythingLLM turns a pile of documents into something you can ask questions of. Drop PDFs,
+    Word files, a website or a repository into a workspace; it splits them, embeds them,
+    stores the vectors and answers with the passages it used. Each workspace keeps its own
+    documents and its own thread, so work does not leak between them.
+
+    **This template sets up**
+
+    - AnythingLLM on a volume, holding its database, the documents and the embedded vectors
+    - a single password, which is what stands between the internet and your documents
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **It starts with nothing configured**
+
+    The first screen asks which model to talk to and which embedder to use, and both can live
+    in this project: an Ollama app at `http://<its app key>:11434` for models and embeddings,
+    or a LiteLLM app at `http://<its app key>:4000/v1` as an OpenAI-compatible provider. It
+    can also use a hosted provider with a key of yours.
+
+    **The vector store is inside it**
+
+    By default the vectors go into LanceDB on the same volume, which needs no other app and
+    is enough for thousands of documents. For more than that, point it at a Weaviate or
+    Qdrant app in this project - the setting is per installation, under Vector Database.
+
+    **The volume is everything**
+
+    Documents, vectors, workspaces, chat history and settings are all on it. The password
+    here protects the app; the volume is what actually holds your documents.
+  categories: [webapps/ai]
+  tags: [ai, llm, documents, open-source]
+  aliases: [rag, chat-with-docs, knowledge-base, embeddings]
+  icon: icons/anythingllm.svg
+  links:
+    website: https://anythingllm.com
+    documentation: https://docs.anythingllm.com
+    source: https://github.com/Mintplex-Labs/anything-llm
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: password
+    title: Password
+    description: >-
+      One password for the whole installation, asked before anything is shown. Leave empty to
+      generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: jwtSecret
+    title: Session secret
+    description: Signs the sessions people sign in with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: Embedding documents locally is the hungry part; give it room if you do that.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume documents, vectors and settings are kept on.
+    type: volume
+
+versions:
+  - name: "1.16"
+    release: "1.16.1"
+    default: true
+    image: mintplexlabs/anythingllm:1.16.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/server/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3001/api/ping
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: anythingllm
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Without this the app warns loudly and writes where nothing is kept.
+        - {k: STORAGE_DIR, v: /app/server/storage}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        # The single password mode: one password for the installation. Multi-user accounts
+        # are turned on inside the app afterwards, and this stops being used.
+        - {k: AUTH_TOKEN, v: "${secrets.AUTH_TOKEN}"}
+        - {k: DISABLE_TELEMETRY, v: "true"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      AUTH_TOKEN:
+        value: "${{ params.password }}"
+    routing:
+      port: 3001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
