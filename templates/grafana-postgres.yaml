@@ -1,0 +1,160 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: grafana-postgres
+  title: Grafana with PostgreSQL
+  tagline: Grafana keeping its dashboards in a database rather than in a file
+  description: |
+    This is [Grafana](grafana), with one difference: what it knows - dashboards, users,
+    alert rules, annotations - is kept in a PostgreSQL database created alongside it rather
+    than in a SQLite file on its own volume.
+
+    **When this is the one to use**
+
+    - **More than one Grafana**: several instances sharing a database serve the same
+      dashboards, which a file on one app's volume cannot do.
+    - **Backups you already take**: if the databases here are backed up and the volumes are
+      not, this puts Grafana where the backups are.
+    - **Many users or heavy alerting**: SQLite is one writer at a time, and a busy alerting
+      setup is writing constantly.
+
+    Otherwise the plain [Grafana](grafana) template is simpler and enough: one app, one
+    volume, nothing else to keep running.
+
+    **This template creates two apps**
+
+    - **Grafana** itself, with a volume for plugins and files it writes
+    - **a PostgreSQL database**, named with `-db`, holding everything else
+
+    Both are needed. The database is the backup.
+
+    **Add a data source first**
+
+    A new Grafana has no data in it. Under **Connections → Data sources**, add one; for a
+    Prometheus app in this project the URL is `http://<its app key>:9090`, reachable inside
+    the project network without a domain of its own. The database created here is Grafana's
+    own storage, not a data source - though nothing stops you adding it as one.
+
+    **The first sign-in**
+
+    The administrator password generated for you is under this app's Secrets, as
+    `GF_SECURITY_ADMIN_PASSWORD`. Grafana asks you to change it on first sign-in; the
+    secret here is not updated when you do, so it records how the app started rather than
+    the password in force.
+
+    **Absolute links need the domain**
+
+    Grafana builds links in alert notifications and invitation emails from its configured
+    root URL, which it does not know until you tell it. Once the app has a domain, add
+    `GF_SERVER_ROOT_URL` as an environment variable with the full address. Everything you
+    do in the browser works without it.
+  categories: [observability/monitoring]
+  tags: [dashboards, monitoring, metrics, open-source]
+  aliases: [grafana postgres, grafana postgresql, dashboard, graphs]
+  icon: icons/grafana.svg
+  links:
+    website: https://grafana.com/oss/grafana/
+    documentation: https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#database
+    source: https://github.com/grafana/grafana
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume Grafana's own files are kept on - plugins, uploaded images, the CSV files
+      of an exported panel. The dashboards are in the database.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: grafana
+      username: grafana
+
+versions:
+  - name: "13.0"
+    release: "13.0.2"
+    default: true
+    image: grafana/grafana-oss:13.0.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/grafana: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /api/health reports the database as well as the server, which is what this
+        # template wants to know: a Grafana that cannot reach its database is not ready.
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: grafana
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: GF_SECURITY_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: GF_SECURITY_ADMIN_PASSWORD, v: "${secrets.GF_SECURITY_ADMIN_PASSWORD}"}
+        # Nobody but the administrator gets in unless they are invited.
+        - {k: GF_USERS_ALLOW_SIGN_UP, v: "false"}
+        # The database this template creates. Grafana migrates it on first start.
+        - {k: GF_DATABASE_TYPE, v: postgres}
+        - k: GF_DATABASE_HOST
+          v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"
+        - {k: GF_DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: GF_DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: GF_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The database and Grafana are on the same project network, which nothing else
+        # reaches; the image's postgres client would otherwise refuse without TLS.
+        - {k: GF_DATABASE_SSL_MODE, v: disable}
+    secrets:
+      GF_SECURITY_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

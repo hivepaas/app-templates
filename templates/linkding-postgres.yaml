@@ -1,0 +1,143 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: linkding-postgres
+  title: linkding with PostgreSQL
+  tagline: The bookmark manager, keeping its bookmarks in a database
+  description: |
+    This is [linkding](linkding), with one difference: the bookmarks, tags and users are
+    kept in a PostgreSQL database created alongside it rather than in a SQLite file on its
+    own volume. The volume is still there - archived page snapshots, favicons and previews
+    are files and stay files.
+
+    **When this is the one to use**
+
+    A large collection with full-text search over it, or a backup routine that covers the
+    databases here and not the volumes. For one person's bookmarks, the plain
+    [linkding](linkding) template is simpler: one app, one volume.
+
+    **This template creates two apps**
+
+    - **linkding** itself, with a volume for archived pages, favicons and previews
+    - **a PostgreSQL database**, named with `-db`, holding the bookmarks
+
+    Both are needed, and both belong in the backup.
+
+    **The first account**
+
+    The username and password given here create the first account on the first start, and
+    are ignored afterwards. Make more accounts from *Settings → Admin*.
+  categories: [webapps/knowledge]
+  tags: [documents, collaboration, open-source]
+  aliases: [bookmarks, read-later, linkding postgres, pinboard]
+  icon: icons/linkding.svg
+  links:
+    website: https://linkding.link
+    documentation: https://linkding.link/options/#database
+    source: https://github.com/sissbruecker/linkding
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume archived pages, favicons and previews are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: linkding
+      username: linkding
+
+versions:
+  - name: "1.47"
+    release: "1.47.0"
+    default: true
+    image: sissbruecker/linkding:1.47.0-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image migrates the database once at startup and carries on serving whatever
+      # happens - so an app that started before its database was reachable comes up
+      # healthy, empty, and writing to the SQLite file it was meant to replace. This waits
+      # for the migration to succeed before handing over to the image's own start script.
+      command: >-
+        sh -c 'until python manage.py migrate --skip-checks; do echo "waiting for the database";
+        sleep 3; done; exec ./bootstrap.sh'
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /etc/linkding/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:9090/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: linkding
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: LD_SUPERUSER_NAME, v: "${{ params.adminUsername }}"}
+        - {k: LD_SUPERUSER_PASSWORD, v: "${secrets.LD_SUPERUSER_PASSWORD}"}
+        # The database this template creates. linkding migrates it on first start.
+        - {k: LD_DB_ENGINE, v: postgres}
+        - {k: LD_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: LD_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: LD_DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: LD_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: LD_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      LD_SUPERUSER_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 9090
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

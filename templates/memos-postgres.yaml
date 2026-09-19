@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: memos-postgres
+  title: Memos with PostgreSQL
+  tagline: The note-taking server, keeping its notes in a database
+  description: |
+    This is [Memos](memos), with one difference: the notes, their tags and the users are
+    kept in a PostgreSQL database created alongside it rather than in a SQLite file. The
+    volume stays for what is genuinely a file - the images and documents attached to notes.
+
+    **When this is the one to use**
+
+    Several people writing at once, or a backup routine that covers the databases here and
+    not the volumes. For one person's notes the plain [Memos](memos) template is simpler.
+
+    **This template creates two apps**
+
+    - **Memos** itself, with a volume for attachments
+    - **a PostgreSQL database**, named with `-db`, holding the notes
+
+    Both are needed, and both belong in the backup: the attachments are useless without the
+    notes that point at them.
+
+    **The first account**
+
+    The first person to sign up becomes the administrator, so open it and make your account
+    before giving the address to anybody else.
+  categories: [webapps/knowledge]
+  tags: [documents, open-source]
+  aliases: [notes, memos postgres, microblog]
+  icon: icons/memos.svg
+  links:
+    website: https://usememos.com
+    documentation: https://usememos.com/docs/install/database
+    source: https://github.com/usememos/memos
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: instanceUrl
+    title: Public address
+    description: >-
+      The address links in shared memos are built from, scheme and all. The default only
+      works for other apps in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:5230
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the files attached to notes are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: memos
+      username: memos
+
+versions:
+  - name: "0.30"
+    release: "0.30.0"
+    default: true
+    image: neosmemo/memos:0.30.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /var/opt/memos:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl in the image, but busybox has a wget.
+        command: busybox wget -q -O /dev/null http://127.0.0.1:5230/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: memos
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MEMOS_MODE, v: prod}
+        - {k: MEMOS_PORT, v: "5230"}
+        - {k: MEMOS_DATA, v: /var/opt/memos}
+        - {k: MEMOS_INSTANCE_URL, v: "${{ params.instanceUrl }}"}
+        # One connection string, and the driver that reads it. Generated passwords are
+        # letters and digits only, so nothing here needs escaping.
+        - {k: MEMOS_DRIVER, v: postgres}
+        - k: MEMOS_DSN
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable
+    routing:
+      port: 5230
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

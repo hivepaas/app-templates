@@ -1,0 +1,158 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: vaultwarden-postgres
+  title: Vaultwarden with PostgreSQL
+  tagline: The Bitwarden-compatible vault, kept in a database rather than a file
+  description: |
+    This is [Vaultwarden](vaultwarden), with one difference: the vault, the users and the
+    tokens are kept in a PostgreSQL database created alongside it rather than in SQLite on
+    its own volume. The volume stays for the attachments, the icon cache and the keys that
+    sign the clients' tokens.
+
+    **When this is the one to use**
+
+    A vault several people use at once, or a backup routine that covers the databases here
+    and not the volumes. For one person or a household, the plain
+    [Vaultwarden](vaultwarden) template is simpler and just as safe.
+
+    **This template creates two apps**
+
+    - **Vaultwarden** itself, with a volume for attachments and the signing keys
+    - **a PostgreSQL database**, named with `-db`, holding the vault
+
+    Both are needed, and **both** are the backup: the database without the volume cannot
+    sign a client in, and the volume without the database has no vault to unlock.
+
+    **Give it its domain before you store anything in it**
+
+    The clients need an address to be pointed at, and features that identify the server -
+    passkeys, U2F keys and the admin page - are tied to it. Without a domain it answers on
+    `http://localhost`, which is enough to look at and not enough to use.
+
+    **The first account**
+
+    Sign-ups are open by default, so create yours as soon as the app is up and then set
+    "Allow sign-ups" to closed in this app's settings.
+
+    **What this server never has**
+
+    Each user's data is encrypted with their own key, which the server does not hold - so a
+    forgotten master password cannot be reset from `/admin`, only the account deleted. That
+    is true of the database here as much as of the file it replaces.
+  categories: [webapps/security]
+  tags: [passwords, open-source]
+  aliases: [bitwarden, password-manager, vault, vaultwarden postgres]
+  icon: icons/vaultwarden.svg
+  links:
+    website: https://github.com/dani-garcia/vaultwarden/wiki
+    documentation: https://github.com/dani-garcia/vaultwarden/wiki/Using-the-PostgreSQL-Backend
+    source: https://github.com/dani-garcia/vaultwarden
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. The clients are pointed at it, so fill it in here or
+      add it in the app's routing settings before storing anything.
+    type: domain
+    optional: true
+  - name: adminToken
+    title: Admin token
+    description: What signs you in to the /admin page. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: signupsAllowed
+    title: Allow sign-ups
+    description: Leave open until you have created your own account, then close it.
+    type: select
+    default: "true"
+    options:
+      - {value: "true", title: "Open - anybody who reaches the app can create an account"}
+      - {value: "false", title: "Closed - no new accounts"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume attachments, the icon cache and the server keys are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: vaultwarden
+      username: vaultwarden
+
+versions:
+  - name: "1.37"
+    release: "1.37.3"
+    default: true
+    image: vaultwarden/server:1.37.3-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Vaultwarden builds the address it hands to clients from DOMAIN, and an app has no
+      # domain until somebody adds one. This takes the domain when there is one and falls
+      # back to localhost when there is not, then hands over to the image's own start
+      # script.
+      command: >-
+        sh -c 'export DOMAIN="${HIVEPAAS_DOMAIN:+https://$HIVEPAAS_DOMAIN}";
+        export DOMAIN="${DOMAIN:-http://localhost}";
+        exec /start.sh'
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:80/alive
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: vaultwarden
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SIGNUPS_ALLOWED, v: "${{ params.signupsAllowed }}"}
+        - {k: ADMIN_TOKEN, v: "${secrets.ADMIN_TOKEN}"}
+        # The proxy in front of the app terminates TLS and is the only thing that reaches
+        # it, so the address a client is rate-limited by is the one the proxy forwards.
+        - {k: IP_HEADER, v: X-Forwarded-For}
+        # One connection string, which is also what tells Vaultwarden to use PostgreSQL
+        # rather than the SQLite file. Generated passwords are letters and digits only, so
+        # nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+    secrets:
+      ADMIN_TOKEN:
+        value: "${{ params.adminToken }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
