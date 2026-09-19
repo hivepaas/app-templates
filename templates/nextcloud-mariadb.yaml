@@ -1,0 +1,141 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: nextcloud-mariadb
+  title: Nextcloud with MariaDB
+  tagline: Your files on your own server, synced to every desktop and phone
+  description: |
+    This is [Nextcloud](nextcloud), with one difference: it stores what it knows in a
+    MariaDB database created alongside it rather than in PostgreSQL. The files themselves
+    are on the volume either way.
+
+    **Which one to pick**
+
+    Both are supported and both are fine; MariaDB is what most Nextcloud installations run
+    on and what most guides, forum answers and migration scripts assume. If you have no
+    preference, or you are following someone else's instructions, this is the one they mean.
+    If your other apps here are on PostgreSQL and you would rather keep one kind of
+    database, take the plain [Nextcloud](nextcloud) template.
+
+    **This template creates two apps**
+
+    - **Nextcloud** itself, with the volume holding every file anybody uploads
+    - **a MariaDB database**, named with `-db`, holding accounts, shares and metadata
+
+    Both are the backup, and they restore together: the files without the database are a
+    directory nobody can sign in to.
+  categories: [webapps/documents]
+  tags: [files, documents, collaboration, open-source]
+  aliases: [files, drive, storage, sync, nextcloud mariadb, nextcloud mysql]
+  icon: icons/nextcloud.svg
+  links:
+    website: https://nextcloud.com
+    documentation: https://docs.nextcloud.com
+    source: https://github.com/nextcloud/server
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings and in NEXTCLOUD_TRUSTED_DOMAINS.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 10
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the files, the installed apps and the configuration are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: nextcloud
+      username: nextcloud
+
+versions:
+  - name: "32"
+    release: "32.0.2"
+    default: true
+    image: nextcloud:32.0.2-apache
+  - name: "31"
+    release: "31.0.10"
+    image: nextcloud:31.0.10-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # status.php answers before the installation has finished and says so in its body,
+        # which is what makes it a readiness check rather than a liveness one.
+        command: curl -fsS http://127.0.0.1:80/status.php | grep -q '"installed":true'
+        interval: 20s
+        timeout: 10s
+        startPeriod: 300s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: nextcloud
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The image installs itself against whichever database these name - MYSQL_* is how
+        # it is told MariaDB, and the host carries the port with it.
+        - {k: MYSQL_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: MYSQL_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: MYSQL_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: MYSQL_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The administrator is created on the first start, so the installation is finished
+        # before anybody can reach the app rather than waiting for whoever arrives first.
+        - {k: NEXTCLOUD_ADMIN_USER, v: "${{ params.adminUsername }}"}
+        - {k: NEXTCLOUD_ADMIN_PASSWORD, v: "${secrets.NEXTCLOUD_ADMIN_PASSWORD}"}
+        # Nextcloud refuses any request whose Host it does not trust. localhost is for the
+        # health check above, which asks over the loopback interface; HIVEPAAS_HOST is this
+        # app's key, which is how another app in the project reaches it without a domain.
+        - {k: NEXTCLOUD_TRUSTED_DOMAINS, v: "localhost ${HIVEPAAS_HOST} ${{ params.domain }}"}
+        # TLS is terminated in front of the app, so the links Nextcloud writes have to be
+        # told the scheme the browser used rather than the one it sees.
+        - {k: OVERWRITEPROTOCOL, v: https}
+        - {k: TRUSTED_PROXIES, v: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"}
+    secrets:
+      NEXTCLOUD_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

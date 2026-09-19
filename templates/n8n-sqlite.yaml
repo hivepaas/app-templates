@@ -1,0 +1,112 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: n8n-sqlite
+  title: n8n with SQLite
+  tagline: The workflow automation tool in one app, with nothing beside it
+  description: |
+    This is [n8n](n8n), with one difference: the workflows, credentials and execution
+    history are kept in a SQLite file on its own volume instead of in a PostgreSQL database
+    beside it. One app, one volume, nothing else to keep running.
+
+    **When this is the one to use**
+
+    Workflows you run for yourself, on a schedule or a webhook, at a pace a person notices.
+    SQLite is comfortable there and the app is half as much to operate.
+
+    **When it is not**
+
+    Executions are what accumulate - every run is rows, and a busy workflow writes
+    constantly. If n8n is doing real work, or several people are editing at once, use the
+    plain [n8n](n8n) template, which comes with a database. Moving later means exporting
+    the workflows and credentials and importing them into a new app; the two files are not
+    interchangeable.
+
+    **Everything is on the volume**
+
+    The database file, the credentials and the encryption key that reads them. Back that
+    volume up and there is nothing else to keep - and keep it safe: the key and the
+    encrypted credentials sit side by side.
+  categories: [webapps/automation]
+  tags: [automation]
+  aliases: [n8n-io, n8n sqlite]
+  icon: icons/n8n.svg
+  links:
+    website: https://n8n.io
+    documentation: https://docs.n8n.io
+    source: https://github.com/n8n-io/n8n
+  license: Sustainable-Use-License
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Timezone
+    description: What schedules are relative to, as an IANA name such as Europe/Berlin.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z_]+(/[A-Za-z0-9_+-]+){0,2}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the credentials key, custom nodes and binary data are kept on.
+    type: volume
+
+versions:
+  - name: "2.40"
+    release: "2.40.2"
+    default: true
+    image: n8nio/n8n:2.40.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/node/.n8n: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:5678/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: n8n
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The database is a file in n8n's own folder on the volume, beside the encryption
+        # key that reads the credentials in it.
+        - {k: DB_TYPE, v: sqlite}
+        - {k: GENERIC_TIMEZONE, v: "${{ params.timezone }}"}
+        # The address the outside world uses, once a domain is set on the app. It is what
+        # n8n prints as the webhook URL; the editor works without it.
+        - {k: N8N_HOST, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: N8N_PROTOCOL, v: https}
+    routing:
+      port: 5678
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

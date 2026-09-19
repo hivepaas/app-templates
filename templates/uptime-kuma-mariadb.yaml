@@ -1,0 +1,115 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: uptime-kuma-mariadb
+  title: Uptime Kuma with MariaDB
+  tagline: Uptime monitoring with its history in a database
+  description: |
+    This is [Uptime Kuma](uptime-kuma), with one difference: the monitors and every check
+    they have ever made are kept in a MariaDB database created alongside it rather than in a
+    SQLite file. MariaDB is the only database Kuma supports besides SQLite.
+
+    **When this is the one to use**
+
+    Many monitors, a short check interval, or history you want to keep for a long time -
+    heartbeats are the rows that accumulate, one per monitor per interval, forever. That is
+    also the workload SQLite likes least.
+
+    **This template creates two apps**
+
+    - **Uptime Kuma** itself, with a volume for its configuration and uploads
+    - **a MariaDB database**, named with `-db`, holding the monitors and their history
+
+    For a handful of checks the plain [Uptime Kuma](uptime-kuma) template is simpler: one
+    app, one volume.
+
+    **The first account**
+
+    Open it and the first screen asks for an administrator account; the database question it
+    would otherwise ask is already answered. Whoever creates that account owns the instance.
+  categories: [observability/monitoring]
+  tags: [uptime, monitoring, open-source]
+  aliases: [uptime, status-page, monitoring, uptime kuma mariadb]
+  icon: icons/uptime-kuma.svg
+  links:
+    website: https://uptime.kuma.pet
+    documentation: https://github.com/louislam/uptime-kuma/wiki
+    source: https://github.com/louislam/uptime-kuma
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the monitors, settings and history are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: kuma
+      username: kuma
+
+versions:
+  - name: "2.5"
+    release: "2.5.5"
+    default: true
+    image: louislam/uptime-kuma:2.5.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3001
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: uptime-kuma
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Answering this here skips the screen that asks where to keep the data, and points
+        # Kuma at the database this template creates rather than at a file.
+        - {k: UPTIME_KUMA_DB_TYPE, v: mariadb}
+        - {k: UPTIME_KUMA_DB_HOSTNAME, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: UPTIME_KUMA_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: UPTIME_KUMA_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: UPTIME_KUMA_DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: UPTIME_KUMA_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 3001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
