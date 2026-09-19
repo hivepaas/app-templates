@@ -1,0 +1,106 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gitea-sqlite
+  title: Gitea with SQLite
+  tagline: A git server in one app, with nothing else to run beside it
+  description: |
+    This is [Gitea](gitea), with one difference: it keeps everything in a SQLite file on its
+    own volume instead of in a PostgreSQL database beside it. One app, one volume, nothing
+    else to keep running.
+
+    **When this is the one to use**
+
+    A personal git server, a team of a few people, a mirror of repositories you keep
+    elsewhere. Gitea itself is small and SQLite handles that load without noticing.
+
+    **When it is not**
+
+    Many people pushing at once, or CI hammering the API: SQLite takes one writer at a time,
+    and the answer then is the plain [Gitea](gitea) template, which comes with a database.
+    Moving later means dumping and restoring through Gitea's own `dump` and `restore` - the
+    two are not interchangeable in place.
+
+    **Everything is on the volume**
+
+    Repositories, the database file, avatars, attachments and the configuration. Back that
+    volume up and there is nothing else to keep.
+
+    **The first account**
+
+    Open it and the installation page appears with the database already filled in. The
+    first account you create is the administrator.
+  categories: [webapps/dev-tools]
+  tags: [git, open-source]
+  aliases: [git, forge, gitea sqlite, small git server]
+  icon: icons/gitea.svg
+  links:
+    website: https://about.gitea.com
+    documentation: https://docs.gitea.com
+    source: https://github.com/go-gitea/gitea
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the repositories, the database file and the configuration are kept on.
+    type: volume
+
+versions:
+  - name: "1.27"
+    release: "1.27.3"
+    default: true
+    image: gitea/gitea:1.27.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gitea
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # GITEA__section__KEY writes app.ini before the server starts, which is what fills
+        # in the installation page. The database is a file on the volume, next to the
+        # repositories it belongs with.
+        - {k: GITEA__database__DB_TYPE, v: sqlite3}
+        - {k: GITEA__database__PATH, v: /data/gitea/gitea.db}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
