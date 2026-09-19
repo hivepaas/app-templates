@@ -893,6 +893,43 @@
       }
     },
     {
+      "name": "glance",
+      "file": {
+        "path": "templates/glance.yaml",
+        "sha256": "16d9bedc093f04b908bd2b4ea6ce3f86f5db1c92b9ef7e6d96969960d1767022"
+      },
+      "icon": {
+        "path": "icons/glance.svg",
+        "sha256": "3d7ff6fbd3d77c94ac33c20fe15e20207bdc3e07429015d22588ef1fbc85ffef"
+      },
+      "title": "Glance",
+      "tagline": "One page with everything you check in the morning",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "dashboard",
+        "homepage",
+        "start-page",
+        "widgets"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.8",
+          "release": "0.8.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "gotify",
       "file": {
         "path": "templates/gotify.yaml",
@@ -2448,6 +2485,43 @@
       }
     },
     {
+      "name": "privatebin",
+      "file": {
+        "path": "templates/privatebin.yaml",
+        "sha256": "0e2f180d69927646f575b519a8670f5007f02aa937854ef3652ed153189c19bd"
+      },
+      "icon": {
+        "path": "icons/privatebin.svg",
+        "sha256": "3a2dbfccd56d592bd3438ca1ebc56699e51565760a2397a01ae466f126786daf"
+      },
+      "title": "PrivateBin",
+      "tagline": "Pastes the server itself cannot read",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "pastebin",
+        "paste",
+        "snippets",
+        "secrets-sharing"
+      ],
+      "license": "Zlib",
+      "versions": [
+        {
+          "name": "2.0",
+          "release": "2.0.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "prometheus",
       "file": {
         "path": "templates/prometheus.yaml",
@@ -2587,6 +2661,44 @@
         {
           "name": "4.3",
           "release": "4.3.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "radicale",
+      "file": {
+        "path": "templates/radicale.yaml",
+        "sha256": "7ee17119b1c6cd77e0c52dbb9ab1d933b609639a9566072013827de7357fed95"
+      },
+      "icon": {
+        "path": "icons/radicale.svg",
+        "sha256": "010e1875f490a9ae7609826b93f1ea3f239767afae0798bdd63f251d2a04e973"
+      },
+      "title": "Radicale",
+      "tagline": "Your calendars and contacts, synced by every phone you own",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "caldav",
+        "carddav",
+        "calendar",
+        "contacts",
+        "dav"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.8",
+          "release": "3.8.0.0",
           "default": true
         }
       ],

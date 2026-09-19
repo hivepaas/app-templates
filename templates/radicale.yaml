@@ -1,0 +1,148 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: radicale
+  title: Radicale
+  tagline: Your calendars and contacts, synced by every phone you own
+  description: |
+    Radicale is a CalDAV and CardDAV server - the protocols iOS, Android, Thunderbird and
+    every other calendar app already speak. Point them at this app and appointments and
+    contacts sync between them, kept on your own server as plain files rather than in an
+    account somewhere.
+
+    **This template sets up**
+
+    - the server on a volume, where the calendars and address books are stored as files
+    - one account, from the username and password here, with its password hashed on the way in
+    - collections private to their owner: another account cannot read yours
+    - a health check on its own endpoint
+
+    **Adding it to a phone**
+
+    On iOS: Settings, Calendar, Accounts, Add Account, Other, Add CalDAV Account, with this
+    app's address as the server and the credentials here. Android needs DAVx5 from the store,
+    which takes the same three things. Put a calendar app's account in and it creates the
+    collections it needs on the first sync.
+
+    **More people**
+
+    The account here is the one this template makes. More are added by editing the users file
+    on the volume - one `name:hash` line each - which Radicale reads on every request, so
+    nothing needs restarting.
+
+    **What the volume holds**
+
+    Every event and contact, as `.ics` and `.vcf` files under a directory per collection.
+    They are readable text: a backup of that volume is a backup you could open by hand.
+  categories: [webapps/knowledge]
+  tags: [collaboration, open-source]
+  aliases: [caldav, carddav, calendar, contacts, dav]
+  icon: icons/radicale.svg
+  links:
+    website: https://radicale.org
+    documentation: https://radicale.org/v3.html
+    source: https://github.com/Kozea/Radicale
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at - what a phone connects to. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: username
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._@-]{2,64}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume calendars, contacts and the users file are kept on.
+    type: volume
+
+versions:
+  - name: "3.8"
+    release: "3.8.0.0"
+    default: true
+    image: tomsquest/docker-radicale:3.8.0.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Radicale authenticates against an htpasswd file, and a password cannot be written
+      # into one from here - a secret in a configuration file is refused, and rightly. So
+      # the file is written at every start from the environment, with the password hashed
+      # by the bcrypt the image already carries, and only then is Radicale started.
+      command: >-
+        sh -c 'umask 077;
+        /venv/bin/python -c "import bcrypt, os;
+        open(\"/data/users\", \"wb\").write(os.environ[\"RADICALE_USERNAME\"].encode() + b\":\" +
+        bcrypt.hashpw(os.environ[\"RADICALE_PASSWORD\"].encode(), bcrypt.gensalt()) + b\"\\n\")";
+        chown radicale:radicale /data/users;
+        exec su-exec radicale /venv/bin/radicale --config /config/config'
+    storage:
+      mounts:
+        # noCopy: the image ships /data, and docker would copy it - ownership and all - into
+        # the empty volume the first time it is mounted here.
+        /data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The web interface, which answers without credentials - the collections behind it
+        # answer 401, and the root only redirects here.
+        command: curl -fsS -o /dev/null http://127.0.0.1:5232/.web/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: radicale
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: RADICALE_USERNAME, v: "${{ params.username }}"}
+        - {k: RADICALE_PASSWORD, v: "${secrets.RADICALE_PASSWORD}"}
+        # The entry point applies every RADICALE_CONFIG_ variable to the configuration file
+        # before starting, which is how these reach Radicale without a file of our own.
+        - {k: RADICALE_CONFIG_AUTH_TYPE, v: htpasswd}
+        - {k: RADICALE_CONFIG_AUTH_HTPASSWD_FILENAME, v: /data/users}
+        - {k: RADICALE_CONFIG_AUTH_HTPASSWD_ENCRYPTION, v: bcrypt}
+        - {k: RADICALE_CONFIG_STORAGE_FILESYSTEM_FOLDER, v: /data/collections}
+        # Each account sees only its own collections.
+        - {k: RADICALE_CONFIG_RIGHTS_TYPE, v: owner_only}
+        - {k: TAKE_FILE_OWNERSHIP, v: "true"}
+    secrets:
+      RADICALE_PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 5232
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

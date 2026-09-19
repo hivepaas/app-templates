@@ -1,0 +1,173 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: privatebin
+  title: PrivateBin
+  tagline: Pastes the server itself cannot read
+  description: |
+    PrivateBin is a pastebin where the encryption happens in the browser: the text is
+    encrypted before it is sent, and the key lives in the part of the link after the `#`,
+    which browsers never send to a server. So this app stores ciphertext it has no way to
+    read, and a leaked database is a pile of noise without the links.
+
+    **This template sets up**
+
+    - PrivateBin on a volume, where the pastes are kept as files
+    - pastes that expire, are readable once, or are discussed in comments - the defaults are
+      in a configuration file you can edit
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **What it is good for**
+
+    Sending a log, a stack trace or a configuration snippet to somebody without it living in
+    a chat history forever. Set an expiry when you create it - a day is the default here - or
+    mark it "burn after reading" so the first reader is the last.
+
+    **No accounts, so think about who can reach it**
+
+    Anybody who can open the page can create a paste. On a domain that means the internet:
+    fine for a team that wants it that way, and a reason to leave it inside the project
+    otherwise. Size and expiry limits are in the configuration file if you do publish it.
+
+    **What the volume holds**
+
+    One file per paste, plus its comments and its expiry. Expired pastes are removed as they
+    are next visited rather than by a timer, so a volume can hold a little more than what is
+    still readable.
+  categories: [webapps/dev-tools]
+  tags: [privacy, open-source]
+  aliases: [pastebin, paste, snippets, secrets-sharing]
+  icon: icons/privatebin.svg
+  links:
+    website: https://privatebin.info
+    documentation: https://github.com/PrivateBin/PrivateBin/wiki
+    source: https://github.com/PrivateBin/PrivateBin
+  license: Zlib
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to keep it inside the project.
+    type: domain
+    optional: true
+  - name: defaultExpiry
+    title: Default expiry
+    description: How long a new paste lasts unless the person creating it chooses otherwise.
+    type: select
+    default: 1day
+    options:
+      - {value: 5min, title: Five minutes}
+      - {value: 1hour, title: One hour}
+      - {value: 1day, title: One day}
+      - {value: 1week, title: One week}
+      - {value: 1month, title: One month}
+  - name: sizeLimit
+    title: Largest paste
+    description: Anything bigger is refused before it is stored.
+    type: select
+    default: "2097152"
+    options:
+      - {value: "262144", title: 256 KB}
+      - {value: "2097152", title: 2 MB}
+      - {value: "10485760", title: 10 MB}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the encrypted pastes are kept on.
+    type: volume
+
+versions:
+  - name: "2.0"
+    release: "2.0.6"
+    default: true
+    image: privatebin/nginx-fpm-alpine:2.0.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /srv/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8080/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: privatebin
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      conf.php:
+        # The defaults this app runs with. Everything here is editable afterwards under this
+        # app's configuration files - the full reference is conf.sample.php upstream.
+        content: |
+          [main]
+          name = "PrivateBin"
+          discussion = true
+          opendiscussion = false
+          password = true
+          fileupload = false
+          burnafterreadingselected = false
+          defaultformatter = "plaintext"
+          sizelimit = ${{ params.sizeLimit }}
+          template = "bootstrap5"
+          languageselection = true
+
+          [expire]
+          default = "${{ params.defaultExpiry }}"
+
+          [expire_options]
+          5min = 300
+          10min = 600
+          1hour = 3600
+          1day = 86400
+          1week = 604800
+          1month = 2592000
+          1year = 31536000
+          never = 0
+
+          [formatter_options]
+          plaintext = "Plain Text"
+          syntaxhighlighting = "Source Code"
+          markdown = "Markdown"
+
+          [traffic]
+          limit = 10
+          header = "X_FORWARDED_FOR"
+
+          [purge]
+          limit = 300
+          batchsize = 10
+
+          [model]
+          class = Filesystem
+
+          [model_options]
+          dir = "/srv/data"
+        swarmRef:
+          file: {name: /srv/cfg/conf.php, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

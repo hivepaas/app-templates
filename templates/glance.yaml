@@ -1,0 +1,169 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: glance
+  title: Glance
+  tagline: One page with everything you check in the morning
+  description: |
+    Glance is a dashboard made of widgets: RSS feeds, the weather, your calendar, GitHub
+    releases, server statistics, bookmarks, a search box. It is configured in one YAML file
+    and renders as a fast page with no JavaScript framework behind it - the sort of home page
+    a browser can open on every start without noticing.
+
+    **This template sets up**
+
+    - Glance with a starting page - a clock, a search box, bookmarks and a news feed
+    - a sign-in, from the username and password here
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Configuring it**
+
+    The page is the configuration file this app carries, `glance.yml`, which you edit under
+    this app's configuration files and apply by redeploying. It is a list of columns holding
+    widgets; the reference for what they can be is in Glance's documentation. Nothing else
+    is stored, so this app needs no volume at all.
+
+    **What it can reach**
+
+    Widgets fetch over the network from inside this app, so anything in the project is
+    reachable by app key - the statistics of another app, an RSS feed from a Miniflux app,
+    or a link list pointing at everything you run here.
+
+    **Keys stay in the environment**
+
+    A widget needing an API key reads it as `${SOME_KEY}` in the configuration file, and the
+    value goes in this app's environment - so a key is never written into the file itself.
+  categories: [webapps/dev-tools]
+  tags: [dashboards, open-source]
+  aliases: [dashboard, homepage, start-page, widgets]
+  icon: icons/glance.svg
+  links:
+    website: https://github.com/glanceapp/glance
+    documentation: https://github.com/glanceapp/glance/blob/main/docs/configuration.md
+    source: https://github.com/glanceapp/glance
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Session key
+    description: >-
+      Signs the sessions people sign in with - 86 characters, which is the 64 bytes Glance
+      wants. Leave empty to generate one.
+    type: secret
+    minLength: 86
+    maxLength: 86
+    generate: {length: 86}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+versions:
+  - name: "0.8"
+    release: "0.8.6"
+    default: true
+    image: glanceapp/glance:v0.8.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /api/healthz answers without a session; the pages themselves redirect to the
+        # sign-in page.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/api/healthz
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: glance
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Glance wants exactly 64 bytes here. Generated secrets are letters and digits, so
+        # 86 of them plus the padding characters decode to precisely that.
+        - {k: GLANCE_SECRET_KEY, v: "${secrets.GLANCE_SECRET_KEY}=="}
+        - {k: GLANCE_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: GLANCE_PASSWORD, v: "${secrets.GLANCE_PASSWORD}"}
+    secrets:
+      GLANCE_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      GLANCE_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      glance.yml:
+        # A page to start from, and the shape of the file: columns holding widgets. The
+        # ${...} values are read from this app's environment, which is how a password and an
+        # API key stay out of the file.
+        content: |
+          auth:
+            secret-key: ${GLANCE_SECRET_KEY}
+            users:
+              ${GLANCE_USERNAME}:
+                password: ${GLANCE_PASSWORD}
+
+          server:
+            host: 0.0.0.0
+            port: 8080
+
+          pages:
+            - name: Home
+              columns:
+                - size: small
+                  widgets:
+                    - type: calendar
+                    - type: bookmarks
+                      groups:
+                        - title: HivePaaS
+                          links:
+                            - title: Documentation
+                              url: https://hivepaas.com
+                - size: full
+                  widgets:
+                    - type: search
+                      search-engine: duckduckgo
+                    - type: rss
+                      title: News
+                      limit: 10
+                      feeds:
+                        - url: https://hnrss.org/frontpage
+                          title: Hacker News
+        swarmRef:
+          file: {name: /app/config/glance.yml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
