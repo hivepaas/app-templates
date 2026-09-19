@@ -1,0 +1,112 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: navidrome
+  title: Navidrome
+  tagline: Your music collection, streamed to anything that speaks Subsonic
+  description: |
+    Navidrome reads a folder of music, learns the tags, and serves it: a web player of its
+    own, and the Subsonic API that dozens of phone apps already speak - play:Sub, substreamer,
+    Symfonium, Feishin, DSub. It is one small Go binary and a SQLite database, and it is
+    happy with a library of a hundred thousand tracks.
+
+    **Two volumes**
+
+    The music volume is the collection, mounted read-only as far as Navidrome is concerned -
+    it never writes to it. The data volume holds its database: the scan, the play counts,
+    the playlists and the users.
+
+    **The first account**
+
+    The first person to open it creates the administrator account. Do that before giving the
+    address to anybody.
+
+    **Scanning**
+
+    It scans at startup and then watches for changes. A large library takes a while the first
+    time; the log says where it is.
+
+    **Playing from a phone**
+
+    Add the app's address, your username and password to any Subsonic client. Nothing else is
+    needed - no separate key, no pairing.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [music, subsonic, streaming, airsonic]
+  icon: icons/navidrome.svg
+  links:
+    website: https://www.navidrome.org
+    documentation: https://www.navidrome.org/docs/
+    source: https://github.com/navidrome/navidrome
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: A scan of a very large library is the heaviest moment; playing is light.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: musicVolume
+    title: Music volume
+    description: The volume the music is on, mounted at `/music`. Navidrome only reads it.
+    type: volume
+  - name: dataVolume
+    title: Data volume
+    description: The volume the scan, playlists, play counts and users are kept on.
+    type: volume
+
+versions:
+  - name: "0.64"
+    release: "0.64.0"
+    default: true
+    image: deluan/navidrome:0.64.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /music: {type: volume, source: "${{ params.musicVolume }}"}
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:4533/ping
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: navidrome
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ND_MUSICFOLDER, v: /music}
+        - {k: ND_DATAFOLDER, v: /data}
+        # Watches for new files rather than only scanning at startup.
+        - {k: ND_SCANSCHEDULE, v: "@every 1h"}
+        - {k: ND_LOGLEVEL, v: info}
+    routing:
+      port: 4533
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

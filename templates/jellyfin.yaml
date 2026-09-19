@@ -1,0 +1,122 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jellyfin
+  title: Jellyfin
+  tagline: Your films and series, on your own server, with no account anywhere
+  description: |
+    Jellyfin serves the video and music you already have: point it at your library, let it
+    fetch artwork and descriptions, and watch from a browser, a phone, a TV app or Kodi. It
+    is a fork of Emby from before it closed, and there is no subscription, no account with
+    anybody, and no feature held back.
+
+    **Two volumes, and only one of them matters**
+
+    The media volume holds the library and is yours; the configuration volume holds the
+    database Jellyfin builds about it - users, artwork, watch state, the cache. Losing the
+    second means rescanning, which is time; losing the first means losing the films.
+
+    **Filling the library**
+
+    Jellyfin does not download anything. Put files on the media volume however you like -
+    another app that writes to the same volume, or an upload - and then add a library in
+    *Dashboard → Libraries* pointing at `/media`.
+
+    **Transcoding is the expensive part**
+
+    Playing a file a device understands costs almost nothing. Anything else is transcoded on
+    the processor here, which is one core busy per stream and warm hardware. Hardware
+    acceleration needs a GPU passed into the container, which this template does not do -
+    keep the files in formats your devices play, and it stays cheap.
+
+    **The first screen**
+
+    A short wizard: language, the first administrator account, a library, and whether to
+    allow remote connections. Nothing is created before you do that.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [media-server, movies, tv, plex-alternative, emby]
+  icon: icons/jellyfin.svg
+  links:
+    website: https://jellyfin.org
+    documentation: https://jellyfin.org/docs/
+    source: https://github.com/jellyfin/jellyfin
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: Playback is light; transcoding and the first library scan are not.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: mediaVolume
+    title: Media volume
+    description: The volume the films, series and music are on, mounted at `/media`.
+    type: volume
+  - name: configVolume
+    title: Configuration volume
+    description: >-
+      The volume Jellyfin's own database, artwork and cache are kept on - everything it
+      builds about the library rather than the library itself.
+    type: volume
+
+versions:
+  - name: "12.1"
+    release: "12.1"
+    default: true
+    image: jellyfin/jellyfin:12.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /media: {type: volume, source: "${{ params.mediaVolume }}"}
+        /config:
+          type: volume
+          source: "${{ params.configVolume }}"
+          volumeOptions: {subpath: config}
+        /cache:
+          type: volume
+          source: "${{ params.configVolume }}"
+          volumeOptions: {subpath: cache}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Jellyfin's own endpoint, which answers before anybody has been through the wizard.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8096/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jellyfin
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # What Jellyfin puts into the links it hands to clients, once the app has a domain.
+        - {k: JELLYFIN_PublishedServerUrl, v: "${HIVEPAAS_APP_URL}"}
+    routing:
+      port: 8096
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

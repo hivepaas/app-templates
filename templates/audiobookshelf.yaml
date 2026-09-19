@@ -1,0 +1,126 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: audiobookshelf
+  title: Audiobookshelf
+  tagline: Audiobooks and podcasts that remember where you stopped
+  description: |
+    Audiobookshelf serves audiobooks and podcasts, keeps each listener's position in sync
+    across devices, and downloads podcast episodes on a schedule. Its own apps for Android
+    and iOS play offline and sync back when they reconnect.
+
+    **Three directories, two volumes**
+
+    The media volume holds the books and the podcasts. The data volume holds everything
+    Audiobookshelf knows about them - its database, the covers and the metadata it fetched,
+    and each user's progress.
+
+    **The first account**
+
+    Opening it asks you to create the root user. Everything else - libraries, more users,
+    what each may see - is set from inside.
+
+    **Filling the library**
+
+    Point a library at `/audiobooks` or `/podcasts` and it scans. Podcasts it can fetch
+    itself: give it a feed and it downloads new episodes into the media volume.
+
+    **Metadata comes from the internet**
+
+    Covers and descriptions are looked up from Audible, iTunes and Google Books when you ask
+    for them. Nothing leaves the server unless you press the button.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [audiobooks, podcasts, plex-alternative, books]
+  icon: icons/audiobookshelf.svg
+  links:
+    website: https://www.audiobookshelf.org
+    documentation: https://www.audiobookshelf.org/docs
+    source: https://github.com/advplyr/audiobookshelf
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Serving is light. Scanning a large library and converting an ebook are the heavy
+      moments.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: mediaVolume
+    title: Media volume
+    description: >-
+      The volume the audiobooks and podcasts are on, mounted at `/audiobooks` and
+      `/podcasts`.
+    type: volume
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the database, the covers and everybody's listening position are kept on.
+    type: volume
+
+versions:
+  - name: "2.36"
+    release: "2.36.1"
+    default: true
+    image: advplyr/audiobookshelf:2.36.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /audiobooks:
+          type: volume
+          source: "${{ params.mediaVolume }}"
+          volumeOptions: {subpath: audiobooks}
+        /podcasts:
+          type: volume
+          source: "${{ params.mediaVolume }}"
+          volumeOptions: {subpath: podcasts}
+        /config:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+        /metadata:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: metadata}
+    container:
+      # The image is built on tini, which has to be process 1 to do its job.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl in the image; wget is there.
+        command: wget -q -O /dev/null http://127.0.0.1/healthcheck
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: audiobookshelf
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

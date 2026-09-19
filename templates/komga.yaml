@@ -1,0 +1,107 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: komga
+  title: Komga
+  tagline: A library for comics, manga and magazines, with a reader in the browser
+  description: |
+    Komga reads a folder of CBZ, CBR, PDF and EPUB files and turns it into a library: series
+    and volumes with covers and metadata, a reader that works on a phone, read state per
+    person, and the OPDS feed that comic readers like Panels, Chunky and Tachiyomi already
+    speak.
+
+    **Two volumes**
+
+    The library volume holds the files, mounted at `/books`. The data volume holds Komga's
+    own database: what it scanned, the thumbnails it made, the accounts and how far each has
+    read.
+
+    **The first account**
+
+    The first person to open it creates the administrator. Add a library pointing at `/books`
+    and it scans; new files are noticed as they arrive.
+
+    **Reading from an app**
+
+    Point any OPDS client at this app's address with your username and password. Komga also
+    speaks the Kobo sync protocol, so a Kobo reader can sync against it directly.
+
+    **It does not download anything**
+
+    Komga organises what is already on the volume. Put files there however you like.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [comics, manga, cbz, opds, ebooks]
+  icon: icons/komga.svg
+  links:
+    website: https://komga.org
+    documentation: https://komga.org/docs/introduction
+    source: https://github.com/gotson/komga
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      A JVM, so give it room: scanning and making thumbnails for a large library is the
+      heavy moment.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: booksVolume
+    title: Library volume
+    description: The volume the comics and books are on, mounted at `/books`.
+    type: volume
+  - name: dataVolume
+    title: Data volume
+    description: The volume Komga's database, thumbnails and accounts are kept on.
+    type: volume
+
+versions:
+  - name: "1.27"
+    release: "1.27.0"
+    default: true
+    image: gotson/komga:1.27.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /books: {type: volume, source: "${{ params.booksVolume }}"}
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Spring's own health endpoint, which Komga leaves open.
+        command: curl -fsS -o /dev/null http://127.0.0.1:25600/actuator/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: komga
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 25600
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
