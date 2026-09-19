@@ -44,6 +44,16 @@ metadata:
     a runner elsewhere against this GitLab, or run one next to it - what a runner needs is
     the address above and a registration token from the CI settings.
 
+    **The storage it needs**
+
+    GitLab wants POSIX from its volume: it marks the repository directory setgid and refuses
+    to start without it, and its bundled PostgreSQL, Redis and Gitaly each open a unix
+    socket under the same directory. Local Linux storage does all of that. A shared folder -
+    which is what every path from the host is on a Docker Desktop install - does none of it,
+    and the app stops with "Failed asserting that mode permissions ... is 2770" or "could
+    not create any Unix-domain sockets". On such a machine, give GitLab a volume that is not
+    a path from the host.
+
     **Storage**
 
     Everything is on the volume: repositories, the database, uploads, artifacts and the
@@ -152,9 +162,10 @@ app:
           v: >-
             external_url(ENV['HIVEPAAS_APP_URL'].to_s.empty? ? 'http://localhost' :
             ENV['HIVEPAAS_APP_URL']);
-            nginx['listen_port'] = 80;
-            nginx['listen_https'] = false;
-            nginx['proxy_set_headers'] = {'X-Forwarded-Proto' => 'https', 'X-Forwarded-Ssl' => 'on'};
+            gitlab_rails['nginx']['listen_port'] = 80;
+            gitlab_rails['nginx']['listen_https'] = false;
+            gitlab_rails['nginx']['proxy_set_headers'] = {'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Ssl' => 'on'};
             letsencrypt['enable'] = false;
             registry['enable'] = false;
             prometheus_monitoring['enable'] = false;
