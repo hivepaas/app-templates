@@ -1,0 +1,162 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: odoo
+  title: Odoo
+  tagline: Invoicing, inventory, CRM and the rest of a company, in one application
+  description: |
+    Odoo is business software as one system: sales and CRM, invoicing and accounting,
+    inventory and purchasing, projects, timesheets, helpdesk, a website and a shop. You
+    install the parts you need from inside it, and they share the same customers, products
+    and journals rather than syncing between tools.
+
+    **This template creates two apps**
+
+    - **Odoo** itself, with a volume holding the file store - every attachment and image
+    - **a PostgreSQL database**, named with `-db`, holding everything else
+
+    Both are the backup, and they restore together: the file store is full of documents the
+    database refers to by name.
+
+    **The first screen**
+
+    Odoo asks you to create a database: a name, the language, the country, and the first
+    administrator's email and password. That screen also asks for the **master password**,
+    which guards creating, duplicating and deleting databases rather than signing in. The one
+    generated for you is under this app's Secrets, inside `odoo.conf` - Odoo reads it from a
+    file and from nowhere else, which is also why changing it from inside Odoo does not
+    stick: change it in that secret instead.
+
+    **One Odoo, several databases**
+
+    Odoo can hold more than one company database in the same PostgreSQL. Everything created
+    that way shares this app's memory and its file store, which is fine for a test copy of
+    production and not the way to run two real companies.
+
+    **Installing apps needs room**
+
+    A fresh Odoo is small; installing Accounting, Inventory and Website is not. Two
+    gigabytes is comfortable for a few users, and the workers are sized from it.
+
+    **It writes its own links**
+
+    Emails and portal links are built from the address Odoo is told, under *Settings →
+    General Settings → Developer Tools*, `web.base.url`. Set it once the app has a domain.
+  categories: [webapps/business]
+  tags: [business-intelligence, project-management, collaboration, open-source]
+  aliases: [erp, crm, invoicing, accounting, inventory]
+  icon: icons/odoo.svg
+  links:
+    website: https://www.odoo.com
+    documentation: https://www.odoo.com/documentation/19.0/
+    source: https://github.com/odoo/odoo
+  license: LGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: masterPassword
+    title: Master password
+    description: >-
+      What guards creating, duplicating and deleting databases - not the account you sign in
+      with. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Odoo sizes its workers from this. Two gigabytes carries a few users with the usual
+      apps installed.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the file store is kept on - every attachment, image and report.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: postgres
+      username: odoo
+
+versions:
+  - name: "19.0"
+    release: "19.0"
+    default: true
+    image: odoo:19.0-20260908
+  - name: "18.0"
+    release: "18.0"
+    image: odoo:18.0-20260908
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/odoo: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Odoo's own endpoint, which answers without a database selected - which is what a
+        # new app is until somebody creates one on the first screen.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8069/web/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: odoo
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # What the image's entry point writes into odoo.conf before starting. The user is
+        # the database's owner here, which is what lets Odoo create its own databases.
+        - {k: HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      # Odoo's configuration file, which is a secret rather than a config file because the
+      # master password lives in it: Odoo reads that password from a file and from nowhere
+      # else - no environment variable, no argument - and a secret is the one thing here
+      # that is encrypted at rest and never shown back.
+      #
+      # The image's entry point adds the database settings to whatever it finds in this
+      # file, which is why they are absent from it.
+      odoo.conf:
+        value: |
+          [options]
+          admin_passwd = ${{ params.masterPassword }}
+          addons_path = /mnt/extra-addons
+          data_dir = /var/lib/odoo
+          list_db = True
+          proxy_mode = True
+        swarmRef:
+          file: {name: /etc/odoo/odoo.conf, uid: "100", gid: "0", mode: 440}
+    routing:
+      port: 8069
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
