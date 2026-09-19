@@ -1,0 +1,142 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: flowise-postgres
+  title: Flowise with PostgreSQL
+  tagline: The visual builder for LLM flows, with its flows in a database
+  description: |
+    This is [Flowise](flowise), with one difference: the flows, the credentials and the
+    chat history are kept in a PostgreSQL database created alongside it rather than in a
+    SQLite file. The volume stays for the uploaded files, the logs, and the key the
+    credentials are encrypted with.
+
+    **When this is the one to use**
+
+    Several people building flows at once, chat histories that keep growing, or a backup
+    routine that covers the databases here and not the volumes. For one person trying
+    things out, the plain [Flowise](flowise) template is simpler.
+
+    **This template creates two apps**
+
+    - **Flowise** itself, with a volume for uploads, logs and the encryption key
+    - **a PostgreSQL database**, named with `-db`, holding the flows
+
+    Both are needed, and **both** are the backup: the credentials in the database are
+    encrypted with the key on the volume, so one without the other restores flows that
+    cannot reach anything.
+
+    **The first account**
+
+    The username and password given here create the administrator on the first start and
+    are ignored afterwards.
+  categories: [webapps/ai]
+  tags: [ai, llm, low-code, automation, open-source]
+  aliases: [langchain, chatbot, agents, no-code, rag, flowise postgres]
+  icon: icons/flowise.svg
+  links:
+    website: https://flowiseai.com
+    documentation: https://docs.flowiseai.com
+    source: https://github.com/FlowiseAI/Flowise
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._@-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: At least 8 characters. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume its database, uploads and encryption key are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: flowise
+      username: flowise
+
+versions:
+  # 3.1.2 rather than the newest: the 3.1.4 image fails to start, with its own components
+  # failing to load ("Package subpath './utils/uuid' is not defined by exports") and the
+  # process exiting. Checked on this exact image, both architectures published.
+  - name: "3.1"
+    release: "3.1.2"
+    default: true
+    image: flowiseai/flowise:3.1.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/v1/ping
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: flowise
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # What is left on the volume: the logs, the files people upload, and the key its
+        # credentials are encrypted with. The flows themselves are in the database.
+        - {k: SECRETKEY_PATH, v: /data}
+        - {k: LOG_PATH, v: /data/logs}
+        - {k: BLOB_STORAGE_PATH, v: /data/storage}
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: FLOWISE_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: FLOWISE_PASSWORD, v: "${secrets.FLOWISE_PASSWORD}"}
+        - {k: DISABLE_FLOWISE_TELEMETRY, v: "true"}
+        # The database this template creates. Flowise migrates it on first start.
+        - {k: DATABASE_TYPE, v: postgres}
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      FLOWISE_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

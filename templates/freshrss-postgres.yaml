@@ -1,0 +1,154 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: freshrss-postgres
+  title: FreshRSS with PostgreSQL
+  tagline: The feed reader, with its feeds and articles in a database
+  description: |
+    This is [FreshRSS](freshrss), with one difference: the feeds, the articles and the
+    accounts are kept in a PostgreSQL database created alongside it rather than in a SQLite
+    file.
+
+    **When this is the one to use**
+
+    Many feeds or a long retention - articles are the rows that accumulate - several people
+    reading, or a backup routine that covers the databases here and not the volumes. For one
+    person's feeds the plain [FreshRSS](freshrss) template is simpler.
+
+    **This template creates two apps**
+
+    - **FreshRSS** itself, with a volume for its configuration and favicons
+    - **a PostgreSQL database**, named with `-db`, holding the feeds and articles
+
+    **The first account**
+
+    The username and password given here create the installation and its administrator on
+    the first start, and are ignored afterwards. The API password is set to the same value,
+    which is what the mobile readers use.
+  categories: [webapps/knowledge]
+  tags: [documents, open-source]
+  aliases: [rss, feeds, reader, atom, news, freshrss postgres]
+  icon: icons/freshrss.svg
+  links:
+    website: https://freshrss.org
+    documentation: https://freshrss.github.io/FreshRSS/
+    source: https://github.com/FreshRSS/FreshRSS
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9_]{2,38}$'
+  - name: adminPassword
+    title: Password
+    description: >-
+      At least 7 characters, and also the password a mobile app uses for the API. Leave
+      empty to generate one.
+    type: secret
+    minLength: 7
+    generate: {length: 24}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume articles, your account and extensions are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: freshrss
+      username: freshrss
+
+versions:
+  - name: "1.30"
+    release: "1.30.0"
+    default: true
+    image: freshrss/freshrss:1.30.0-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/FreshRSS/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /var/www/FreshRSS/extensions:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: extensions}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The application itself rather than the root, which only redirects to it. No curl
+        # in the image, but wget is there.
+        command: wget -q -O /dev/null http://127.0.0.1:80/i/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: freshrss
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+        # Its own scheduler refreshes feeds, at thirteen and forty-three minutes past.
+        - {k: CRON_MIN, v: "13,43"}
+        # Both are read once, while the installation is empty, and ignored afterwards: the
+        # first creates the installation, the second the account that administers it.
+        # The installation is created against the database this template makes, which is
+        # what --db-type and the four that follow it say. FreshRSS reads them once, while
+        # it has no installation, and ignores them afterwards.
+        - k: FRESHRSS_INSTALL
+          v: >-
+            --api-enabled --default-user ${{ params.adminUsername }} --language en
+            --db-type pgsql --db-host ${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}
+            --db-user ${{ deps.db.ref.HIVEPAAS_USER }} --db-password ${{ deps.db.ref.HIVEPAAS_PASSWORD }}
+            --db-base ${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - k: FRESHRSS_USER
+          v: >-
+            --user ${{ params.adminUsername }} --password ${secrets.FRESHRSS_PASSWORD}
+            --api-password ${secrets.FRESHRSS_PASSWORD} --language en
+    secrets:
+      FRESHRSS_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

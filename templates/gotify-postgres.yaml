@@ -1,0 +1,130 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gotify-postgres
+  title: Gotify with PostgreSQL
+  tagline: Push notifications to your own phone, with the messages in a database
+  description: |
+    This is [Gotify](gotify), with one difference: the applications, clients and messages
+    are kept in a PostgreSQL database created alongside it rather than in a SQLite file.
+
+    **When this is the one to use**
+
+    A lot of messages, several senders writing at once, or a backup routine that covers the
+    databases here and not the volumes. For a few alerts a day the plain
+    [Gotify](gotify) template is simpler.
+
+    **This template creates two apps**
+
+    - **Gotify** itself, with a volume for uploaded application images
+    - **a PostgreSQL database**, named with `-db`, holding everything else
+
+    **The first account**
+
+    The username and password given here create the administrator on the first start and
+    are ignored afterwards. Tokens for applications and clients are made inside.
+  categories: [webapps/communication]
+  tags: [notifications, open-source]
+  aliases: [push, notify, alerts, messages, gotify postgres]
+  icon: icons/gotify.svg
+  links:
+    website: https://gotify.net
+    documentation: https://gotify.net/docs/
+    source: https://github.com/gotify/server
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, and what the phone app connects to. Leave it empty to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and uploaded images are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: gotify
+      username: gotify
+
+versions:
+  - name: "3.1"
+    release: "3.1.1"
+    default: true
+    image: gotify/server:3.1.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The endpoint answers for the database as well as the server itself.
+        command: curl -fsS -o /dev/null http://127.0.0.1:80/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gotify
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: GOTIFY_DEFAULTUSER_NAME, v: "${{ params.adminUsername }}"}
+        - {k: GOTIFY_DEFAULTUSER_PASS, v: "${secrets.GOTIFY_DEFAULTUSER_PASS}"}
+        # TLS is terminated in front of the app, so its own server speaks plain HTTP.
+        - {k: GOTIFY_SERVER_SSL_ENABLED, v: "false"}
+        # The database this template creates. Gotify migrates it on first start.
+        - {k: GOTIFY_DATABASE_DIALECT, v: postgres}
+        - k: GOTIFY_DATABASE_CONNECTION
+          v: >-
+            host=${{ deps.db.ref.HIVEPAAS_HOST }} port=${{ deps.db.ref.HIVEPAAS_PORT }}
+            user=${{ deps.db.ref.HIVEPAAS_USER }} dbname=${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            password=${{ deps.db.ref.HIVEPAAS_PASSWORD }} sslmode=disable
+    secrets:
+      GOTIFY_DEFAULTUSER_PASS:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
