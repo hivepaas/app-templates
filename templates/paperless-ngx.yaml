@@ -213,6 +213,10 @@ app:
         - {k: PAPERLESS_TIKA_ENABLED, v: "1"}
         - {k: PAPERLESS_TIKA_ENDPOINT, v: "http://${{ deps.tika.key }}:9998"}
         - {k: PAPERLESS_TIKA_GOTENBERG_ENDPOINT, v: "http://${{ deps.gotenberg.key }}:3000"}
+        # The address the app answers at, which is what Django checks a form submission
+        # against. It is empty until the app has a domain - which is what Paperless expects
+        # of an app that has none - and HivePaaS fills it in the moment one is added.
+        - {k: PAPERLESS_URL, v: "${HIVEPAAS_APP_URL}"}
         - {k: PAPERLESS_SECRET_KEY, v: "${secrets.PAPERLESS_SECRET_KEY}"}
         # Created on the first start only. Changing them afterwards does nothing; the
         # password is changed from inside the app.
@@ -223,21 +227,6 @@ app:
         # What the consume directory is watched with. A bind through a virtual machine does
         # not deliver file events, and polling is what works everywhere.
         - {k: PAPERLESS_CONSUMER_POLLING, v: "30"}
-    configFiles:
-      paperless-url.sh:
-        # PAPERLESS_URL is the address the app answers at, which is what Django checks a
-        # form submission against - and an app has no domain until somebody gives it one.
-        # It cannot be an ordinary variable: "https://" with no host behind it is refused
-        # at startup, and an app that will not start is worse than one that does not know
-        # its address. So it is written here instead, by the image's own hook for scripts
-        # that run before its services, from the domain the app has at that moment.
-        content: |
-          #!/command/with-contenv bash
-          if [ -n "$HIVEPAAS_DOMAIN" ]; then
-            printf 'https://%s' "$HIVEPAAS_DOMAIN" > /run/s6/container_environment/PAPERLESS_URL
-          fi
-        swarmRef:
-          file: {name: /custom-cont-init.d/10-paperless-url.sh, mode: 755}
     secrets:
       PAPERLESS_SECRET_KEY:
         value: "${{ params.secretKey }}"
