@@ -1,0 +1,100 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: beszel
+  title: Beszel
+  tagline: Server monitoring small enough to forget about, with alerts that work
+  description: |
+    Beszel watches machines: processor, memory, disk, network, temperatures and the docker
+    containers on each one, with history and alerts. It is two pieces - this hub, which is
+    the interface and the database, and a small agent on every machine you want watched.
+
+    **This app is the hub**
+
+    The agents are not apps here: an agent runs on the machine it reports about, next to its
+    docker daemon, which is a thing you install on the host rather than a container this
+    platform schedules. Beszel's documentation has a one-line installer for each system, and
+    the hub gives you the public key and the command to paste.
+
+    **The first account**
+
+    Opening it asks you to create the administrator. Then *Add system* gives you a name, a
+    host and a port, and the agent command to run on that machine.
+
+    **Alerts**
+
+    Per system and per metric - a processor above a threshold for so many minutes, a disk
+    filling, a machine that stopped reporting - delivered by email or by anything Shoutrrr
+    speaks, which is most chat services.
+
+    **There is no health check on this app**
+
+    The image carries the Beszel binary and nothing else - no shell, no curl - so there is
+    nothing to run a check with. HivePaaS reports it as running rather than as healthy.
+
+    **What it keeps**
+
+    The systems, the accounts and the whole history, in its database on the volume.
+  categories: [observability/monitoring]
+  tags: [monitoring, metrics, dashboards, open-source]
+  aliases: [server-monitoring, netdata-alternative, resources]
+  icon: icons/beszel.svg
+  links:
+    website: https://beszel.dev
+    documentation: https://beszel.dev/guide/getting-started
+    source: https://github.com/henrygd/beszel
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, and what the agents connect back through if they are
+      elsewhere. Leave it empty to add one later.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: The hub is small; the history it stores is on disk rather than in memory.
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the systems, accounts and the history are kept on.
+    type: volume
+
+versions:
+  - name: "0.20"
+    release: "0.20.0"
+    default: true
+    image: henrygd/beszel:0.20.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /beszel_data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: it holds the binary and no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: beszel
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8090
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

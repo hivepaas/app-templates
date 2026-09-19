@@ -1,0 +1,123 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gatus
+  title: Gatus
+  tagline: A status page that is a YAML file and nothing else
+  description: |
+    Gatus checks endpoints on a schedule and shows the result on one page: is it up, how fast
+    did it answer, did the body say what it should, when did it last fail. Everything it does
+    is declared in a configuration file - the endpoints, the conditions each must meet, where
+    alerts go - which makes it the opposite kind of tool from a monitoring system you click
+    through.
+
+    **The configuration is this app's config file**
+
+    The template installs a starting `config.yaml` with one endpoint in it. Edit it in this
+    app's configuration files: add your own endpoints, conditions and alerts, redeploy, and
+    the page follows. A condition is as simple as `[STATUS] == 200` or as particular as
+    `[BODY].status == "ok"`.
+
+    **Watching other apps here**
+
+    Another app in this project is reached by its key and its own port - `http://myapp:8080`
+    - without anything being exposed publicly. That is the common case for this app: a status
+    page for the things running beside it.
+
+    **Alerts**
+
+    Gatus speaks Discord, Slack, Telegram, ntfy, Gotify, email, PagerDuty and a generic
+    webhook. Each alert is configured once and then referenced per endpoint.
+
+    **There is no health check on this app**
+
+    The image carries the Gatus binary and nothing else - no shell, no curl - so there is
+    nothing to run a check with. HivePaaS reports it as running rather than as healthy; the
+    page itself tells you whether it is working.
+
+    **Storage is optional and this template skips it**
+
+    Gatus keeps its history in memory by default, which is enough for a status page: it
+    restarts with an empty history and fills it again within a cycle. Point it at a database
+    in the configuration file if you want the history kept.
+  categories: [observability/monitoring]
+  tags: [monitoring, uptime, dashboards, open-source]
+  aliases: [status-page, healthchecks, uptime]
+  icon: icons/gatus.svg
+  links:
+    website: https://gatus.io
+    documentation: https://github.com/TwiN/gatus#configuration
+    source: https://github.com/TwiN/gatus
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the status page answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: One small binary, and the history it keeps in memory.
+    type: size
+    default: 256MB
+    min: 64MB
+
+versions:
+  - name: "5.36"
+    release: "v5.36.0"
+    default: true
+    image: twinproduction/gatus:v5.36.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: it holds the binary and no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gatus
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      config.yaml:
+        # A starting point with one endpoint, so the page has something on it. Replace it
+        # with your own: every endpoint, condition and alert Gatus knows is in this file.
+        content: |
+          storage:
+            type: memory
+
+          endpoints:
+            - name: this status page
+              group: examples
+              url: http://127.0.0.1:8080/health
+              interval: 60s
+              conditions:
+                - "[STATUS] == 200"
+
+            # An app in this project is reached by its key and its own port:
+            # - name: my app
+            #   url: http://myapp:8080/health
+            #   interval: 60s
+            #   conditions:
+            #     - "[STATUS] == 200"
+            #     - "[RESPONSE_TIME] < 500"
+        swarmRef:
+          file: {name: /config/config.yaml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

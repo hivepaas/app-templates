@@ -1,0 +1,155 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: lldap
+  title: LLDAP
+  tagline: A small LDAP server with a web interface, for apps that want a directory
+  description: |
+    LLDAP is a light LDAP server: accounts and groups, a simple web interface to manage them,
+    and enough of the protocol for the apps that ask for LDAP to be happy. It is not a
+    replacement for OpenLDAP or Active Directory - it is the thing you run when four apps
+    each want their own user list and you would rather have one.
+
+    **What speaks to it**
+
+    Nextcloud, Gitea, Grafana, Jellyfin, Vaultwarden, Portainer, Authelia and most
+    self-hosted apps with an LDAP option. Point them at this app's key as the host and port
+    `3890`, with the bind user `uid=admin,ou=people,<your base DN>`.
+
+    **The admin account**
+
+    The user name is `admin` and the password is the one generated for you, under this app's
+    Secrets as `LLDAP_LDAP_USER_PASS`. Sign in to the web interface with it to create people
+    and groups.
+
+    **Two ports, one exposed**
+
+    The web interface is on 17170 and is what this app routes. LDAP itself is on 3890 and
+    stays on the project network, which is where the apps that use it are - nothing outside
+    needs to reach it.
+
+    **Password reset links need the address**
+
+    LLDAP builds the links it emails from an address it is told, and it refuses to start on
+    an empty one - so this template leaves it at its default rather than guessing. Once the
+    app has a domain, add `LLDAP_HTTP_URL` as an environment variable with the full address.
+    Everything else works without it.
+
+    **What it keeps**
+
+    Accounts, groups and the private key that signs its sessions, in a SQLite file on the
+    volume. The key seed is a secret here too: restore the volume without it and the sessions
+    break.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [ldap, directory, users, openldap]
+  icon: icons/lldap.svg
+  links:
+    website: https://github.com/lldap/lldap
+    documentation: https://github.com/lldap/lldap/blob/main/README.md
+    source: https://github.com/lldap/lldap
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web interface answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: baseDn
+    title: Base DN
+    description: The root of the directory. Apps that bind to it need the same value.
+    type: string
+    default: dc=example,dc=com
+    pattern: '^(dc|o|ou)=[A-Za-z0-9-]+(,(dc|o|ou)=[A-Za-z0-9-]+)*$'
+  - name: adminPassword
+    title: Administrator password
+    description: The password of the `admin` account. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: jwtSecret
+    title: JWT secret
+    description: What signs the web sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: keySeed
+    title: Key seed
+    description: >-
+      What the server's private key is derived from. Leave empty to generate one, and keep it
+      with the backup - a restored volume needs the same seed.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the accounts, groups and the server's key are kept on.
+    type: volume
+
+versions:
+  - name: "2026-08"
+    release: "2026-08-28"
+    default: true
+    # By digest: lldap releases are dated tags, and a date alone is not something the
+    # catalogue treats as a release.
+    image: >-
+      lldap/lldap:2026-08-28@sha256:81d8db15f3b6561ec24df022cf0bfd8cf762be7760122cef4ea882788b51bd7e
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on tini, which has to be process 1 to do its job.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:17170/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: lldap
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LLDAP_LDAP_BASE_DN, v: "${{ params.baseDn }}"}
+        - {k: LLDAP_LDAP_USER_PASS, v: "${secrets.LLDAP_LDAP_USER_PASS}"}
+        - {k: LLDAP_JWT_SECRET, v: "${secrets.LLDAP_JWT_SECRET}"}
+        - {k: LLDAP_KEY_SEED, v: "${secrets.LLDAP_KEY_SEED}"}
+        - {k: LLDAP_LDAP_PORT, v: "3890"}
+        - {k: LLDAP_HTTP_PORT, v: "17170"}
+    secrets:
+      LLDAP_LDAP_USER_PASS:
+        value: "${{ params.adminPassword }}"
+      LLDAP_JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      LLDAP_KEY_SEED:
+        value: "${{ params.keySeed }}"
+    routing:
+      port: 17170
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
