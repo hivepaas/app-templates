@@ -1,0 +1,89 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cyberchef
+  title: CyberChef
+  tagline: The cyber Swiss army knife, running on your own server
+  description: |
+    CyberChef is a page of several hundred operations you chain into a recipe: decode base64,
+    parse a JWT, un-gzip, convert a timestamp, diff two blobs, extract strings, decrypt with
+    a key you paste. It is what most people reach for a random website to do - and this is
+    the same tool, served from your own server.
+
+    **This template sets up**
+
+    - CyberChef as a static page, with nothing behind it
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Nothing leaves the browser**
+
+    Every operation runs in the page itself: the data you paste is never sent anywhere, and
+    this app serves files and nothing else. That is the reason to run your own copy - a
+    production secret pasted into somebody else's site is a secret you have given away.
+
+    **No accounts, and nothing kept**
+
+    There is nothing to sign in to and no volume: the app has no state at all. Recipes you
+    want to keep are saved by the browser or copied out as a link. Deleting this app loses
+    nothing but the address.
+  categories: [webapps/dev-tools]
+  tags: [open-source]
+  aliases: [encode, decode, base64, hashing, forensics]
+  icon: icons/cyberchef.svg
+  links:
+    website: https://gchq.github.io/CyberChef/
+    documentation: https://github.com/gchq/CyberChef/wiki
+    source: https://github.com/gchq/CyberChef
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 128MB
+    min: 64MB
+
+versions:
+  - name: "11.5"
+    release: "11.5.0"
+    default: true
+    image: ghcr.io/gchq/cyberchef:11.5.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8080/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: cyberchef
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -553,6 +553,43 @@
       }
     },
     {
+      "name": "cyberchef",
+      "file": {
+        "path": "templates/cyberchef.yaml",
+        "sha256": "ac085adf6fc1383139f431270c82c96b657bbebc0883c4b04346e857a7bab0d7"
+      },
+      "icon": {
+        "path": "icons/cyberchef.svg",
+        "sha256": "df2aeff6944ba1026db6ab9668940b64d7acc2effe546c9d2296dd864c495a79"
+      },
+      "title": "CyberChef",
+      "tagline": "The cyber Swiss army knife, running on your own server",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "encode",
+        "decode",
+        "base64",
+        "hashing",
+        "forensics"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "11.5",
+          "release": "11.5.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "directus",
       "file": {
         "path": "templates/directus.yaml",
@@ -919,6 +956,56 @@
         {
           "name": "6.64",
           "release": "6.64.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "ghostfolio",
+      "file": {
+        "path": "templates/ghostfolio.yaml",
+        "sha256": "d34a825da5e08972027346923ae8ef1e63a004fc8fa2c6970083a7a29ea0f940"
+      },
+      "icon": {
+        "path": "icons/ghostfolio.svg",
+        "sha256": "32f74ec66b7ff9e7f4835df120cd26b56dde815b761f2bb646170951325baf07"
+      },
+      "title": "Ghostfolio",
+      "tagline": "What your investments are actually worth, across every account",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "open-source"
+      ],
+      "aliases": [
+        "portfolio",
+        "investments",
+        "stocks",
+        "wealth",
+        "finance"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Cache",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.70",
+          "release": "3.70.1",
           "default": true
         }
       ],
@@ -2384,6 +2471,44 @@
             "pg17",
             "pg16"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "picoshare",
+      "file": {
+        "path": "templates/picoshare.yaml",
+        "sha256": "5eefefdfc978ed0393bdece901b27d216a9395a1fcb30e1f5a14c7f50ee79bcb"
+      },
+      "icon": {
+        "path": "icons/picoshare.svg",
+        "sha256": "2046221ffa6e1c28cb8d3a6f1bde8263de1ed3970116290cc90f8dbc93061207"
+      },
+      "title": "PicoShare",
+      "tagline": "Drop a file in, hand out the link, and it is gone when you said",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "files",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "file-sharing",
+        "upload",
+        "send",
+        "transfer"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.4",
+          "default": true
         }
       ],
       "requires": {

@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: ghostfolio
+  title: Ghostfolio
+  tagline: What your investments are actually worth, across every account
+  description: |
+    Ghostfolio puts every holding in one place - shares, funds, crypto, cash, in whatever
+    currencies they are - and answers the questions a broker's app avoids: what the whole
+    portfolio returned, how it is divided by region and sector, what the fees cost, and how
+    much came from dividends. Transactions are entered by hand or imported from a CSV.
+
+    **This template creates three apps**
+
+    - **Ghostfolio** itself
+    - **a PostgreSQL database** for the portfolios, named after the app with `-db` added
+    - **a Valkey cache**, named with `-redis`, which it uses for prices and sessions
+
+    All three are needed. The database is the portfolio; the cache can be lost without
+    consequence.
+
+    **The first account is a token, not a password**
+
+    Press "Get started" and it makes an account and shows you a security token - a long
+    string which is the only way back in. There is no email, no password and no recovery:
+    save it where you keep passwords before closing the tab. The first account made is the
+    administrator.
+
+    **Prices come from outside**
+
+    Quotes are fetched from public sources, which cover common shares, funds and
+    cryptocurrencies. Some markets need a data provider key, added under Administration; the
+    variables for those keys go in this app's environment.
+
+    **Nothing here is advice, or a broker**
+
+    It reads nothing from your accounts and cannot trade: it is a record of what you tell it
+    you hold, kept on your own server rather than in somebody else's product.
+  categories: [webapps/business]
+  tags: [business-intelligence, open-source]
+  aliases: [portfolio, investments, stocks, wealth, finance]
+  icon: icons/ghostfolio.svg
+  links:
+    website: https://ghostfol.io
+    documentation: https://github.com/ghostfolio/ghostfolio#readme
+    source: https://github.com/ghostfolio/ghostfolio
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: accessTokenSalt
+    title: Token salt
+    description: >-
+      Hashes the security tokens accounts sign in with - changing it locks everybody out.
+      Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: jwtSecret
+    title: Session secret
+    description: Signs the sessions people sign in with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: ghostfolio
+      username: ghostfolio
+  - name: redis
+    title: Cache
+    template: valkey
+    version: "9.1"
+
+versions:
+  - name: "3.70"
+    release: "3.70.1"
+    default: true
+    image: ghostfolio/ghostfolio:3.70.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither curl nor wget - only the node it runs on.
+        command: >-
+          node -e "require('http').get('http://127.0.0.1:3333/api/v1/health',r=>process.exit(r.statusCode===200?0:1))
+          .on('error',()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: ghostfolio
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Generated passwords are letters and digits only, so nothing here needs escaping.
+        # sslmode=disable because the database app does not serve TLS and this Prisma
+        # refuses to fall back: with prefer it stops at "The server does not support SSL
+        # connections" while seeding. The traffic never leaves the project's own network.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?connect_timeout=300&sslmode=disable
+        - {k: REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: ACCESS_TOKEN_SALT, v: "${secrets.ACCESS_TOKEN_SALT}"}
+        - {k: JWT_SECRET_KEY, v: "${secrets.JWT_SECRET_KEY}"}
+        - {k: HOST, v: "0.0.0.0"}
+        - {k: PORT, v: "3333"}
+        - {k: NODE_ENV, v: production}
+    secrets:
+      ACCESS_TOKEN_SALT:
+        value: "${{ params.accessTokenSalt }}"
+      JWT_SECRET_KEY:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 3333
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,114 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: picoshare
+  title: PicoShare
+  tagline: Drop a file in, hand out the link, and it is gone when you said
+  description: |
+    PicoShare is for sending somebody a file without a service in between: upload it, get a
+    short link, choose when it expires. There is no account for the person receiving it, no
+    app to install, no compression or renaming - what they download is the file you put in.
+
+    **This template sets up**
+
+    - PicoShare on a volume, where the files and their links are kept
+    - one password, which is what stands between the internet and the upload page
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **How it is used**
+
+    Open it, sign in with the password here, drag a file in and pick an expiry - an hour, a
+    day, a year, or never. The link it gives back needs no password: anybody holding it can
+    download until it expires, which is the point of it and the thing to be deliberate about.
+
+    **Expiry is enforced, not suggested**
+
+    A file past its expiry is deleted rather than hidden. Links can also be created with a
+    custom short name, and revoked before their time from the file list.
+
+    **What the volume holds**
+
+    One SQLite database with the files themselves inside it. That makes a backup of the
+    volume a complete backup, and a large upload a large database - the volume needs room
+    for what you send.
+  categories: [webapps/documents]
+  tags: [files, documents, open-source]
+  aliases: [file-sharing, upload, send, transfer]
+  icon: icons/picoshare.svg
+  links:
+    website: https://pico.rocks
+    documentation: https://github.com/mtlynch/picoshare#readme
+    source: https://github.com/mtlynch/picoshare
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at - the one your download links are built from. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: password
+    title: Password
+    description: The single password that opens the upload page. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the uploaded files are kept on, inside its database.
+    type: volume
+
+versions:
+  - name: "1.5"
+    release: "1.5.4"
+    default: true
+    image: mtlynch/picoshare:v1.5.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:4001/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: picoshare
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PORT, v: "4001"}
+        - {k: PS_SHARED_SECRET, v: "${secrets.PS_SHARED_SECRET}"}
+    secrets:
+      PS_SHARED_SECRET:
+        value: "${{ params.password }}"
+    routing:
+      port: 4001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
