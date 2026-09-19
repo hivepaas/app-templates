@@ -79,6 +79,16 @@ parameters:
       The volume every photo and video is kept on, as it arrived. Plan for the size of the
       libraries you will back up.
     type: volume
+  - name: allowUnsafeFilesystem
+    title: Allow an unsafe filesystem for the database
+    description: >-
+      Immich's database refuses to start unless its files are on local Linux storage, which
+      is what keeps a write it acknowledged from being lost. A Docker Desktop install on
+      macOS or Windows has nothing else to offer it - every path from the host is a shared
+      folder - and the database stops with "PGDATA is on 'fuseblk'". Turn this on there, and
+      only there: on a server, give the database a volume on local storage instead.
+    type: bool
+    default: false
 
 dependencies:
   - name: db
@@ -88,6 +98,7 @@ dependencies:
     params:
       dbName: immich
       username: immich
+      allowUnsafeFilesystem: "${{ params.allowUnsafeFilesystem }}"
   - name: redis
     title: Cache
     template: valkey
