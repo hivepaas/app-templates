@@ -1,0 +1,144 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: linkwarden
+  title: Linkwarden
+  tagline: Bookmarks that keep the page, not just the link
+  description: |
+    Linkwarden saves a link and then saves the page behind it: a screenshot, a PDF and the
+    readable text, kept in collections you can share with other people or publish. When the
+    site goes down or quietly rewrites the article, your copy is still here - which is the
+    difference between a bookmark and an archive.
+
+    **This template creates two apps**
+
+    - **Linkwarden** itself, with a volume holding every archived page
+    - **a PostgreSQL database**, named with `-db`, holding the links, collections and users
+
+    Both are needed, and both belong in the backup: the database knows what the files on the
+    volume are.
+
+    **Set the domain before the first account**
+
+    Sign-in is built from the address this app answers at. With no domain set, the login
+    works over the app's own address on the private network, but links in the interface and
+    any invitation will point at the wrong place. Set the domain in routing settings, then
+    make the first account - it becomes the administrator.
+
+    **It is heavier than a bookmark manager sounds**
+
+    Archiving runs a real browser inside the container to load the page, screenshot it and
+    print it to PDF. That is where the memory goes, and why the image is large. A smaller
+    limit than the default will let it serve pages happily and fail at archiving them.
+
+    **Storage grows with what you archive**
+
+    A screenshot plus a PDF for every link adds up faster than the links do. Per-collection
+    settings decide what gets archived; turn off what you do not need if the volume is
+    precious.
+  categories: [webapps/knowledge]
+  tags: [documents, collaboration, open-source]
+  aliases: [bookmarks, read-later, archive, pocket, pinboard]
+  icon: icons/linkwarden.svg
+  links:
+    website: https://linkwarden.app
+    documentation: https://docs.linkwarden.app
+    source: https://github.com/linkwarden/linkwarden
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Sign-in and every link in the interface are built
+      from it, so set it before making the first account if you can.
+    type: domain
+    optional: true
+  - name: authSecret
+    title: Authentication secret
+    description: What signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      The application and the headless browser it archives pages with. Below 2GB, archiving
+      is what fails first.
+    type: size
+    default: 3GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the archived screenshots, PDFs and readable text are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: linkwarden
+      username: linkwarden
+
+versions:
+  - name: "2.14"
+    release: "2.14.1"
+    default: true
+    image: ghcr.io/linkwarden/linkwarden:v2.14.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own command migrates the database and then starts. On the first start
+      # the database app may not be accepting connections yet, and a failed migration would
+      # take the container down with it.
+      command: >-
+        sh -c 'until yarn prisma:deploy; do echo "waiting for the database"; sleep 5; done;
+        exec yarn concurrently:start'
+    storage:
+      mounts:
+        # Where the archived files are written, under the application's working directory.
+        /data/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 8
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: linkwarden
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # A single connection string. Generated passwords are letters and digits only, so
+        # nothing here needs escaping.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
+        # Where sign-in redirects back to. It follows the app's domain once one is set.
+        - {k: NEXTAUTH_URL, v: "${HIVEPAAS_APP_URL}/api/v1/auth"}
+    secrets:
+      NEXTAUTH_SECRET:
+        value: "${{ params.authSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

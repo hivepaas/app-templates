@@ -1,0 +1,159 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: listmonk
+  title: listmonk
+  tagline: Your mailing list, without the per-subscriber bill
+  description: |
+    listmonk sends newsletters: lists of subscribers with arbitrary attributes on each one,
+    campaigns written in a rich editor or in raw HTML, templates, scheduled and A/B sends,
+    a subscription form to embed, and opens and clicks counted afterwards. One binary and a
+    PostgreSQL database, holding a million subscribers without complaint.
+
+    **This template creates two apps**
+
+    - **listmonk** itself, with a volume for uploaded images and attachments
+    - **a PostgreSQL database**, named with `-db`, holding the subscribers and the campaigns
+
+    Both are needed, and the database is the important half of the backup: the subscribers,
+    what they consented to and what was sent to them are all in it.
+
+    **It cannot send anything yet**
+
+    listmonk has no mail server of its own - it hands each message to one. Open
+    *Settings → SMTP* and give it a provider (Amazon SES, Postmark, Mailgun, or any SMTP
+    server) before the first campaign. The default entry there points at a mail server on
+    localhost that does not exist here.
+
+    **About actually arriving**
+
+    Sending your own newsletter means the deliverability is yours too: SPF, DKIM and DMARC
+    on the sending domain, and an IP address with a reputation. This is why most people send
+    through a provider rather than straight from the server - listmonk is happy either way,
+    but a message sent directly from a fresh address rarely reaches an inbox.
+
+    **The first account**
+
+    The username and password given here create the administrator on the first start and are
+    ignored afterwards. More users, with roles, are made from *Admin → Users*.
+  categories: [webapps/communication]
+  tags: [email, automation, open-source]
+  aliases: [newsletter, mailing list, mailchimp, email marketing, campaigns]
+  icon: icons/listmonk.svg
+  links:
+    website: https://listmonk.app
+    documentation: https://listmonk.app/docs/
+    source: https://github.com/knadh/listmonk
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at - and the one in the subscription and unsubscribe
+      links, so a campaign sent before it is set will carry links that do not work. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: One Go binary; the database has a limit of its own.
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume images and attachments uploaded to campaigns are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: listmonk
+      username: listmonk
+
+versions:
+  - name: "6.2"
+    release: "6.2.0"
+    default: true
+    image: listmonk/listmonk:v6.2.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # listmonk does not create its own schema on start: --install does, once, and
+      # --upgrade carries it across a version change. The loop is for the first start,
+      # where the database app may not be accepting connections yet.
+      command: >-
+        sh -c 'until ./listmonk --install --idempotent --yes --config ""; do
+        echo "waiting for the database"; sleep 3; done;
+        ./listmonk --upgrade --yes --config "" && exec ./listmonk --config ""'
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it into the empty
+        # volume with its own ownership.
+        /listmonk/uploads:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl in the image; wget is there.
+        command: wget -q -O /dev/null http://127.0.0.1:9000/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: listmonk
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LISTMONK_app__address, v: "0.0.0.0:9000"}
+        # Read by --install on the first start, when there is nobody, and ignored after.
+        - {k: LISTMONK_ADMIN_USER, v: "${{ params.adminUsername }}"}
+        - {k: LISTMONK_ADMIN_PASSWORD, v: "${secrets.LISTMONK_ADMIN_PASSWORD}"}
+        # The database this template creates.
+        - {k: LISTMONK_db__host, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: LISTMONK_db__port, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: LISTMONK_db__user, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: LISTMONK_db__password, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: LISTMONK_db__database, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        # Both apps are on the project's private network; there is nothing to encrypt
+        # between them and the database is not listening for TLS.
+        - {k: LISTMONK_db__ssl_mode, v: disable}
+        - {k: TZ, v: UTC}
+    secrets:
+      LISTMONK_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

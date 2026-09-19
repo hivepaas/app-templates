@@ -1,0 +1,137 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: grist
+  title: Grist
+  tagline: A spreadsheet that is really a database
+  description: |
+    Grist looks like a spreadsheet and behaves like a relational database: tables with real
+    column types, references between them, formulas written in Python rather than a formula
+    language, and as many different views of the same data as you care to build - grids,
+    cards, charts, a form people outside can fill in. It is where a spreadsheet that has
+    grown a hundred columns and three lookup tables should have gone in the first place.
+
+    **The important thing to know first: this build has no login**
+
+    Grist's open-source build has no accounts and no password. Anyone who can reach the
+    address is signed in as the one user this app was created with, with full access to
+    every document. There is no setting to turn on that changes this.
+
+    So decide how it will be reached before you put anything in it:
+
+    - keep it off the public internet - no domain, reached over the private network, or
+      restricted by IP in the app's routing settings, or
+    - put it behind basic authentication in routing settings, or
+    - put a login portal such as [Authelia](authelia) in front of it and set
+      `GRIST_FORWARD_AUTH_HEADER` so Grist trusts the user that portal authenticated.
+
+    **Your documents are files**
+
+    Each document is a SQLite file on the volume, and downloading one gives you exactly that
+    file - openable elsewhere, re-uploadable here. Back up the volume and you have backed up
+    everything: the documents, the list of them, and the session keys.
+
+    **Importing**
+
+    A CSV or an Excel sheet becomes a document on upload, with types guessed from the data
+    and correctable afterwards. Large imports are worth doing once and cleaning up in place
+    rather than repeating.
+  categories: [webapps/low-code]
+  tags: [spreadsheet, low-code, documents, open-source]
+  aliases: [spreadsheet, airtable, excel, tables, database ui]
+  icon: icons/grist.svg
+  links:
+    website: https://www.getgrist.com
+    documentation: https://support.getgrist.com/self-managed/
+    source: https://github.com/gristlabs/grist-core
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings - and read the note above about who can reach it before you do.
+    type: domain
+    optional: true
+  - name: defaultEmail
+    title: Your email address
+    description: >-
+      The single user every visitor is signed in as, and the owner of everything created
+      here. It is a label rather than a login - no password is ever asked for.
+    type: string
+    default: you@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: sessionSecret
+    title: Session secret
+    description: What signs the session cookies. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Each open document is loaded into memory along with a Python process for its formulas.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the documents, the list of them and the sessions are kept on.
+    type: volume
+
+versions:
+  - name: "1.7"
+    release: "1.7.6"
+    default: true
+    image: gristlabs/grist-oss:1.7.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The image's entrypoint takes ownership of this directory at every start, so the
+        # volume is safe to mount empty.
+        /persist: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8484/status
+        interval: 20s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: grist
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: GRIST_SESSION_SECRET, v: "${secrets.GRIST_SESSION_SECRET}"}
+        - {k: GRIST_DEFAULT_EMAIL, v: "${{ params.defaultEmail }}"}
+        # One team site rather than the multi-organisation layout the hosted service has.
+        - {k: GRIST_SINGLE_ORG, v: docs}
+        # Formulas run in the same container. The alternative sandbox needs privileges a
+        # Swarm service does not get, and this is the image's own default.
+        - {k: GRIST_SANDBOX_FLAVOR, v: unsandboxed}
+        # What Grist writes into the links it generates - empty until the app has a domain.
+        - {k: APP_HOME_URL, v: "${HIVEPAAS_APP_URL}"}
+    secrets:
+      GRIST_SESSION_SECRET:
+        value: "${{ params.sessionSecret }}"
+    routing:
+      port: 8484
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

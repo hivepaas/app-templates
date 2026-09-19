@@ -1,0 +1,122 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: docuseal
+  title: DocuSeal
+  tagline: Send a document, get it signed back
+  description: |
+    DocuSeal is document signing: upload a PDF, drag the fields onto it - signature, initials,
+    date, a text box, a checkbox - send the link to whoever has to fill them in, and get back
+    a finished PDF with an audit trail of who signed what and when. Reusable templates, more
+    than one signer in order, and a form people can fill in from a phone.
+
+    **After it starts**
+
+    The first person to open it makes the administrator account. Do that before the address
+    is known to anyone else: until it is made, the account is there for the taking.
+
+    **Sending email**
+
+    Signing requests are emails, so DocuSeal cannot send anything until it is told how.
+    Put an SMTP server into *Settings → Email* once it is running. Until then the signing
+    links can still be copied by hand and sent yourself.
+
+    **Everything is on the volume**
+
+    The uploaded documents, the finished signed copies, the templates and the database are
+    all in one directory on the volume. That directory is the backup - and a signed document
+    is the kind of thing worth keeping a second copy of somewhere else.
+
+    **What this build includes**
+
+    The open-source build signs, sends and stores. The paid edition adds things like
+    conditional fields, bulk sending and SSO, which this template does not enable.
+  categories: [webapps/documents]
+  tags: [documents, collaboration, open-source]
+  aliases: [esign, signature, docusign, e-signature, pdf sign]
+  icon: icons/docuseal.svg
+  links:
+    website: https://www.docuseal.com
+    documentation: https://www.docuseal.com/docs
+    source: https://github.com/docusealco/docuseal
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at - the one signing links are opened from. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: secretKeyBase
+    title: Secret key base
+    description: >-
+      What signs the sessions and encrypts stored credentials. Leave empty to generate one,
+      and keep it with the backup.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: A Ruby application, its background workers, and PDF rendering.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the documents, the signed copies and the database are kept on.
+    type: volume
+
+versions:
+  - name: "2.3"
+    release: "2.3.6"
+    default: true
+    image: docuseal/docuseal:2.3.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The working directory, and where the database and every uploaded file are kept.
+        # Mounted empty, docker copies the image's own directory in with its ownership,
+        # which is what lets the application write here.
+        /data/docuseal: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl in the image; wget is there. /up is the framework's own check.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/up
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: docuseal
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SECRET_KEY_BASE, v: "${secrets.DOCUSEAL_SECRET_KEY_BASE}"}
+        # Behind the reverse proxy the request arrives over plain HTTP, and the application
+        # would otherwise redirect it back to HTTPS forever.
+        - {k: FORCE_SSL, v: "false"}
+    secrets:
+      DOCUSEAL_SECRET_KEY_BASE:
+        value: "${{ params.secretKeyBase }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

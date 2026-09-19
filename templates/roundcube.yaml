@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: roundcube
+  title: Roundcube
+  tagline: Webmail for a mailbox you already have
+  description: |
+    Roundcube is a mail client that runs on the server instead of on your laptop: folders,
+    threads, search, an address book, filters, signatures, and encryption if you want it.
+    It reads whatever mailbox you point it at over IMAP and sends through that account's
+    SMTP server.
+
+    **It is not a mail server**
+
+    This is the client half only. It needs an account somewhere - your own mail server, or a
+    provider - and it will not receive or deliver anything by itself. Filling in the IMAP
+    and SMTP addresses below is the whole configuration; everybody signs in with the same
+    user name and password they use with that provider.
+
+    **What to put in the addresses**
+
+    Use the scheme the server expects: `ssl://imap.example.com` with port 993 for IMAP over
+    TLS, and `tls://smtp.example.com` with port 587 for submission with STARTTLS. Plain
+    `imap.example.com` means an unencrypted connection, which is worth avoiding unless the
+    mail server is on this same private network.
+
+    **A note on providers with two-factor authentication**
+
+    Gmail, Outlook and the like refuse an ordinary password over IMAP. Those accounts need
+    an app password created in the provider's own settings - Roundcube has no way to answer
+    a second factor.
+
+    **What is kept here**
+
+    The address book, preferences, search folders and message caches, in a SQLite database
+    on the volume. Your mail stays on the mail server; losing this volume costs you contacts
+    and settings, not messages.
+  categories: [webapps/communication]
+  tags: [email, open-source]
+  aliases: [webmail, imap, mail client, email]
+  icon: icons/roundcube.svg
+  links:
+    website: https://roundcube.net
+    documentation: https://github.com/roundcube/roundcubemail-docker#readme
+    source: https://github.com/roundcube/roundcubemail
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: imapHost
+    title: IMAP server
+    description: >-
+      Where the mail is read from, with the scheme the server expects - `ssl://imap.example.com`
+      for IMAP over TLS.
+    type: string
+    default: ssl://imap.example.com
+  - name: imapPort
+    title: IMAP port
+    type: int
+    default: 993
+    min: 1
+    max: 65535
+  - name: smtpHost
+    title: SMTP server
+    description: >-
+      Where mail is sent through - `tls://smtp.example.com` for submission with STARTTLS.
+    type: string
+    default: tls://smtp.example.com
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: desKey
+    title: Encryption key
+    description: >-
+      What the stored session password is encrypted with. Exactly 24 characters; leave empty
+      to generate one.
+    type: secret
+    minLength: 24
+    maxLength: 24
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the address book, preferences and caches are kept on.
+    type: volume
+
+versions:
+  - name: "1.6"
+    release: "1.6.19"
+    default: true
+    image: roundcube/roundcubemail:1.6.19-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The SQLite database, the generated configuration and the encryption keyring.
+        # Mounted empty, docker copies the image's own directory in with its ownership.
+        /var/roundcube: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:80/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: roundcube
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ROUNDCUBEMAIL_DEFAULT_HOST, v: "${{ params.imapHost }}"}
+        - {k: ROUNDCUBEMAIL_DEFAULT_PORT, v: "${{ params.imapPort }}"}
+        - {k: ROUNDCUBEMAIL_SMTP_SERVER, v: "${{ params.smtpHost }}"}
+        - {k: ROUNDCUBEMAIL_SMTP_PORT, v: "${{ params.smtpPort }}"}
+        # SQLite on the volume. There is one row per user and a message cache; a database
+        # app would be more moving parts than this needs.
+        - {k: ROUNDCUBEMAIL_DB_TYPE, v: sqlite}
+        - {k: ROUNDCUBEMAIL_DES_KEY, v: "${secrets.ROUNDCUBEMAIL_DES_KEY}"}
+        # What a message with attachments may weigh. The reverse proxy has a limit of its
+        # own, in the app's routing settings, and the smaller of the two wins.
+        - {k: ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE, v: 25M}
+    secrets:
+      ROUNDCUBEMAIL_DES_KEY:
+        value: "${{ params.desKey }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
