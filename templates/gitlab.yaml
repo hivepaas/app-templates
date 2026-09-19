@@ -1,0 +1,173 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gitlab
+  title: GitLab
+  tagline: Repositories, reviews, CI and issues, all in one place
+  description: |
+    GitLab is the whole of a software team's tooling in one application: git repositories
+    with merge requests and reviews, CI pipelines, an issue tracker and boards, a container
+    registry, wikis, and the permissions that hold them together.
+
+    **It is one container with everything inside it**
+
+    The omnibus image runs its own PostgreSQL, Redis, nginx, Puma, Sidekiq and Gitaly under
+    one supervisor. That is what makes it a single app here, and also what makes it the
+    heaviest app in this catalogue: give it four gigabytes and a few minutes for the first
+    boot, during which it configures itself before answering anything.
+
+    **The first sign-in**
+
+    Sign in as `root` with the password this app was created with. Change it, or create your
+    own account and make it an administrator, and then turn off open registration under
+    *Admin → Settings → General → Sign-up restrictions* unless you meant to leave it open.
+
+    **Its address**
+
+    GitLab writes its own address into the clone URLs, the emails and the pipeline links, so
+    it is told the domain this app answers at. Until it has one it uses `http://localhost`,
+    which is enough to sign in and look around but not to clone from another machine. Adding
+    a domain afterwards restarts the app and reconfigures it - a few minutes during which it
+    is unavailable, after which the clone URLs are right.
+
+    **Cloning over SSH**
+
+    Cloning over HTTPS works as soon as there is a domain. SSH does not: git over SSH is a
+    TCP port rather than a web address, and nothing here routes one to this app yet. Until
+    it does, use HTTPS remotes, or reach port 22 of this app from inside the project
+    network.
+
+    **CI runners are separate**
+
+    This app is the coordinator; the runners that execute jobs are not part of it. Register
+    a runner elsewhere against this GitLab, or run one next to it - what a runner needs is
+    the address above and a registration token from the CI settings.
+
+    **Storage**
+
+    Everything is on the volume: repositories, the database, uploads, artifacts and the
+    configuration, each in its own directory. Back it up whole, and give it room - artifacts
+    and uploads grow faster than repositories do.
+  categories: [webapps/dev-tools]
+  tags: [git, automation, collaboration, open-source]
+  aliases: [git-server, repositories, merge-requests, ci, devops]
+  icon: icons/gitlab.svg
+  links:
+    website: https://about.gitlab.com
+    documentation: https://docs.gitlab.com
+    source: https://gitlab.com/gitlab-org/gitlab-foss
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. GitLab writes it into clone URLs and emails, and
+      reconfigures itself when it changes - which takes the app down for a few minutes.
+    type: domain
+    optional: true
+  - name: rootPassword
+    title: Root password
+    description: The password of the built-in `root` administrator. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Four gigabytes is what GitLab asks for with a handful of users. It is configured here
+      to run Puma in single mode and Sidekiq with five threads, which is what makes that
+      enough.
+    type: size
+    default: 4GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume holding the repositories, the database, the uploads and the configuration,
+      each in a directory of its own.
+    type: volume
+
+versions:
+  - name: "19.4"
+    release: "19.4.0"
+    default: true
+    image: gitlab/gitlab-ce:19.4.0-ce.0
+  - name: "19.3"
+    release: "19.3.2"
+    image: gitlab/gitlab-ce:19.3.2-ce.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /etc/gitlab:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+        /var/opt/gitlab:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /var/log/gitlab:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: logs}
+    container:
+      # The image runs everything under its own supervisor, which is the container's init
+      # and expects to be process 1. Docker's would sit in front of it.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # GitLab's own liveness endpoint, which needs no account. The first boot writes the
+        # configuration and migrates the database before anything answers, which is what
+        # the long start period is for.
+        command: curl -fsS -o /dev/null http://127.0.0.1/-/health
+        interval: 30s
+        timeout: 10s
+        startPeriod: 900s
+        retries: 10
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gitlab
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Omnibus reads this as Ruby before it configures anything. TLS is terminated by
+        # the proxy in front, so nginx here listens on plain 80 and is told what the
+        # outside scheme is; the address falls back to localhost while the app has no
+        # domain, because an empty external_url stops GitLab from starting at all.
+        - k: GITLAB_OMNIBUS_CONFIG
+          v: >-
+            external_url(ENV['HIVEPAAS_APP_URL'].to_s.empty? ? 'http://localhost' :
+            ENV['HIVEPAAS_APP_URL']);
+            nginx['listen_port'] = 80;
+            nginx['listen_https'] = false;
+            nginx['proxy_set_headers'] = {'X-Forwarded-Proto' => 'https', 'X-Forwarded-Ssl' => 'on'};
+            letsencrypt['enable'] = false;
+            registry['enable'] = false;
+            prometheus_monitoring['enable'] = false;
+            puma['worker_processes'] = 0;
+            sidekiq['max_concurrency'] = 5;
+            gitlab_rails['initial_root_password'] = ENV['GITLAB_ROOT_PASSWORD'];
+            gitlab_rails['usage_ping_enabled'] = false
+        - {k: GITLAB_ROOT_PASSWORD, v: "${secrets.GITLAB_ROOT_PASSWORD}"}
+    secrets:
+      GITLAB_ROOT_PASSWORD:
+        value: "${{ params.rootPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
