@@ -37,6 +37,16 @@ metadata:
     Another app in the same environment reaches it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT`
     (5432), `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and `HIVEPAAS_DATABASE_NAME`.
 
+    **It refuses a filesystem it cannot trust**
+
+    The image checks what its data directory is on and starts only on local Linux storage -
+    ext4, xfs, btrfs, zfs - because a network share or a VM shared folder acknowledges
+    writes a database is counting on and then loses them. On a server this passes without
+    anyone noticing. On Docker Desktop for macOS or Windows every path from the host is a
+    shared folder, and the database stops with "PGDATA is on 'fuseblk'": give it a volume
+    that is not a path from the host, or turn on **Allow an unsafe filesystem** and accept
+    what that means.
+
     **The image comes from the Immich project**
 
     They build and pin these combinations, which is why the version here reads like
@@ -81,6 +91,17 @@ parameters:
     title: Data volume
     description: The volume the database files are kept on.
     type: volume
+  - name: allowUnsafeFilesystem
+    title: Allow an unsafe filesystem
+    description: >-
+      This image refuses to start when the database files would land on anything but local
+      Linux storage - ext4, xfs, btrfs, zfs - because a network share or a shared folder
+      loses the writes a database depends on. Turn this on only where that is understood and
+      accepted: a Docker Desktop install on macOS or Windows, where every path from the host
+      is a shared folder, and the data is a copy you can lose. On a server, leave it off and
+      give the database a volume on local storage.
+    type: bool
+    default: false
 
 versions:
   # By digest, not by tag: a tag like 17-vectorchord1.1.1-pgvector0.8.5 pins the two
@@ -138,5 +159,8 @@ app:
         # What the Immich project's own deployment uses: it costs nothing and catches a
         # corrupt page at the moment it is read rather than later.
         - {k: POSTGRES_INITDB_ARGS, v: "--data-checksums"}
+        # The image checks what its data directory is on and refuses anything but local
+        # Linux storage. "false" is not a bypass: it is what the check already does.
+        - {k: IGNORE_DATABASE_FSTYPE, v: "${{ params.allowUnsafeFilesystem }}"}
     routing:
       port: 5432
