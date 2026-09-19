@@ -1,0 +1,155 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: immich
+  title: Immich
+  tagline: Your phone's photo library, on your own server
+  description: |
+    Immich is a photo and video library with the app most people actually want: automatic
+    backup from an iPhone or Android, a timeline that loads as you scroll, albums, sharing
+    links, search by description, faces grouped into people, and a map. What it does not have
+    is a monthly bill or a company between you and your pictures.
+
+    **This template creates four apps**
+
+    - **Immich** itself, with a volume holding every original file
+    - **a PostgreSQL database with VectorChord**, which Immich requires, named with `-db`
+    - **a Valkey cache** for its job queues, named with `-redis`
+    - **the machine learning service**, named with `-ml`, which does search and faces
+
+    All four are needed for the full app. The library volume and the database together are
+    the backup: one without the other restores nothing useful.
+
+    **After it starts**
+
+    Open it and make the first account - that one becomes the administrator. Then install the
+    mobile app, point it at this address, and turn on backup. There is no setup wizard beyond
+    that; the rest is done from inside.
+
+    **What the first hours look like**
+
+    A library that already has photos is worked through in the background: thumbnails first,
+    then embeddings and faces on the machine learning app. Search results and People stay
+    thin until that finishes, which on a processor rather than a graphics card is hours for a
+    large library. Nothing is lost while it catches up.
+
+    **Uploading large videos**
+
+    A reverse proxy has a limit on how big a request may be, and a phone uploading a long
+    video will meet it. If uploads of large files fail, raise the maximum request body size
+    in this app's routing settings.
+
+    **Storage is the thing to plan**
+
+    Originals are kept as they arrived. A phone library of 50 GB stays 50 GB here, plus
+    thumbnails - so put the volume somewhere it can grow, and keep a copy of it elsewhere.
+    Immich is not a backup by itself: it is where the photos live.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [photos, google-photos, gallery, backup-photos, pictures]
+  icon: icons/immich.svg
+  links:
+    website: https://immich.app
+    documentation: https://docs.immich.app
+    source: https://github.com/immich-app/immich
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at - the one the mobile app connects to. Leave it empty
+      to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      The server itself, which transcodes video and makes thumbnails. The machine learning
+      app has a limit of its own.
+    type: size
+    default: 3GB
+    min: 1GB
+  - name: libraryVolume
+    title: Library volume
+    description: >-
+      The volume every photo and video is kept on, as it arrived. Plan for the size of the
+      libraries you will back up.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres-vectorchord
+    version: "17"
+    params:
+      dbName: immich
+      username: immich
+  - name: redis
+    title: Cache
+    template: valkey
+    version: "9.1"
+  - name: ml
+    title: Machine learning
+    template: immich-machine-learning
+    version: "3.2"
+
+versions:
+  - name: "3.2"
+    release: "3.2.2"
+    default: true
+    image: ghcr.io/immich-app/immich-server:v3.2.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships a /data directory, and docker would copy it into an empty
+        # volume with its own ownership, over what the volume was prepared with.
+        /data:
+          type: volume
+          source: "${{ params.libraryVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: immich-healthcheck
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: immich
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_HOSTNAME, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DB_DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: REDIS_HOSTNAME, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        # The machine learning app is a dependency of its own, reached by its key.
+        - {k: IMMICH_MACHINE_LEARNING_ENABLED, v: "true"}
+        - {k: IMMICH_MACHINE_LEARNING_URL, v: "http://${{ deps.ml.key }}:3003"}
+        - {k: TZ, v: UTC}
+    routing:
+      port: 2283
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

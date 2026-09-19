@@ -1012,6 +1012,99 @@
       }
     },
     {
+      "name": "immich",
+      "file": {
+        "path": "templates/immich.yaml",
+        "sha256": "e74d18ea748a2ac9e8b3cdd492fee02f5ccce624a2e86d0943ae44034baac300"
+      },
+      "icon": {
+        "path": "icons/immich.svg",
+        "sha256": "6ecb62b015a4b1f8feea9cfcb18d701be66da600262f75c7cd273316ccbbbd51"
+      },
+      "title": "Immich",
+      "tagline": "Your phone's photo library, on your own server",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "photos",
+        "google-photos",
+        "gallery",
+        "backup-photos",
+        "pictures"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres-vectorchord"
+        },
+        {
+          "name": "redis",
+          "title": "Cache",
+          "template": "valkey"
+        },
+        {
+          "name": "ml",
+          "title": "Machine learning",
+          "template": "immich-machine-learning"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.2",
+          "release": "3.2.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "immich-machine-learning",
+      "file": {
+        "path": "templates/immich-machine-learning.yaml",
+        "sha256": "78c3e4b210bb4f5612c550cab5c891b7043a32eab3a17d8d88faaab3eb8cfd97"
+      },
+      "icon": {
+        "path": "icons/immich-machine-learning.svg",
+        "sha256": "ca8f63b3f2cf250bfe7f3d92475a4bc678c13b071b0b2008fd695ba2105c98f8"
+      },
+      "title": "Immich Machine Learning",
+      "tagline": "The half of Immich that recognises what is in a photo",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "immich-ml",
+        "clip",
+        "face-detection",
+        "photo-search"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.2",
+          "release": "3.2.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "influxdb",
       "file": {
         "path": "templates/influxdb.yaml",
@@ -2228,6 +2321,51 @@
             "alpine",
             "debian"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "postgres-vectorchord",
+      "file": {
+        "path": "templates/postgres-vectorchord.yaml",
+        "sha256": "5e4442769b2e1c726553bc21a5987903540a1f0cb6806964827424c620036c2b"
+      },
+      "icon": {
+        "path": "icons/postgres-vectorchord.svg",
+        "sha256": "06c1e89be0578c5113178782665ebe1f567f68fc9045eb6f2a308fe6c2dc1dc3"
+      },
+      "title": "PostgreSQL with VectorChord",
+      "tagline": "PostgreSQL that searches by meaning, at the size photo libraries reach",
+      "categories": [
+        "databases/vector",
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "vector",
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "pgvector",
+        "vchord",
+        "embeddings",
+        "immich-database"
+      ],
+      "license": "PostgreSQL",
+      "versions": [
+        {
+          "name": "17",
+          "release": "17 + vchord 1.1.1 + pgvector 0.8.5",
+          "default": true
+        },
+        {
+          "name": "16",
+          "release": "16 + vchord 1.1.1 + pgvector 0.8.5"
         }
       ],
       "requires": {

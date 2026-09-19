@@ -1,0 +1,94 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: immich-machine-learning
+  title: Immich Machine Learning
+  tagline: The half of Immich that recognises what is in a photo
+  description: |
+    This is Immich's machine learning service: it turns photos into the embeddings that make
+    search by description work, detects and groups faces, and tags what it recognises. It is
+    a separate app because it is a separate load - heavy while it runs, idle the rest of the
+    time - and because some installations do not want it at all.
+
+    **It is not used on its own**
+
+    Nothing here is for people: it answers an HTTP API that an Immich app calls. Create it
+    with Immich, which offers it as a dependency, or create it alongside and point an
+    existing Immich at `http://<this app's key>:3003`.
+
+    **Models are downloaded when first used**
+
+    The volume is a cache. The first search or the first face detection after a deployment
+    pulls the model it needs - a few hundred megabytes - and later runs read it from the
+    volume. Without the volume that download happens again on every restart.
+
+    **On the CPU**
+
+    It runs on the processor. Indexing an existing library takes hours rather than minutes,
+    and Immich does it in the background; asking for a search while nothing is indexed simply
+    returns nothing yet. Give it memory: a gigabyte is the floor, two is comfortable, and it
+    is only busy while there is work.
+  categories: [webapps/ai]
+  tags: [ai, open-source]
+  aliases: [immich-ml, clip, face-detection, photo-search]
+  icon: icons/immich-machine-learning.svg
+  links:
+    website: https://immich.app
+    documentation: https://docs.immich.app/features/ml-hardware-acceleration
+    source: https://github.com/immich-app/immich
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: A model is loaded into memory while it works. A gigabyte is the floor.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: cacheVolume
+    title: Model cache volume
+    description: The volume the downloaded models are kept on.
+    type: volume
+
+versions:
+  - name: "3.2"
+    release: "3.2.2"
+    default: true
+    image: ghcr.io/immich-app/immich-machine-learning:v3.2.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /cache: {type: volume, source: "${{ params.cacheVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: python3 healthcheck.py
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: immich-machine-learning
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MACHINE_LEARNING_CACHE_FOLDER, v: /cache}
+        - {k: IMMICH_HOST, v: "0.0.0.0"}
+        - {k: IMMICH_PORT, v: "3003"}
+    routing:
+      port: 3003

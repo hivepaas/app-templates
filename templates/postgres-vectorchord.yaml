@@ -1,0 +1,142 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: postgres-vectorchord
+  title: PostgreSQL with VectorChord
+  tagline: PostgreSQL that searches by meaning, at the size photo libraries reach
+  description: |
+    This is PostgreSQL with two vector extensions compiled in: **VectorChord**, which indexes
+    millions of embeddings without holding them all in memory, and **pgvector**, whose types
+    and operators it builds on. Everything a PostgreSQL app expects is here as well - it is
+    an ordinary database that also answers "which of these is most like that".
+
+    **When to use this rather than the plain one**
+
+    - **Immich** requires exactly this image, and refuses to start without VectorChord
+    - a collection large enough that pgvector's index becomes the memory problem
+    - anything else where the search is over embeddings rather than words
+
+    For a few thousand vectors alongside ordinary tables, the `pgvector` template is simpler
+    and enough.
+
+    **Using the extensions**
+
+    Both are created per database and not before you ask:
+
+    ```sql
+    CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+    ```
+
+    An app that manages its own schema - Immich does - creates them itself at the first
+    start.
+
+    **Connecting**
+
+    Another app in the same environment reaches it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT`
+    (5432), `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and `HIVEPAAS_DATABASE_NAME`.
+
+    **The image comes from the Immich project**
+
+    They build and pin these combinations, which is why the version here reads like
+    `17 + vchord 1.1.1 + pgvector 0.8.5` rather than a PostgreSQL release alone. It is
+    upstream PostgreSQL underneath.
+  categories: [databases/vector, databases/sql]
+  tags: [sql, relational, vector, ai, open-source]
+  aliases: [pgvector, vchord, embeddings, immich-database]
+  icon: icons/postgres-vectorchord.svg
+  links:
+    website: https://www.postgresql.org
+    documentation: https://docs.vectorchord.ai
+    source: https://github.com/tensorchord/VectorChord
+  license: PostgreSQL
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: Vector indexes are built in memory, so give it more than a plain database.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  # By digest, not by tag: a tag like 17-vectorchord1.1.1-pgvector0.8.5 pins the two
+  # extensions but leaves PostgreSQL's own patch level moving, which is exactly what a
+  # pinned image is meant to prevent. The Immich project pins these by digest too.
+  - name: "17"
+    release: "17 + vchord 1.1.1 + pgvector 0.8.5"
+    default: true
+    image: >-
+      ghcr.io/immich-app/postgres:17-vectorchord1.1.1-pgvector0.8.5@sha256:80c2a8ad05e05c8390e47ae627c345d4220e1e02249b789d8dd7512501a337da
+  - name: "16"
+    release: "16 + vchord 1.1.1 + pgvector 0.8.5"
+    image: >-
+      ghcr.io/immich-app/postgres:16-vectorchord1.1.1-pgvector0.8.5@sha256:db9f0b798e5c4bfe3a8d58632c0b26062297e2ea12a4131cc88ee09f638b18cb
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships /var/lib/postgresql/data, and docker would copy it into an
+        # empty volume with its own ownership, over what the volume was prepared with.
+        /var/lib/postgresql/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check, which knows what this build needs to be ready.
+        command: /usr/local/bin/healthcheck.sh
+        interval: 15s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        # What the Immich project's own deployment uses: it costs nothing and catches a
+        # corrupt page at the moment it is read rather than later.
+        - {k: POSTGRES_INITDB_ARGS, v: "--data-checksums"}
+    routing:
+      port: 5432
