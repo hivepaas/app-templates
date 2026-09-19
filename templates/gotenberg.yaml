@@ -1,0 +1,102 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gotenberg
+  title: Gotenberg
+  tagline: Turns documents and web pages into PDFs, over HTTP
+  description: |
+    Gotenberg is a conversion service: post it a Word document, a spreadsheet, an HTML page
+    or a URL and it answers with a PDF. Chromium and LibreOffice do the work, so what comes
+    back looks the way the original does, and neither of them has to be installed anywhere
+    else.
+
+    **It has no interface and no login**
+
+    This is a service other apps call, not a page a person opens - it answers on port 3000
+    inside the project network and is not exposed publicly. Paperless-ngx uses it to convert
+    the office documents it is given; anything of your own can use it the same way.
+
+    **Converting something**
+
+    ```
+    curl --request POST http://gotenberg:3000/forms/libreoffice/convert \
+      --form files=@report.docx -o report.pdf
+    ```
+
+    The Chromium routes render HTML and URLs, the LibreOffice route renders office formats,
+    and `/forms/pdfengines/merge` joins PDFs together.
+
+    **JavaScript is turned off**
+
+    The Chromium routes run with scripts disabled and may read only files the request itself
+    brings, which is what the Paperless-ngx project recommends: converting a document from
+    somebody else should not let that document fetch anything or run anything.
+
+    **What it needs**
+
+    Memory, mostly. Chromium and LibreOffice are both started per request, and a large
+    document needs room to render. It keeps nothing: there is no volume, and a restart loses
+    only the conversions that were in flight.
+  categories: [webapps/dev-tools]
+  tags: [documents, automation, open-source]
+  aliases: [pdf, convert, libreoffice, chromium, document-conversion]
+  icon: icons/gotenberg.svg
+  links:
+    website: https://gotenberg.dev
+    documentation: https://gotenberg.dev/docs/getting-started/introduction
+    source: https://github.com/gotenberg/gotenberg
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Chromium and LibreOffice are started per request, and a long document needs room to
+      render. Below a gigabyte, conversions of large files fail rather than slow down.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "8.37"
+    release: "8.37.0"
+    default: true
+    image: gotenberg/gotenberg:8.37.0
+  - name: "8.36"
+    release: "8.36.0"
+    image: gotenberg/gotenberg:8.36.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # What the Paperless-ngx project runs it with, and a good default for anybody: a
+      # document being converted is somebody else's file, and these two flags stop it from
+      # running scripts or reaching anything but the request's own files.
+      command: >-
+        gotenberg --chromium-disable-javascript=true --chromium-allow-list=file:///tmp/.*
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own endpoint, which reports Chromium and LibreOffice separately and
+        # is what its documentation points a container check at.
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gotenberg
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 3000

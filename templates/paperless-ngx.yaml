@@ -1,0 +1,250 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: paperless-ngx
+  title: Paperless-ngx
+  tagline: Scan a document once, find it again forever
+  description: |
+    Paperless-ngx is where paper goes to stop being paper. Feed it a scan or a PDF and it
+    reads the text with OCR, files it by correspondent, type and tag, and makes every word
+    searchable - so the insurance letter from four years ago is a search away rather than a
+    box in a cupboard.
+
+    **This template creates five apps**
+
+    - **Paperless-ngx** itself, holding the documents and their thumbnails
+    - **a PostgreSQL database**, named with `-db`, which holds everything it knows about them
+    - **a Valkey broker**, named with `-broker`, which carries the background work
+    - **Gotenberg**, named with `-gotenberg`, which converts office documents to PDF
+    - **Apache Tika**, named with `-tika`, which reads the text out of them
+
+    The last two are what makes Word, Excel and email consumable rather than PDFs and images
+    alone. The documents volume and the database together are the backup: one without the
+    other restores nothing useful.
+
+    **After it starts**
+
+    Sign in with the administrator account this template created - the username and password
+    are the ones you gave here. Then put files into the consume directory of the documents
+    volume, or drag them into the web interface, and they appear as documents a minute or so
+    later.
+
+    **The directories on the volume**
+
+    - `media` - the documents themselves, as they will be kept
+    - `data` - the search index, the classifier and everything derived
+    - `consume` - what is watched: anything dropped here is taken in and removed
+    - `export` - where an export is written when you ask for one
+
+    **OCR takes what it takes**
+
+    A scanned page is read on the processor, which is seconds per page. A first import of a
+    few thousand pages runs for hours in the background; the documents are usable as they
+    arrive, and search fills in behind them.
+
+    **Uploading from a phone or a scanner**
+
+    A reverse proxy limits how big a request may be, and a long scan will meet it. If
+    uploads of large files fail, raise the maximum request body size in this app's routing
+    settings.
+  categories: [webapps/documents]
+  tags: [documents, files, search, open-source]
+  aliases: [paperless, dms, scanner, ocr, archive, documents]
+  icon: icons/paperless-ngx.svg
+  links:
+    website: https://docs.paperless-ngx.com
+    documentation: https://docs.paperless-ngx.com/configuration/
+    source: https://github.com/paperless-ngx/paperless-ngx
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    description: The account created on the first start, and the only one until it makes others.
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9_.@+-]{1,150}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: secretKey
+    title: Secret key
+    description: What signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: ocrLanguage
+    title: OCR language
+    description: >-
+      The language most documents are written in, as a three-letter code. The image carries
+      English, German, Italian, Spanish and French; join two with a plus, as in `eng+deu`,
+      for documents that mix them.
+    type: string
+    default: eng
+    pattern: '^[a-z]{3}(\+[a-z]{3})*$'
+  - name: timeZone
+    title: Time zone
+    description: What the dates on documents are shown in, as an IANA name such as Europe/Berlin.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Paperless itself, which runs the OCR. The database, the broker and the two conversion
+      services have limits of their own.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: documentsVolume
+    title: Documents volume
+    description: >-
+      The volume the documents, the search index and the consume directory are kept on. Plan
+      for the size of what you will scan; the originals are kept as they arrived.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: paperless
+      username: paperless
+  - name: broker
+    title: Broker
+    template: valkey
+    version: "9.1"
+  - name: gotenberg
+    title: Document conversion
+    template: gotenberg
+    version: "8.37"
+  - name: tika
+    title: Text extraction
+    template: tika
+    version: "3.3"
+
+versions:
+  - name: "3.2"
+    release: "3.2.0"
+    default: true
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.2.0
+  - name: "3.1"
+    release: "3.1.3"
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.1.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # Four directories of one volume, because they are one thing to back up and one
+        # thing to restore: the documents are useless without the index that finds them.
+        /usr/src/paperless/media:
+          type: volume
+          source: "${{ params.documentsVolume }}"
+          volumeOptions: {subpath: media}
+        /usr/src/paperless/data:
+          type: volume
+          source: "${{ params.documentsVolume }}"
+          volumeOptions: {subpath: data}
+        /usr/src/paperless/consume:
+          type: volume
+          source: "${{ params.documentsVolume }}"
+          volumeOptions: {subpath: consume}
+        /usr/src/paperless/export:
+          type: volume
+          source: "${{ params.documentsVolume }}"
+          volumeOptions: {subpath: export}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The web server answering at all. It redirects to the login page, which -f counts
+        # as success; what it does not count is the gateway error of a server still
+        # starting.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8000/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: paperless-ngx
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PAPERLESS_DBENGINE, v: postgresql}
+        - {k: PAPERLESS_DBHOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: PAPERLESS_DBPORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: PAPERLESS_DBNAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: PAPERLESS_DBUSER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PAPERLESS_DBPASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Valkey has no user name to set: it authenticates as its built-in `default` user.
+        - k: PAPERLESS_REDIS
+          v: >-
+            redis://default:${{ deps.broker.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.broker.ref.HIVEPAAS_HOST }}:${{ deps.broker.ref.HIVEPAAS_PORT }}
+        # The two services that make office documents and email consumable. Without them
+        # Paperless takes PDFs and images and refuses the rest.
+        - {k: PAPERLESS_TIKA_ENABLED, v: "1"}
+        - {k: PAPERLESS_TIKA_ENDPOINT, v: "http://${{ deps.tika.key }}:9998"}
+        - {k: PAPERLESS_TIKA_GOTENBERG_ENDPOINT, v: "http://${{ deps.gotenberg.key }}:3000"}
+        - {k: PAPERLESS_SECRET_KEY, v: "${secrets.PAPERLESS_SECRET_KEY}"}
+        # Created on the first start only. Changing them afterwards does nothing; the
+        # password is changed from inside the app.
+        - {k: PAPERLESS_ADMIN_USER, v: "${{ params.adminUsername }}"}
+        - {k: PAPERLESS_ADMIN_PASSWORD, v: "${secrets.PAPERLESS_ADMIN_PASSWORD}"}
+        - {k: PAPERLESS_OCR_LANGUAGE, v: "${{ params.ocrLanguage }}"}
+        - {k: PAPERLESS_TIME_ZONE, v: "${{ params.timeZone }}"}
+        # What the consume directory is watched with. A bind through a virtual machine does
+        # not deliver file events, and polling is what works everywhere.
+        - {k: PAPERLESS_CONSUMER_POLLING, v: "30"}
+    configFiles:
+      paperless-url.sh:
+        # PAPERLESS_URL is the address the app answers at, which is what Django checks a
+        # form submission against - and an app has no domain until somebody gives it one.
+        # It cannot be an ordinary variable: "https://" with no host behind it is refused
+        # at startup, and an app that will not start is worse than one that does not know
+        # its address. So it is written here instead, by the image's own hook for scripts
+        # that run before its services, from the domain the app has at that moment.
+        content: |
+          #!/command/with-contenv bash
+          if [ -n "$HIVEPAAS_DOMAIN" ]; then
+            printf 'https://%s' "$HIVEPAAS_DOMAIN" > /run/s6/container_environment/PAPERLESS_URL
+          fi
+        swarmRef:
+          file: {name: /custom-cont-init.d/10-paperless-url.sh, mode: 755}
+    secrets:
+      PAPERLESS_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      PAPERLESS_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

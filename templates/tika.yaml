@@ -1,0 +1,99 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: tika
+  title: Apache Tika
+  tagline: Reads the text out of a thousand file formats
+  description: |
+    Tika takes a file of almost any kind - PDF, Word, spreadsheets, presentations, email,
+    images, archives, audio - and answers with the text inside it and what it could learn
+    about it: the author, the dates, the page count, the language. It is the library search
+    engines and document archives use to turn files into something that can be indexed.
+
+    **It has no interface and no login**
+
+    This is a service other apps call, not a page a person opens - it answers on port 9998
+    inside the project network and is not exposed publicly. Paperless-ngx uses it to read
+    office documents; anything of your own can use it the same way.
+
+    **Asking it something**
+
+    ```
+    curl -T report.docx http://tika:9998/tika --header "Accept: text/plain"
+    curl -T report.docx http://tika:9998/meta --header "Accept: application/json"
+    ```
+
+    `/tika` returns the text, `/meta` the metadata, `/detect/stream` the file type, and
+    `/language/stream` the language it is written in.
+
+    **What it needs**
+
+    Memory. Tika is a Java service and parses a whole document at a time, so a large PDF
+    needs room; below a gigabyte, big files fail rather than slow down. It keeps nothing:
+    there is no volume, and a restart loses only what was being parsed.
+
+    **This is the plain image**
+
+    It carries Tika's own parsers. The `-full` image adds OCR and a few heavy extras, which
+    a Paperless-ngx install does not need - Paperless does its own OCR before Tika sees
+    anything.
+  categories: [webapps/dev-tools]
+  tags: [documents, search, full-text, open-source]
+  aliases: [text-extraction, metadata, parser, ocr, content]
+  icon: icons/tika.svg
+  links:
+    website: https://tika.apache.org
+    documentation: https://tika.apache.org/3.3.1/index.html
+    source: https://github.com/apache/tika
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      A document is parsed whole, in a Java heap. A gigabyte is enough for ordinary office
+      files; raise it for large scanned PDFs.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "3.3"
+    release: "3.3.1.0"
+    default: true
+    image: apache/tika:3.3.1.0
+  - name: "3.2"
+    release: "3.2.3.0"
+    image: apache/tika:3.2.3.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries the Tika server and a shell, and no curl or wget - so the check
+        # is a bare HTTP request written with bash's own /dev/tcp.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/9998; printf "GET /tika HTTP/1.0\r\n\r\n" >&3;
+          head -1 <&3 | grep -q " 200 "'
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: tika
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 9998
