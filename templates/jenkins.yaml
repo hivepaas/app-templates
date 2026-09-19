@@ -1,0 +1,130 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jenkins
+  title: Jenkins
+  tagline: The build server that has run everybody's pipelines for twenty years
+  description: |
+    Jenkins builds, tests and deploys whatever you tell it to, triggered by a commit, a
+    schedule or a button. Its answer to almost every question is a plugin - and after two
+    decades there is one for nearly everything, which is why it is still where most
+    pipelines live.
+
+    **The first time you open it**
+
+    It asks for an unlock code, which is written into the container at
+    `/var/jenkins_home/secrets/initialAdminPassword`. Open this app's terminal and read it:
+
+    ```
+    cat /var/jenkins_home/secrets/initialAdminPassword
+    ```
+
+    It is also printed in the app's logs between rows of asterisks. Then the wizard installs
+    the suggested plugins and asks you to make the first administrator account.
+
+    **Tell it its own address**
+
+    Under *Manage Jenkins → System*, set the Jenkins URL to the address you reach it at.
+    Until that matches, Jenkins says the reverse proxy setup looks broken, and links in the
+    emails and webhooks it sends point at the wrong place.
+
+    **Builds run in this container**
+
+    Out of the box Jenkins builds on itself, so what a job can use is what this image has:
+    a JDK, git, and whatever you install into the volume. For anything else, connect agents
+    - an agent in this project reaches the controller at this app's key on port 50000, which
+    is open on the project network and not exposed publicly - or use a plugin that starts
+    them on demand.
+
+    **Storage is everything**
+
+    `/var/jenkins_home` holds the configuration, the job definitions, the build history, the
+    plugins and the credentials. It is the whole of Jenkins: back up that volume and there
+    is nothing else to keep.
+
+    **Memory**
+
+    A controller with a handful of jobs is comfortable in two gigabytes. The JVM sizes
+    itself from the container's limit, so raising the limit is how you give it more heap.
+  categories: [webapps/dev-tools]
+  tags: [automation, testing, git, open-source]
+  aliases: [ci, cd, build-server, pipeline, hudson]
+  icon: icons/jenkins.svg
+  links:
+    website: https://www.jenkins.io
+    documentation: https://www.jenkins.io/doc/
+    source: https://github.com/jenkinsci/jenkins
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      The JVM takes its heap from this, so it is also how much Jenkins gets. Below a
+      gigabyte a controller with plugins struggles.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Jenkins home volume
+    description: >-
+      The volume `/var/jenkins_home` is kept on: configuration, jobs, build history, plugins
+      and credentials. This is the backup.
+    type: volume
+
+versions:
+  - name: "2.568"
+    release: "2.568.3 LTS"
+    default: true
+    image: jenkins/jenkins:2.568.3-jdk21
+  - name: "2.568-slim"
+    release: "2.568.3 LTS, slim"
+    image: jenkins/jenkins:2.568.3-slim-jdk21
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/jenkins_home: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The login page, which answers as soon as the web interface is up and does not
+        # need an account. Jenkins answers 503 while it is still loading plugins, which -f
+        # counts as a failure, which is what the start period is for.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/login
+        interval: 20s
+        timeout: 10s
+        startPeriod: 240s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jenkins
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # No display, and the JVM sized from the container rather than from the host.
+        - {k: JAVA_OPTS, v: "-Djava.awt.headless=true -XX:MaxRAMPercentage=75"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

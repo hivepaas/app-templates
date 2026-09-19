@@ -1,0 +1,177 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kopia
+  title: Kopia
+  tagline: Backups that deduplicate, encrypt and verify themselves
+  description: |
+    Kopia takes snapshots of directories and writes them to a repository - a local disk, S3,
+    Backblaze B2, Google Cloud, Azure, or anything reachable over SFTP or WebDAV. Everything
+    is encrypted before it leaves, identical blocks are stored once however many snapshots
+    contain them, and every snapshot can be verified and restored on its own.
+
+    **This is the server, with its web interface**
+
+    It starts with no repository and waits: open it, then either create a repository or
+    connect to one that exists. From there you add the directories to snapshot, the policies
+    that decide how often and how long to keep them, and you can browse and restore any
+    snapshot from the same interface.
+
+    **Reaching what you want to back up**
+
+    Kopia snapshots what it can see, so a directory has to be mounted into this app. Add the
+    volumes of the apps you want backed up in this app's storage settings - read-only is
+    enough and is the safer choice - and they appear as paths to select.
+
+    **Where the backups go**
+
+    The volume this template asks for is mounted at `/repository`, which is the simplest
+    answer: a repository on your own storage. It is also the answer that keeps the backup on
+    the same machine as the thing being backed up, so if this is the only copy, point Kopia
+    at an S3 bucket or another host instead - the interface takes those details when the
+    repository is created.
+
+    **Two passwords, and what each one loses**
+
+    The repository password encrypts the backups and **cannot be recovered**: without it,
+    the repository is bytes nobody can read, this app included. The server password only
+    guards the web interface and can be changed here.
+
+    **Memory**
+
+    Deduplication and compression are done in memory, and a first snapshot of a large
+    directory is the heaviest moment. A gigabyte is enough for ordinary use.
+  categories: [storage/backup]
+  tags: [backup, files, s3, open-source]
+  aliases: [snapshot, restore, restic-alternative, deduplication]
+  icon: icons/kopia.svg
+  links:
+    website: https://kopia.io
+    documentation: https://kopia.io/docs/
+    source: https://github.com/kopia/kopia
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: serverUsername
+    title: Interface username
+    description: The name to sign in to the web interface with.
+    type: string
+    default: kopia
+    pattern: '^[a-zA-Z0-9_.@-]{1,64}$'
+  - name: serverPassword
+    title: Interface password
+    description: Leave empty to generate one. It guards the interface and can be changed later.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: repositoryPassword
+    title: Repository password
+    description: >-
+      What the backups themselves are encrypted with. Leave empty to generate one, and keep
+      a copy somewhere else: it cannot be recovered, and without it the backups cannot be
+      read by anybody, including you.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: Deduplication and compression happen in memory; a first large snapshot is the peak.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: repositoryVolume
+    title: Repository volume
+    description: >-
+      The volume mounted at `/repository`, for a repository kept on your own storage. It
+      also holds this app's configuration and cache, in directories of their own.
+    type: volume
+
+versions:
+  - name: "0.23"
+    release: "0.23.1"
+    default: true
+    image: kopia/kopia:0.23.1
+  - name: "0.22"
+    release: "0.22.1"
+    image: kopia/kopia:0.22.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is kopia itself, so this is what follows it. Everything
+      # else - both passwords, where the config, cache and logs live - is read from the
+      # environment, which keeps the passwords out of the process list.
+      command: server start --insecure --address 0.0.0.0:51515
+    storage:
+      mounts:
+        /repository:
+          type: volume
+          source: "${{ params.repositoryVolume }}"
+          volumeOptions: {subpath: repository}
+        /app/config:
+          type: volume
+          source: "${{ params.repositoryVolume }}"
+          volumeOptions: {subpath: config}
+        /app/cache:
+          type: volume
+          source: "${{ params.repositoryVolume }}"
+          volumeOptions: {subpath: cache}
+        /app/logs:
+          type: volume
+          source: "${{ params.repositoryVolume }}"
+          volumeOptions: {subpath: logs}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The interface answers 401 without credentials, so the check carries the ones the
+        # app was given. It reports the server, not the repository: a server with no
+        # repository connected yet is exactly what a new app is.
+        command: >-
+          curl -fsS -o /dev/null -u "$KOPIA_SERVER_USERNAME:$KOPIA_SERVER_PASSWORD"
+          http://127.0.0.1:51515/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kopia
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: KOPIA_SERVER_USERNAME, v: "${{ params.serverUsername }}"}
+        - {k: KOPIA_SERVER_PASSWORD, v: "${secrets.KOPIA_SERVER_PASSWORD}"}
+        # The repository password, for the repository this app creates or connects to.
+        - {k: KOPIA_PASSWORD, v: "${secrets.KOPIA_PASSWORD}"}
+        - {k: KOPIA_CONFIG_PATH, v: /app/config/repository.config}
+        - {k: KOPIA_CACHE_DIRECTORY, v: /app/cache}
+        - {k: KOPIA_LOG_DIR, v: /app/logs}
+        # Nothing here should be asking github how old it is.
+        - {k: KOPIA_CHECK_FOR_UPDATES, v: "false"}
+    secrets:
+      KOPIA_SERVER_PASSWORD:
+        value: "${{ params.serverPassword }}"
+      KOPIA_PASSWORD:
+        value: "${{ params.repositoryPassword }}"
+    routing:
+      port: 51515
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

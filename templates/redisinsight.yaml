@@ -1,0 +1,138 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: redisinsight
+  title: RedisInsight
+  tagline: Look inside Redis and Valkey, and ask them things
+  description: |
+    RedisInsight is Redis's own interface to a database: browse the keys by pattern, read
+    and edit values of every type, watch what commands are running, profile the slow ones,
+    run queries against RediSearch indexes and JSON documents, and see what memory is spent
+    on.
+
+    **Connecting it to a database here**
+
+    A Redis or Valkey app in the same project environment is reached by its key as the host
+    and its own port - `myapp-cache` and `6379` - with the password from that app's
+    `HIVEPAAS_PASSWORD`. Nothing has to be exposed publicly: this app sits on the same
+    project network and connects from inside it.
+
+    **The first screen**
+
+    It opens on Redis's terms and two choices: whether to send usage analytics, and whether
+    to encrypt what it stores. Both are yours to make - but until that screen is answered it
+    will not save a database at all, so answer it before adding one.
+
+    **The passwords it is given**
+
+    With encryption accepted, a database's password is kept encrypted on the volume, with a
+    key this app was created with. The key is the app's secret, not something anybody types
+    again - but it is also what the encrypted passwords need, so an app restored onto a new
+    volume without it is an app whose databases have to be added once more.
+
+    **What it keeps**
+
+    The list of databases you added, and the settings, on its volume. The data stays in
+    Redis - this is a window onto it, not a copy of it.
+
+    **It has no login of its own**
+
+    Anyone who opens it can read and write every database it has been given. If it is
+    exposed publicly, put basic authentication in front of it in the app's routing settings,
+    or leave it on the project network.
+
+    **Analytics**
+
+    The build sends usage analytics to Redis unless you say otherwise; the switch is in its
+    own Settings, under Privacy.
+  categories: [webapps/dev-tools]
+  tags: [redis-compatible, key-value, dashboards, open-source]
+  aliases: [redis-gui, redis-insight, valkey-gui, redis-browser]
+  icon: icons/redisinsight.svg
+  links:
+    website: https://redis.io/insight/
+    documentation: https://redis.io/docs/latest/operate/redisinsight/
+    source: https://github.com/RedisInsight/RedisInsight
+  license: SSPL-1.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Browsing large keys and profiling loads them into the interface, so give it room if
+      the databases are big.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      What the passwords of the databases you add are encrypted with, where they are kept.
+      Leave empty to generate one. Losing it means adding the databases again.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: dataVolume
+    title: Data volume
+    description: The volume the list of databases and the settings are kept on.
+    type: volume
+
+versions:
+  - name: "3.8"
+    release: "3.8.0"
+    default: true
+    image: redis/redisinsight:3.8.0
+  - name: "3.6"
+    release: "3.6.0"
+    image: redis/redisinsight:3.6.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries wget and no curl. /api/health answers once the server is up,
+        # which is what the interface needs; a database it cannot reach is reported inside.
+        command: wget -q -O /dev/null http://127.0.0.1:5540/api/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: redisinsight
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Without a key it has nowhere safe to put a database's password and refuses to
+        # store one at all - "Unsupported encryption strategy" on the first database added.
+        - {k: RI_ENCRYPTION_KEY, v: "${secrets.RI_ENCRYPTION_KEY}"}
+    secrets:
+      RI_ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+    routing:
+      port: 5540
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

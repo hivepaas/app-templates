@@ -1,0 +1,94 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: it-tools
+  title: IT Tools
+  tagline: The small conversions a developer does all day, on your own server
+  description: |
+    IT Tools is a page of about eighty small utilities: encode and decode Base64 and JWTs,
+    format JSON and SQL, generate UUIDs and passwords, hash a string, convert colours and
+    cron expressions, read an X.509 certificate, escape a regular expression, compare two
+    texts.
+
+    **Why run it rather than use the public one**
+
+    The public site does all of this in the browser and sends nothing anywhere - and the
+    string you are about to paste is a production token, a customer's certificate, a
+    connection URL with a password in it. Running it here means no one has to trust that
+    promise, or remember which site it was.
+
+    **There is nothing to configure**
+
+    This is a static page: no database, no volume, no account. It holds no state of its own,
+    so a restart loses nothing and an upgrade is a redeploy.
+
+    **Keeping it to your team**
+
+    There is no login, because the app has none. If it is exposed publicly, put basic
+    authentication in front of it in the app's routing settings, or leave it on the project
+    network and reach it from inside.
+  categories: [webapps/dev-tools]
+  tags: [open-source, privacy]
+  aliases: [tools, utilities, converter, encoder, decoder, jwt, base64]
+  icon: icons/it-tools.svg
+  links:
+    website: https://it-tools.tech
+    documentation: https://github.com/CorentinTh/it-tools#readme
+    source: https://github.com/CorentinTh/it-tools
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: An nginx serving static files needs very little.
+    type: size
+    default: 128MB
+    min: 64MB
+
+versions:
+  - name: "2024.10"
+    release: "2024.10.22"
+    default: true
+    image: corentinth/it-tools:2024.10.22-7ca5933
+  - name: "2024.5"
+    release: "2024.5.13"
+    image: corentinth/it-tools:2024.5.13-a0bc346
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The page itself. There is nothing behind it to be half-ready.
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: it-tools
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
