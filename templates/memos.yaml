@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: memos
+  title: Memos
+  tagline: A place for short notes, in plain markdown, that stays yours
+  description: |
+    Memos is for the notes that are a sentence long: a thought, a link, a snippet, tagged
+    with `#something` and found again by searching. Everything is markdown, the interface is
+    a single timeline, and there is an API for anything that should write to it automatically.
+
+    **This template sets up**
+
+    - Memos on a volume, holding its database and the files people attach
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Make your account before anybody else does**
+
+    A new installation has nobody, and the first account made becomes the host - the
+    administrator. Open it and sign up straight away. Afterwards, turn off sign-ups in
+    Settings so the next visitor cannot make their own.
+
+    **What the volume holds**
+
+    An SQLite database with every note and the files attached to them. That is the whole of
+    it - no other app, nothing anywhere else.
+
+    **If you want it public**
+
+    A memo can be shared by link, so it can be read by somebody without an account. The rest
+    stays private to whoever signed in, which is what makes this usable on a domain.
+  categories: [webapps/knowledge]
+  tags: [documents, open-source]
+  aliases: [notes, journal, microblog, note-taking]
+  icon: icons/memos.svg
+  links:
+    website: https://usememos.com
+    documentation: https://usememos.com/docs
+    source: https://github.com/usememos/memos
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: instanceUrl
+    title: Public address
+    description: >-
+      The address links in shared memos are built from, scheme and all. The default only
+      works for other apps in this project.
+    type: string
+    default: http://${HIVEPAAS_HOST}:5230
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the notes and their attachments are kept on.
+    type: volume
+
+versions:
+  - name: "0.30"
+    release: "0.30.0"
+    default: true
+    image: neosmemo/memos:0.30.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /var/opt/memos:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl in the image, but busybox has a wget.
+        command: busybox wget -q -O /dev/null http://127.0.0.1:5230/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: memos
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MEMOS_MODE, v: prod}
+        - {k: MEMOS_PORT, v: "5230"}
+        - {k: MEMOS_DATA, v: /var/opt/memos}
+        - {k: MEMOS_INSTANCE_URL, v: "${{ params.instanceUrl }}"}
+    routing:
+      port: 5230
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

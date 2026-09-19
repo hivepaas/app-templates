@@ -1267,6 +1267,44 @@
       }
     },
     {
+      "name": "linkding",
+      "file": {
+        "path": "templates/linkding.yaml",
+        "sha256": "70f0dde160ace4ec41ce4d647081c5b6d58de3942205bba15f112ea4f19d8b0e"
+      },
+      "icon": {
+        "path": "icons/linkding.svg",
+        "sha256": "a804d8ed7b5dbf4f2b7b554033b9f78079bd5cd09970072d8b35de9ba266f39d"
+      },
+      "title": "Linkding",
+      "tagline": "Bookmarks you keep, searchable, with the page saved alongside",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "bookmarks",
+        "links",
+        "pocket",
+        "read-later",
+        "pinboard"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.47",
+          "release": "1.47.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "litellm",
       "file": {
         "path": "templates/litellm.yaml",
@@ -1536,6 +1574,43 @@
         {
           "name": "1.6",
           "release": "1.6.45",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "memos",
+      "file": {
+        "path": "templates/memos.yaml",
+        "sha256": "6b26b22568811e9df637b562e75771442f47eb40da4733f4786576e2c44e059d"
+      },
+      "icon": {
+        "path": "icons/memos.svg",
+        "sha256": "c18d39e0f3d28537351e77e3ff5bb3bb12a4b8199301df9285ed1045ff03e8a4"
+      },
+      "title": "Memos",
+      "tagline": "A place for short notes, in plain markdown, that stays yours",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "notes",
+        "journal",
+        "microblog",
+        "note-taking"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.30",
+          "release": "0.30.0",
           "default": true
         }
       ],
@@ -2701,6 +2776,42 @@
         {
           "name": "4.47",
           "release": "4.47",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "shlink",
+      "file": {
+        "path": "templates/shlink.yaml",
+        "sha256": "158bc9ad0fb5dd656b9660595ca24cfff1db926598e2b35cc55b7947141f7380"
+      },
+      "icon": {
+        "path": "icons/shlink.svg",
+        "sha256": "4bc351fc81a643f75da82a47b2a1cb52326d54b12654517bf982a32267543b02"
+      },
+      "title": "Shlink",
+      "tagline": "Short links you own, with the statistics that come with them",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "url-shortener",
+        "short-links",
+        "bitly",
+        "redirects"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "5.1",
+          "release": "5.1.6",
           "default": true
         }
       ],

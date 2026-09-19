@@ -1,0 +1,127 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: linkding
+  title: Linkding
+  tagline: Bookmarks you keep, searchable, with the page saved alongside
+  description: |
+    Linkding is a bookmark manager: a link, a title, tags, notes, and a full-text search over
+    everything you saved. It can archive the page itself as you file it, so a link that rots
+    still has its content. The interface is plain and fast, there is a browser extension, and
+    a REST API for everything else.
+
+    **This template sets up**
+
+    - Linkding on a volume, holding its database and any archived pages
+    - an account made at the first start from the username and password here
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Your account is made at the first start**
+
+    The username and password here become the first user, created before anybody can reach
+    the app. The password is under this app's Secrets, as `LD_SUPERUSER_PASSWORD`. More
+    accounts are added from the administration page inside.
+
+    **Bringing bookmarks with you**
+
+    It imports a Netscape bookmarks file - what every browser and most bookmark services
+    export - from Settings, and exports the same. Nothing here is locked in.
+
+    **What the volume holds**
+
+    An SQLite database with the bookmarks, plus archived page snapshots if you turn that on.
+    Snapshots are the part that grows: a few hundred kilobytes each, on top of a database
+    measured in megabytes.
+  categories: [webapps/knowledge]
+  tags: [documents, open-source]
+  aliases: [bookmarks, links, pocket, read-later, pinboard]
+  icon: icons/linkding.svg
+  links:
+    website: https://linkding.link
+    documentation: https://linkding.link/installation/
+    source: https://github.com/sissbruecker/linkding
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume bookmarks and archived pages are kept on.
+    type: volume
+
+versions:
+  - name: "1.47"
+    release: "1.47.0"
+    default: true
+    image: sissbruecker/linkding:1.47.0-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /etc/linkding/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:9090/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: linkding
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read at the first start, when there is nobody, and ignored afterwards.
+        - {k: LD_SUPERUSER_NAME, v: "${{ params.adminUsername }}"}
+        - {k: LD_SUPERUSER_PASSWORD, v: "${secrets.LD_SUPERUSER_PASSWORD}"}
+        - {k: LD_SERVER_PORT, v: "9090"}
+    secrets:
+      LD_SUPERUSER_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 9090
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,141 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: shlink
+  title: Shlink
+  tagline: Short links you own, with the statistics that come with them
+  description: |
+    Shlink turns long URLs into short ones on a domain of yours, and counts what happens to
+    them: visits over time, where from, which referrer, which device. Links can carry tags,
+    expire on a date or after a number of visits, and send Android or iOS visitors somewhere
+    else. Everything is done through its REST API or the command line - there is no web
+    interface in this app.
+
+    **This template sets up**
+
+    - the API and the redirects on a volume, with an SQLite database
+    - an API key generated at the first start, under this app's Secrets as `INITIAL_API_KEY`
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Creating a link**
+
+    ```
+    curl -X POST https://<this app's address>/rest/v3/short-urls \
+      -H "X-Api-Key: <the key>" -H "Content-Type: application/json" \
+      -d '{"longUrl":"https://example.com/a/very/long/address"}'
+    ```
+
+    The answer holds the short URL. Put the same address and key into shlink-web-client if
+    you want a screen for it - that is a separate app, and a static one.
+
+    **The short domain has to be right**
+
+    Every short URL is built from "Short link domain", so it has to be the address visitors
+    will follow - the same one you route to this app. Change it later and the links already
+    handed out keep the old address.
+
+    **SQLite is the small choice**
+
+    It keeps everything in a file on the volume, which is right for a personal or team
+    installation and is what this template sets up. A busy public shortener wants PostgreSQL
+    or MySQL instead - the variables for that go in this app's environment afterwards.
+  categories: [webapps/dev-tools]
+  tags: [open-source]
+  aliases: [url-shortener, short-links, bitly, redirects]
+  icon: icons/shlink.svg
+  links:
+    website: https://shlink.io
+    documentation: https://shlink.io/documentation/
+    source: https://github.com/shlinkio/shlink
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: shortDomain
+    title: Short link domain
+    description: >-
+      The host every short URL is built from - the domain you route to this app. The default
+      only works for other apps in this project.
+    type: string
+    default: ${HIVEPAAS_HOST}
+    pattern: '^[^\s/:]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the same as the short link domain
+      above. Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: apiKey
+    title: API key
+    description: >-
+      Created at the first start and used for every request. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the links and their visit statistics are kept on.
+    type: volume
+
+versions:
+  - name: "5.1"
+    release: "5.1.6"
+    default: true
+    image: shlinkio/shlink:5.1.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /etc/shlink/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /rest/health answers without a key, and answers for the database behind it.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/rest/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: shlink
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DEFAULT_DOMAIN, v: "${{ params.shortDomain }}"}
+        # TLS is terminated in front of the app, and the links it writes have to say https
+        # rather than the scheme its own server sees.
+        - {k: IS_HTTPS_ENABLED, v: "true"}
+        - {k: INITIAL_API_KEY, v: "${secrets.INITIAL_API_KEY}"}
+        - {k: TIMEZONE, v: UTC}
+    secrets:
+      INITIAL_API_KEY:
+        value: "${{ params.apiKey }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
