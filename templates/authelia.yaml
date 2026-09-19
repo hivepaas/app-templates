@@ -1,0 +1,195 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: authelia
+  title: Authelia
+  tagline: One sign-in page in front of the apps that have none
+  description: |
+    Authelia is the login screen for everything else: a portal with passwords, two-factor
+    authentication and rules about who may reach what, sitting in front of apps through the
+    reverse proxy rather than inside them. It is the answer to every template here that says
+    "this app has no login of its own".
+
+    **What this template gives you**
+
+    A running Authelia with its own storage, a file of users on the volume, and the three
+    secrets it needs generated for you. What it does not do is put itself in front of
+    anything - see below, because that part is manual today.
+
+    **The first start creates the users file and restarts**
+
+    Authelia writes an example users file on its first start and stops; the app restarts by
+    itself and comes up. That example user is disabled: add your own with the app's terminal,
+
+    ```
+    authelia crypto hash generate argon2 --password 'your password'
+    ```
+
+    and put the hash into `/config/users_database.yml` beside a display name, an email and a
+    group.
+
+    **Before it protects anything**
+
+    Two things have to be told the truth about your domain, in this app's configuration file:
+    `session.cookies[0].domain` must be the domain the protected apps sit under, and
+    `authelia_url` must be where this app answers. Both ship as `example.com` because a
+    template cannot know them.
+
+    **Putting it in front of an app**
+
+    HivePaaS routing offers basic auth rather than forward authentication, so the middleware
+    is added by hand: on the app you want protected, add a label whose name carries
+    `.x-custom-` - which is how HivePaaS knows a Traefik label is yours and leaves it alone -
+    defining a `forwardAuth` middleware pointing at `http://<this app's key>:9091/api/authz/forward-auth`,
+    and another label attaching that middleware to the app's router.
+
+    **Storage**
+
+    The users file, the database of sessions and second factors, and the notifications it
+    would otherwise email - all on the volume. There is no SMTP server configured, so
+    password resets are written to `/config/notification.txt`; set a real notifier in the
+    configuration file when you want them delivered.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [sso, forward-auth, 2fa, login, oidc]
+  icon: icons/authelia.svg
+  links:
+    website: https://www.authelia.com
+    documentation: https://www.authelia.com/configuration/prologue/introduction/
+    source: https://github.com/authelia/authelia
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the portal answers at. Leave it empty to add one later, in the app's
+      routing settings - and remember the configuration file has to be told it as well.
+    type: domain
+    optional: true
+  - name: jwtSecret
+    title: Reset JWT secret
+    description: What signs the password-reset links. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: sessionSecret
+    title: Session secret
+    description: What signs the session cookies. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: storageKey
+    title: Storage encryption key
+    description: >-
+      What the second-factor registrations in the database are encrypted with. Leave empty to
+      generate one, and keep it with the backup - without it they cannot be read.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: One Go binary and a SQLite database.
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the users file, the sessions and the second factors are kept on.
+    type: volume
+
+versions:
+  - name: "4.39"
+    release: "4.39.28"
+    default: true
+    image: authelia/authelia:4.39.28
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl in the image; wget is there. /api/health answers once the storage has
+        # been migrated and the users file has been read.
+        command: wget -q -O /dev/null http://127.0.0.1:9091/api/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: authelia
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET, v: "${secrets.AUTHELIA_JWT_SECRET}"}
+        - {k: AUTHELIA_SESSION_SECRET, v: "${secrets.AUTHELIA_SESSION_SECRET}"}
+        - {k: AUTHELIA_STORAGE_ENCRYPTION_KEY, v: "${secrets.AUTHELIA_STORAGE_KEY}"}
+    secrets:
+      AUTHELIA_JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      AUTHELIA_SESSION_SECRET:
+        value: "${{ params.sessionSecret }}"
+      AUTHELIA_STORAGE_KEY:
+        value: "${{ params.storageKey }}"
+    configFiles:
+      configuration.yml:
+        # Everything except the three secrets, which come from the environment. The two
+        # values that have to match your own domain are marked: Authelia will not protect
+        # anything until they do.
+        content: |
+          theme: light
+          server:
+            address: tcp://0.0.0.0:9091
+          log:
+            level: info
+
+          authentication_backend:
+            file:
+              path: /config/users_database.yml
+
+          access_control:
+            default_policy: one_factor
+
+          session:
+            cookies:
+              # CHANGE BOTH: the domain your protected apps sit under, and where this
+              # app answers.
+              - domain: example.com
+                authelia_url: https://auth.example.com
+
+          storage:
+            local:
+              path: /config/db.sqlite3
+
+          # No mail server is configured, so password resets are written to a file on the
+          # volume. Replace this with an smtp notifier to have them delivered.
+          notifier:
+            filesystem:
+              filename: /config/notification.txt
+
+          regulation:
+            max_retries: 3
+            find_time: 2m
+            ban_time: 5m
+        swarmRef:
+          file: {name: /config/configuration.yml, mode: 444}
+    routing:
+      port: 9091
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

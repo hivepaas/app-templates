@@ -1,0 +1,180 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: authentik
+  title: authentik
+  tagline: One account for every app, and the protocols to prove it
+  description: |
+    authentik is an identity provider: one directory of people and groups, one sign-in page,
+    and the protocols other software already speaks - OAuth2 and OpenID Connect, SAML, LDAP,
+    SCIM, and a forward-auth endpoint for applications that have no login at all. Where
+    [Authelia](authelia) is a login page in front of things, authentik is the account system
+    those things can be taught to use.
+
+    **This template creates three apps**
+
+    - **authentik** itself, with a volume for uploaded icons and backgrounds
+    - **a PostgreSQL database**, named with `-db`, holding everything: users, groups, flows,
+      applications and every configured provider
+    - **a Valkey cache**, named with `-redis`, for sessions and the task queue
+
+    The database is the whole installation. Back it up.
+
+    **Server and worker in one container**
+
+    authentik is normally run as two containers sharing a database. This template uses the
+    image's own `allinone` mode, which runs both in one - the arrangement authentik ships
+    for single-server installations. Everything works, including the background tasks that
+    send email and synchronise directories; what you give up is scaling the two apart.
+
+    **After it starts**
+
+    Sign in as `akadmin` with the password below. Then, before anything else, go to
+    *Directory → Users* and give that account an email address you own, so a password reset
+    can reach you.
+
+    **Adding an application**
+
+    Each application gets a provider and a matching entry in *Applications*. For software
+    that understands OpenID Connect, create an OAuth2/OIDC provider and paste the client id,
+    the secret and the discovery URL into it. For software with no login of its own, create
+    a proxy provider in forward-auth mode - and note that attaching it to an app here means
+    adding a Traefik label by hand, since HivePaaS routing offers basic authentication
+    rather than forward authentication.
+
+    **Sending email**
+
+    Password resets and invitations are emails, and there is no mail server configured. Add
+    SMTP settings as environment variables (`AUTHENTIK_EMAIL__HOST` and the rest) when you
+    need them delivered.
+
+    **It wants memory**
+
+    A Python application, a Go proxy and a worker in one container. The default limit is
+    what a small installation actually uses; below 1GB it will start and then be killed
+    under load.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [sso, oidc, oauth, saml, ldap, keycloak alternative]
+  icon: icons/authentik.svg
+  links:
+    website: https://goauthentik.io
+    documentation: https://docs.goauthentik.io
+    source: https://github.com/goauthentik/authentik
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Every application you connect to it is given this
+      address, so changing it later means changing them too. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Administrator password
+    description: The password for the `akadmin` account, created on the first start.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      What signs the sessions and encrypts stored credentials. Leave empty to generate one,
+      and keep it with the backup - the database cannot be read without it.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: The server and the worker share this.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded icons, backgrounds and certificates are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: authentik
+      username: authentik
+  - name: redis
+    title: Cache
+    template: valkey
+    version: "9.1"
+
+versions:
+  - name: "2026.8"
+    release: "2026.8.3"
+    default: true
+    image: ghcr.io/goauthentik/server:2026.8.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Server and worker in one container. The image waits for the database itself before
+      # either of them starts, so there is no retry loop to write here.
+      command: allinone
+    storage:
+      mounts:
+        # noCopy is not set: the image ships this directory owned by the user authentik runs
+        # as, and that ownership is what the empty volume needs copied into it.
+        /media: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check, which knows which mode it was started in.
+        command: ak healthcheck
+        interval: 30s
+        timeout: 20s
+        startPeriod: 180s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: authentik
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: AUTHENTIK_SECRET_KEY, v: "${secrets.AUTHENTIK_SECRET_KEY}"}
+        # Read on the first start, when there is nobody, and ignored afterwards.
+        - {k: AUTHENTIK_BOOTSTRAP_PASSWORD, v: "${secrets.AUTHENTIK_BOOTSTRAP_PASSWORD}"}
+        # The database and the cache this template creates.
+        - {k: AUTHENTIK_POSTGRESQL__HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: AUTHENTIK_POSTGRESQL__PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: AUTHENTIK_POSTGRESQL__USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: AUTHENTIK_POSTGRESQL__PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: AUTHENTIK_POSTGRESQL__NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: AUTHENTIK_REDIS__HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+        - {k: AUTHENTIK_REDIS__PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+        - {k: AUTHENTIK_REDIS__PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        # Nothing about this installation is sent anywhere.
+        - {k: AUTHENTIK_ERROR_REPORTING__ENABLED, v: "false"}
+        - {k: AUTHENTIK_DISABLE_UPDATE_CHECK, v: "true"}
+        - {k: AUTHENTIK_DISABLE_STARTUP_ANALYTICS, v: "true"}
+    secrets:
+      AUTHENTIK_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      AUTHENTIK_BOOTSTRAP_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
