@@ -1,0 +1,119 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: actual
+  title: Actual Budget
+  tagline: Envelope budgeting that is fast, local-first and yours
+  description: |
+    Actual is a budgeting app built on giving every amount a job before you spend it. The
+    interface runs in the browser or in its desktop and mobile apps, and it stays fast
+    because the budget lives on the device and syncs through this server rather than being
+    queried from it. Transactions come in by file import or by a bank connection you
+    configure.
+
+    **This template sets up**
+
+    - the sync server on a volume, holding every budget file and its history
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Set the password at the first visit**
+
+    The server asks whoever opens it first to choose the password that protects it - there is
+    no account made here, and no way to set it in advance. Open it as soon as it is deployed,
+    before it is reachable by anybody else, and choose one.
+
+    **The apps sync through it**
+
+    Install Actual on a phone or desktop, give it this app's address and that password, and
+    the budget syncs between them. The browser at the same address is the same app.
+
+    **End-to-end encryption is optional and one-way**
+
+    A budget file can be encrypted with a key this server never sees. Turn it on and the
+    server stores nothing readable; lose the key and nobody - including you - can open the
+    file again.
+
+    **What the volume holds**
+
+    Every budget file, its change history and the server's own database. That is the whole
+    of it, and the only copy unless the apps still have theirs.
+  categories: [webapps/business]
+  tags: [business-intelligence, open-source]
+  aliases: [budget, finance, money, ynab, envelope]
+  icon: icons/actual.svg
+  links:
+    website: https://actualbudget.org
+    documentation: https://actualbudget.org/docs/
+    source: https://github.com/actualbudget/actual
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at - what the desktop and mobile apps connect to. Leave
+      it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume budget files and their history are kept on.
+    type: volume
+
+versions:
+  - name: "26.9"
+    release: "26.9.0"
+    default: true
+    image: actualbudget/actual-server:26.9.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships /data, and docker would copy it - ownership and all - into
+        # the empty volume the first time it is mounted here.
+        /data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries neither curl nor wget - only node, which is enough to ask.
+        command: >-
+          node -e "require('http').get('http://127.0.0.1:5006/health',r=>process.exit(r.statusCode===200?0:1))
+          .on('error',()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: actual
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ACTUAL_DATA_DIR, v: /data}
+        - {k: ACTUAL_PORT, v: "5006"}
+    routing:
+      port: 5006
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

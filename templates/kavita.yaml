@@ -1,0 +1,109 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kavita
+  title: Kavita
+  tagline: Reads your books and comics, and remembers where you stopped
+  description: |
+    Kavita serves a library of ebooks, comics and manga: it reads EPUB, PDF, CBZ, CBR and
+    more, renders them in the browser, tracks progress per person, and organises what it
+    finds by series rather than by filename. Accounts can be limited to particular libraries,
+    and an OPDS feed lets a dedicated reader app fetch from it.
+
+    **This template sets up**
+
+    - Kavita on a volume for its own database, settings and covers
+    - a health check on its own endpoint
+    - a memory limit you choose
+
+    **Point it at your books**
+
+    The volume here holds Kavita's own data, not your library. Add a second mount to this app
+    - the volume where the books are, at a path like `/books` - and then add a library inside
+    Kavita pointing at that path. Read-only is enough if nothing should write back.
+
+    **Make your account before anybody else does**
+
+    The first visit is a setup page that creates the administrator, so open it as soon as it
+    is deployed and make that account yours. Everyone else is invited from inside.
+
+    **Scanning takes a while**
+
+    A library is scanned when it is added and then on a schedule: metadata is read, covers
+    are extracted, and series are grouped. A large collection takes a while the first time
+    and is quiet afterwards.
+  categories: [webapps/documents]
+  tags: [documents, open-source]
+  aliases: [ebooks, comics, manga, epub, library]
+  icon: icons/kavita.svg
+  links:
+    website: https://www.kavitareader.com
+    documentation: https://wiki.kavitareader.com
+    source: https://github.com/Kareadita/Kavita
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: Scanning and rendering are the hungry parts.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: configVolume
+    title: Data volume
+    description: >-
+      The volume Kavita's database, settings and covers are kept on - not the books
+      themselves, which are a mount you add afterwards.
+    type: volume
+
+versions:
+  - name: "0.9"
+    release: "0.9.1"
+    default: true
+    image: jvmilazz0/kavita:0.9.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /kavita/config:
+          type: volume
+          source: "${{ params.configVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:5000/api/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kavita
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -323,6 +323,44 @@
   ],
   "templates": [
     {
+      "name": "actual",
+      "file": {
+        "path": "templates/actual.yaml",
+        "sha256": "5b3618dec40877eb660ea152c92b787e228614db2e0bae7effc2df67549533c1"
+      },
+      "icon": {
+        "path": "icons/actual.svg",
+        "sha256": "76ff2310a7a6c1ca1279f80607edccf8fad416ac996f05ca926b5d338882271c"
+      },
+      "title": "Actual Budget",
+      "tagline": "Envelope budgeting that is fast, local-first and yours",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "open-source"
+      ],
+      "aliases": [
+        "budget",
+        "finance",
+        "money",
+        "ynab",
+        "envelope"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "26.9",
+          "release": "26.9.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "adminer",
       "file": {
         "path": "templates/adminer.yaml",
@@ -809,6 +847,44 @@
       }
     },
     {
+      "name": "freshrss",
+      "file": {
+        "path": "templates/freshrss.yaml",
+        "sha256": "e14748d0d7001ebf2233c5235f4cbfdb88d21646c0a990a7f22fb739a52c201c"
+      },
+      "icon": {
+        "path": "icons/freshrss.svg",
+        "sha256": "7d0386a76986aa148c875337c17a2cbdf2e96a312ab0ab991b7268e721bc8408"
+      },
+      "title": "FreshRSS",
+      "tagline": "A feed reader with filters, folders and an app for every phone",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "rss",
+        "feeds",
+        "reader",
+        "atom",
+        "news"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.30",
+          "release": "1.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "ghost",
       "file": {
         "path": "templates/ghost.yaml",
@@ -1207,6 +1283,44 @@
         {
           "name": "2.21",
           "release": "2.21.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kavita",
+      "file": {
+        "path": "templates/kavita.yaml",
+        "sha256": "1a2da33944d26d9d2004439e6558bde5201a105e732c72227eb1ac73b131c22c"
+      },
+      "icon": {
+        "path": "icons/kavita.svg",
+        "sha256": "e30c8b2fbd963d030618001b4b87bab3b775ccfa2c82349d74765899f021f7c5"
+      },
+      "title": "Kavita",
+      "tagline": "Reads your books and comics, and remembers where you stopped",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "ebooks",
+        "comics",
+        "manga",
+        "epub",
+        "library"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.9",
+          "release": "0.9.1",
           "default": true
         }
       ],
