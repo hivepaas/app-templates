@@ -1,0 +1,134 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: changedetection
+  title: changedetection.io
+  tagline: Watches web pages and tells you the moment they change
+  description: |
+    changedetection.io fetches pages on a schedule and tells you what changed: a price, a
+    availability line, a policy document, a competitor's page, a job board. You pick the part
+    of the page that matters - by CSS selector, XPath or by clicking it in the visual picker
+    - and it ignores the rest.
+
+    **Where it tells you**
+
+    Notifications go out over anything Apprise speaks: email, Telegram, Discord, Slack,
+    Gotify, ntfy, a webhook of your own. Set them per watch or once for everything under
+    *Settings → Notifications*.
+
+    **Pages that need a browser**
+
+    Plain fetching covers most sites and costs almost nothing. A page that builds itself with
+    JavaScript needs a real browser, which this app does not carry: run a Playwright or
+    Sockpuppet browser as its own app and put its address in `PLAYWRIGHT_DRIVER_URL` here.
+    Until then, such pages look empty or unchanged.
+
+    **What it keeps**
+
+    The watches, their history and the snapshots of every version it has seen, on the volume.
+    Snapshots are what grow; a watch checked every few minutes for a year is a lot of
+    versions, and each one is kept so you can diff against it.
+
+    **Watching other apps here**
+
+    It refuses private addresses by default, which is what stops a public instance from being
+    used to probe the network it sits in - and it is also why a watch on another app in this
+    project comes back with "Fetch blocked: ... resolves to a private/reserved IP address".
+    Turn on **Allow private addresses** to watch apps here, and understand what it opens: any
+    watch can then reach anything this app can reach.
+
+    **It has no login of its own**
+
+    Anybody who reaches it can add and remove watches. Set a password under *Settings →
+    General*, or leave the app on the project network rather than exposing it.
+  categories: [webapps/automation]
+  tags: [automation, monitoring, notifications, open-source]
+  aliases: [website-monitor, price-watch, diff, scraper]
+  icon: icons/changedetection.svg
+  links:
+    website: https://changedetection.io
+    documentation: https://github.com/dgtlmoon/changedetection.io/wiki
+    source: https://github.com/dgtlmoon/changedetection.io
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, and what the links inside its notifications are built
+      from. Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: allowPrivateAddresses
+    title: Allow private addresses
+    description: >-
+      Lets watches fetch private and reserved addresses - the other apps in this project, and
+      anything else on the network this app can reach. It is off by default because a watch
+      is a URL somebody types, and an instance other people can reach would otherwise be a
+      way to ask the inside of your network questions.
+    type: bool
+    default: false
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Fetching and diffing are light; a page with a very large body is the heaviest moment.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the watches, their history and every snapshot are kept on.
+    type: volume
+
+versions:
+  - name: "0.60"
+    release: "0.60.7"
+    default: true
+    image: dgtlmoon/changedetection.io:0.60.7
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /datastore: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries python and neither curl nor wget, so the check is written with
+        # what is there. It asks for the watch list, which needs the datastore loaded.
+        command: >-
+          python3 -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/', timeout=5).status == 200 else 1)"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: changedetection
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The address the outside world uses, once a domain is set on the app: the links in
+        # its notifications are built from it.
+        - {k: BASE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: USE_X_SETTINGS, v: "1"}
+        # Whether a watch may fetch a private address - another app here, the LAN. See the
+        # parameter: off is the upstream default, and the safer one.
+        - {k: ALLOW_IANA_RESTRICTED_ADDRESSES, v: "${{ params.allowPrivateAddresses }}"}
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

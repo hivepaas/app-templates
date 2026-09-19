@@ -1,0 +1,169 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: activepieces
+  title: Activepieces
+  tagline: Automations built by dragging pieces together, with AI where you want it
+  description: |
+    Activepieces connects the tools you already use: a trigger somewhere - a form, a webhook,
+    a new row, a schedule - and then the steps that follow, chosen from a few hundred ready
+    pieces or written as a bit of TypeScript. It is the same idea as Zapier or Make, running
+    on your own server.
+
+    **This template creates three apps**
+
+    - **Activepieces** itself, with a volume for the pieces it caches and the files flows pass around
+    - **a PostgreSQL database**, named with `-db`, holding the flows, connections and run history
+    - **a Valkey broker**, named with `-redis`, which carries the queue of work
+
+    All three are needed. The database is the backup.
+
+    **The first account**
+
+    The first person to sign up becomes the owner of the instance, so open it and make your
+    account before giving the address to anybody else.
+
+    **Give it its address**
+
+    Webhooks are the point of a tool like this, and the URL a piece hands to the outside
+    world is built from the address Activepieces knows. Until the app has a domain, that is
+    its own name on the project network - fine for flows that only talk to other apps here,
+    not for a webhook somebody else calls.
+
+    **Two keys it is created with**
+
+    The encryption key protects the credentials stored for each connection, and the JWT
+    secret signs the sessions. Both are under this app's Secrets; keep them with the
+    backup, because connections restored without the key cannot be decrypted.
+  categories: [webapps/automation]
+  tags: [automation, ai, open-source]
+  aliases: [zapier, make, workflow, n8n-alternative, integrations]
+  icon: icons/activepieces.svg
+  links:
+    website: https://www.activepieces.com
+    documentation: https://www.activepieces.com/docs
+    source: https://github.com/activepieces/activepieces
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, and what the webhook URLs are built from. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      What the credentials of each connection are encrypted with. Leave empty to generate
+      one; keep a copy with the backup, because without it the stored connections cannot be
+      read.
+    type: secret
+    minLength: 32
+    generate: {length: 32, charset: hex}
+  - name: jwtSecret
+    title: JWT secret
+    description: What signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Flows run inside this app, and a piece that handles large files needs room for them.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the cached pieces and the files flows pass around are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: activepieces
+      username: activepieces
+  - name: redis
+    title: Queue
+    template: valkey
+    version: "9.1"
+
+versions:
+  - name: "0.91"
+    release: "0.91.0"
+    default: true
+    image: activepieces/activepieces:0.91.0
+  - name: "0.90"
+    release: "0.90.4"
+    image: activepieces/activepieces:0.90.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it - ownership and
+        # all - into the empty volume the first time it is mounted here.
+        /usr/src/app/cache:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The API answers only once the database has been migrated and the queue is
+        # reachable, which is what this app needs before it is of any use.
+        command: curl -fsS -o /dev/null http://127.0.0.1/api/v1/flags
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: activepieces
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: AP_DB_TYPE, v: POSTGRES}
+        - {k: AP_POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: AP_POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: AP_POSTGRES_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: AP_POSTGRES_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: AP_POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: AP_POSTGRES_USE_SSL, v: "false"}
+        # Valkey has no user name to set: it authenticates as its built-in `default` user.
+        - {k: AP_QUEUE_MODE, v: REDIS}
+        - {k: AP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+        - {k: AP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+        - {k: AP_REDIS_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: AP_ENCRYPTION_KEY, v: "${secrets.AP_ENCRYPTION_KEY}"}
+        - {k: AP_JWT_SECRET, v: "${secrets.AP_JWT_SECRET}"}
+        # The address the outside world uses, once a domain is set on the app. Webhook URLs
+        # are built from it; until then it is this app's own name on the project network.
+        - {k: AP_FRONTEND_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: AP_TELEMETRY_ENABLED, v: "false"}
+    secrets:
+      AP_ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      AP_JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

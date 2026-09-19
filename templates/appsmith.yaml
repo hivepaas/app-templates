@@ -1,0 +1,119 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: appsmith
+  title: Appsmith
+  tagline: Internal tools built by dragging widgets and wiring them to your data
+  description: |
+    Appsmith is where the admin panel, the support tool and the ops dashboard get built
+    without a front-end project: drop tables, forms, charts and buttons onto a page, connect
+    them to a PostgreSQL, a REST API, a Google Sheet or an S3 bucket, and write the bits in
+    between in JavaScript.
+
+    **It brings its own database**
+
+    This image runs everything it needs inside one container - its MongoDB and its Redis
+    included - so the app is one app, and the volume is all of it: the applications you
+    build, the datasource credentials, and the internal database. Back that volume up and
+    there is nothing else to keep.
+
+    **The first account**
+
+    The first person to sign up becomes the administrator of the instance, so open it and
+    make your account before giving the address to anybody else. Signing up asks for an
+    email; the instance works without an SMTP server, though invitations and password
+    resets need one, which is set from inside under *Admin settings*.
+
+    **Connecting it to your data**
+
+    A database app in the same project environment is reached by its key as the host and its
+    own port - `myapp-db` and `5432` - with the credentials from that app. Nothing has to be
+    exposed publicly for Appsmith to query it.
+
+    **It is not small**
+
+    The container carries a JVM, MongoDB, Redis and nginx. Two gigabytes is the floor for a
+    usable instance and it starts in a couple of minutes, the first time rather longer.
+  categories: [webapps/low-code]
+  tags: [low-code, dashboards, open-source]
+  aliases: [internal-tools, admin-panel, retool, tooljet]
+  icon: icons/appsmith.svg
+  links:
+    website: https://www.appsmith.com
+    documentation: https://docs.appsmith.com
+    source: https://github.com/appsmithorg/appsmith
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      A JVM, MongoDB, Redis and nginx share this. Below two gigabytes the instance starts
+      and then struggles.
+    type: size
+    default: 2GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume `/appsmith-stacks` is kept on: the applications, the datasource
+      credentials, the internal database and the logs. This is the backup.
+    type: volume
+
+versions:
+  - name: "2.4"
+    release: "v2.4.1"
+    default: true
+    image: appsmith/appsmith-ce:v2.4.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /appsmith-stacks: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Appsmith's own endpoint, which answers when the API behind nginx is up - which is
+        # after MongoDB and the JVM have started, and is what takes the time here.
+        command: curl -fsS -o /dev/null http://127.0.0.1/api/v1/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 300s
+        retries: 8
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: appsmith
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The address the outside world uses, once a domain is set on the app. Appsmith
+        # builds the links in its invitation emails from it.
+        - {k: APPSMITH_CUSTOM_DOMAIN, v: "${HIVEPAAS_APP_URL}"}
+        # TLS is terminated by the proxy in front, so the container's own nginx serves plain
+        # HTTP and does not try to get a certificate of its own.
+        - {k: APPSMITH_DISABLE_TLS_REDIRECT, v: "true"}
+        - {k: APPSMITH_DISABLE_INTERCOM, v: "true"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
