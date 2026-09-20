@@ -30,17 +30,13 @@ metadata:
     container load the module itself: that capability is a way out of the container onto the
     host, and loading a module is the host administrator's job.
 
-    **The VPN port has to be published by hand, for now**
+    **Two addresses, and only one of them is a domain**
 
-    Clients reach WireGuard over UDP, and HivePaaS publishes HTTP and TCP addresses but not
-    yet UDP ones. The admin page works the moment this app has a domain; the VPN itself needs
-    the UDP port published on the node, once, with docker:
-
-        docker service update --publish-add \
-          published=51820,target=51820,protocol=udp <project>_<env>_<appkey>
-
-    Use the same number as the **VPN port** parameter, and open it in whatever firewall the
-    node has. Until then the page will hand out client files that cannot connect.
+    The admin page is served like any other app, over the domain below. WireGuard itself is
+    not HTTP and does not go through the reverse proxy: the app publishes its UDP port
+    directly on the node it runs on, which is what the **VPN port** parameter sets. Open that
+    port in whatever firewall the node has, and no other app on this installation can take
+    it - creating a second one on the same port is refused rather than left to fail later.
 
     **Setup happens once, at first start**
 
@@ -154,6 +150,17 @@ app:
         timeout: 10s
         startPeriod: 30s
         retries: 5
+    networks:
+      endpointSpec:
+        ports:
+          # Published on the node rather than through the ingress mesh: the mesh
+          # rewrites the source address of what arrives, and a VPN server wants the
+          # client's own address - it is what a peer's endpoint is, and what roaming
+          # updates when a client changes network.
+          - target: "${{ params.vpnPort }}"
+            published: "${{ params.vpnPort }}"
+            protocol: udp
+            publishMode: host
     resources:
       limits: {memory: "${{ params.memoryLimit }}"}
       capabilities:
