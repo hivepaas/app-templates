@@ -1,0 +1,131 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: etcd
+  title: etcd
+  tagline: The small key-value store distributed systems agree through
+  description: |
+    etcd is a key-value store built for coordination rather than for data: strongly
+    consistent, watchable, and with leases that expire. It is what Kubernetes keeps its
+    state in, what Patroni elects a PostgreSQL leader through, and what a pair of your own
+    processes can use to agree which of them holds a lock.
+
+    It is not a database for an application's records. Keys are small, the whole keyspace is
+    expected to fit in memory, and every write goes through consensus. Reach for PostgreSQL
+    for data and for this when two processes need to agree on something.
+
+    **One node, and what that means**
+
+    This is a single member. It gives you the API, the watches and the leases, and it gives
+    you no fault tolerance: a cluster tolerates failures by having three or five members
+    vote, and one member votes alone. For coordination inside one installation that is
+    usually the right trade; for anything that must survive the node, it is not.
+
+    **There is no password**
+
+    etcd ships with authentication off, and this template leaves it off: the app answers
+    only on the project's private network, which is the same reasoning the other databases
+    here rely on. Anything on that network can read and write every key.
+
+    If that is not enough, etcd's own authentication can be turned on from the app's
+    terminal, and it stays on afterwards:
+
+    ```
+    etcdctl user add root          # it asks for a password
+    etcdctl auth enable
+    ```
+
+    From then on every client needs `--user root:...`, including the health check, which
+    will need changing in the app's container settings.
+
+    **Reading and writing it**
+
+    `etcdctl` is in the image, so the app's terminal is a working client:
+
+    ```
+    etcdctl put greeting hello
+    etcdctl get greeting
+    etcdctl endpoint status --write-out=table
+    ```
+  categories: [databases/nosql]
+  tags: [key-value, open-source]
+  aliases: [key value, coordination, service discovery, locks, raft]
+  icon: icons/etcd.svg
+  links:
+    website: https://etcd.io
+    documentation: https://etcd.io/docs/
+    source: https://github.com/etcd-io/etcd
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      The keyspace is held in memory, so this is a ceiling on how much you can store as
+      well as on what it uses.
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the write-ahead log and the snapshots are kept on.
+    type: volume
+
+versions:
+  - name: "3.6"
+    release: "3.6.14"
+    default: true
+    image: quay.io/coreos/etcd:v3.6.14
+  - name: "3.5"
+    release: "3.5.33"
+    image: quay.io/coreos/etcd:v3.5.33
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /etcd-data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # CMD rather than CMD-SHELL: this image is distroless and has no shell at all, so
+        # anything wrapped in one never runs and the app is killed as unhealthy while it
+        # is in fact serving.
+        mode: CMD
+        command: /usr/local/bin/etcdctl --endpoints=http://127.0.0.1:2379 endpoint health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: etcd
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # etcd reads every flag it has from the environment, so nothing here overrides the
+        # image's command.
+        - {k: ETCD_DATA_DIR, v: /etcd-data}
+        - {k: ETCD_NAME, v: "${HIVEPAAS_HOST}"}
+        - {k: ETCD_LISTEN_CLIENT_URLS, v: "http://0.0.0.0:2379"}
+        # What it tells a client to come back to: its own name on the project network.
+        - {k: ETCD_ADVERTISE_CLIENT_URLS, v: "http://${HIVEPAAS_HOST}:2379"}
+        - {k: ETCD_LISTEN_PEER_URLS, v: "http://0.0.0.0:2380"}
+        - {k: ETCD_INITIAL_ADVERTISE_PEER_URLS, v: "http://${HIVEPAAS_HOST}:2380"}
+        - {k: ETCD_INITIAL_CLUSTER, v: "${HIVEPAAS_HOST}=http://${HIVEPAAS_HOST}:2380"}
+        - {k: ETCD_INITIAL_CLUSTER_STATE, v: new}
+        # Old revisions are compacted hourly and the freed space given back, which is what
+        # keeps a store that is written often from filling its quota and going read-only.
+        - {k: ETCD_AUTO_COMPACTION_MODE, v: periodic}
+        - {k: ETCD_AUTO_COMPACTION_RETENTION, v: "1h"}
+    routing:
+      port: 2379

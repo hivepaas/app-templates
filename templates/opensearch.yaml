@@ -1,0 +1,148 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: opensearch
+  title: OpenSearch
+  tagline: The search and log engine other software expects to find
+  description: |
+    OpenSearch is the Apache-2.0 continuation of Elasticsearch 7, and it speaks the same
+    API. That matters more than its own merits: a great deal of self-hosted software - help
+    desks, log pipelines, forums, anything with a search box over millions of rows - is
+    written against that API and will not start without something answering it. This is
+    that something.
+
+    If you are choosing a search engine for an application *you* are writing, look at
+    [Meilisearch](meilisearch) or [Typesense](typesense) first: they are far smaller and
+    far easier. Choose this when a piece of software tells you it needs Elasticsearch.
+
+    **One node, and no memory locking**
+
+    A single node, which is what one machine can honestly offer. Shards are not replicated,
+    so the index survives a restart and not a lost disk - rebuild it from the source data,
+    which is how a search index should be treated anyway.
+
+    **Connecting to it**
+
+    Security is on, which means two things. It answers **https**, with a certificate it
+    generated for itself, so a client must be told not to verify it - usually
+    `verify_certs=false`, `ssl_verify: false` or `-k`. And it wants the user `admin` with
+    the password below.
+
+    ```
+    curl -k -u admin:<password> https://<this app>:9200/_cluster/health
+    ```
+
+    Turning security off with `DISABLE_SECURITY_PLUGIN=true` gives plain HTTP and no
+    password at all: anything on the project network could then read and write every index.
+    The self-signed certificate is the lesser annoyance.
+
+    **It is a Java server and it wants memory**
+
+    The heap is fixed at half the limit below. Under about 1GB in total it starts and then
+    struggles; the defaults here are the smallest that behave. There is no swap and no
+    memory locking, so a limit set too low is a process killed mid-merge.
+
+    **Files are read, not mapped**
+
+    Elasticsearch and OpenSearch normally memory-map their indices, which needs
+    `vm.max_map_count` raised on the host - something no app here can do for you. This one
+    is configured to read its files instead. It costs some performance on a large index and
+    it removes the single most common reason these never start.
+  categories: [databases/search]
+  tags: [search, full-text, analytics, open-source]
+  aliases: [elasticsearch, elastic, lucene, full text search, log search]
+  icon: icons/opensearch.svg
+  links:
+    website: https://opensearch.org
+    documentation: https://docs.opensearch.org
+    source: https://github.com/opensearch-project/OpenSearch
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: adminPassword
+    title: Admin password
+    description: >-
+      The password for the `admin` user. OpenSearch refuses a weak one; leave empty to
+      generate a strong one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Half of this becomes the Java heap. Below 1GB it will start and then struggle on any
+      real index.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: heapSize
+    title: Java heap
+    description: >-
+      Set to about half the memory limit, and to the same minimum and maximum - which is
+      what the flags below do. The rest is for the file cache and the process itself.
+    type: string
+    default: 1g
+    pattern: '^[0-9]+[mg]$'
+  - name: dataVolume
+    title: Data volume
+    description: The volume the indices are kept on.
+    type: volume
+
+versions:
+  - name: "3.8"
+    release: "3.8.0"
+    default: true
+    image: opensearchproject/opensearch:3.8.0
+  - name: "2.19"
+    release: "2.19.6"
+    image: opensearchproject/opensearch:2.19.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /usr/share/opensearch/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # https with a certificate it signed itself, so -k; and the cluster is asked
+        # whether it is actually serving rather than whether the port is open.
+        command: >-
+          curl -fsk -o /dev/null -u "admin:$OPENSEARCH_INITIAL_ADMIN_PASSWORD"
+          https://127.0.0.1:9200/_cluster/health
+        interval: 30s
+        timeout: 15s
+        startPeriod: 180s
+        retries: 8
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: opensearch
+      version: "${{ version.name }}"
+      database:
+        username: admin
+        password: "${{ params.adminPassword }}"
+    envVars:
+      data:
+        - {k: OPENSEARCH_INITIAL_ADMIN_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        # One node that is its own cluster manager, rather than one waiting for peers.
+        - {k: discovery.type, v: single-node}
+        - {k: OPENSEARCH_JAVA_OPTS, v: "-Xms${{ params.heapSize }} -Xmx${{ params.heapSize }}"}
+        # Locking the heap into RAM needs a privilege a container here does not get, and
+        # asking for it and failing is how these refuse to start.
+        - {k: bootstrap.memory_lock, v: "false"}
+        # Read the index files rather than memory-map them: mapping needs vm.max_map_count
+        # raised on the host, which nothing in an app template can do.
+        - {k: node.store.allow_mmap, v: "false"}
+        - {k: DISABLE_INSTALL_DEMO_CONFIG, v: "false"}
+    routing:
+      port: 9200

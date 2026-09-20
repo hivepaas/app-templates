@@ -1,0 +1,154 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pgbouncer
+  title: PgBouncer
+  tagline: One pool of connections in front of a PostgreSQL that has run out
+  description: |
+    A PostgreSQL connection costs a process and around ten megabytes, and the server stops
+    accepting them at `max_connections` - a hundred, by default. An application that opens
+    one per request, or five applications that each keep a pool, meet that wall long before
+    the database runs out of anything else. PgBouncer stands in front and hands the same
+    few server connections around between many client ones.
+
+    **What it connects to**
+
+    A [PostgreSQL](postgres) app that already exists in this environment - chosen below.
+    Nothing is copied: the host, the database name and the credentials are read from that
+    app, so rotating its password rotates this too.
+
+    **How applications use it**
+
+    Point them at this app instead of at the database: `${<this app>.HIVEPAAS_HOST}` on port
+    5432, with the same user name, password and database name they used before. Nothing else
+    about the connection string changes.
+
+    **Which pooling mode**
+
+    *transaction* is the default here and the one that helps: a server connection is held
+    only for the length of a transaction, so a hundred idle clients share a handful of them.
+    The price is that anything living outside a transaction stops working - `LISTEN`/
+    `NOTIFY`, advisory locks held across statements, `WITH HOLD` cursors, and prepared
+    statements unless the client names them (PgBouncer 1.21 and newer handle those).
+
+    *session* holds a server connection for as long as the client stays connected. Nothing
+    breaks, and nothing is saved unless your clients connect and disconnect often.
+
+    Pick *transaction* for an application with a connection pool, *session* if you are
+    putting this in front of something you do not control.
+
+    **It stores nothing**
+
+    There is no volume: PgBouncer is a process with a configuration and no state. Losing it
+    loses nothing, and there is nothing in it to back up.
+
+    **What it does not fix**
+
+    A pool makes connections cheap; it does not make queries fast. If the database is slow
+    because the queries are slow, this hides the symptom for a while and then meets the same
+    wall from the other side - with clients queued waiting for a server connection instead
+    of refused at the door.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source]
+  aliases: [connection pool, pooler, pgbouncer, max_connections]
+  icon: icons/pgbouncer.svg
+  links:
+    website: https://www.pgbouncer.org
+    documentation: https://www.pgbouncer.org/config.html
+    source: https://github.com/pgbouncer/pgbouncer
+  license: ISC
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: databaseApp
+    title: Database app
+    description: >-
+      The PostgreSQL app in this environment to pool connections to. What is stored is its
+      key - the name it answers to on the project's network.
+    type: app
+    engine: postgres
+  - name: poolMode
+    title: Pooling mode
+    description: >-
+      transaction shares a server connection between transactions and saves the most;
+      session holds one per connected client and breaks nothing.
+    type: select
+    default: transaction
+    options:
+      - {value: transaction, title: Transaction}
+      - {value: session, title: Session}
+  - name: maxClientConn
+    title: Maximum client connections
+    description: How many clients may be connected to the pooler at once.
+    type: int
+    default: 500
+    min: 10
+    max: 100000
+  - name: defaultPoolSize
+    title: Server connections per pool
+    description: >-
+      How many connections to the database one user and database pair may hold. Keep the
+      total across every pooler well under the database's own max_connections.
+    type: int
+    default: 20
+    min: 1
+    max: 1000
+  - name: memoryLimit
+    title: Memory limit
+    description: One small process; it holds connections, not data.
+    type: size
+    default: 128MB
+    min: 32MB
+
+versions:
+  - name: "1.25"
+    release: "1.25.2"
+    default: true
+    image: edoburu/pgbouncer:v1.25.2-p0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # psql is in the image, and the pooler answers on its own admin database. It is
+        # asked for the list of pools, which needs the pooler up but not the database.
+        command: PGPASSWORD="$DB_PASSWORD" psql -h 127.0.0.1 -p 5432 -U "$DB_USER" -d pgbouncer -tAc "SHOW POOLS" >/dev/null
+        interval: 20s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: pgbouncer
+      version: "${{ version.name }}"
+      # No credentials of its own: clients reach the pooler with the database's own user
+      # and password, which is what the pooler then uses to reach the database.
+    envVars:
+      data:
+        # The database this pools for, by its key in this environment.
+        - {k: DB_HOST, v: "${${{ params.databaseApp }}.HIVEPAAS_HOST}"}
+        - {k: DB_PORT, v: "${${{ params.databaseApp }}.HIVEPAAS_PORT}"}
+        - {k: DB_USER, v: "${${{ params.databaseApp }}.HIVEPAAS_USER}"}
+        - {k: DB_PASSWORD, v: "${${{ params.databaseApp }}.HIVEPAAS_PASSWORD}"}
+        - {k: DB_NAME, v: "${${{ params.databaseApp }}.HIVEPAAS_DATABASE_NAME}"}
+        - {k: POOL_MODE, v: "${{ params.poolMode }}"}
+        - {k: MAX_CLIENT_CONN, v: "${{ params.maxClientConn }}"}
+        - {k: DEFAULT_POOL_SIZE, v: "${{ params.defaultPoolSize }}"}
+        - {k: AUTH_TYPE, v: scram-sha-256}
+        # Who may read the pooler's own statistics through the `pgbouncer` database.
+        - {k: ADMIN_USERS, v: "${${{ params.databaseApp }}.HIVEPAAS_USER}"}
+        # Clients send settings the pooler cannot pass on when a server connection is
+        # shared; these are the ones it is safe to swallow rather than refuse.
+        - {k: IGNORE_STARTUP_PARAMETERS, v: "extra_float_digits,options"}
+    routing:
+      port: 5432

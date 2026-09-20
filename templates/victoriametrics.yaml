@@ -1,0 +1,135 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: victoriametrics
+  title: VictoriaMetrics
+  tagline: Prometheus metrics, kept for longer on less disk
+  description: |
+    VictoriaMetrics stores time series and answers PromQL. It is a drop-in destination for
+    anything that speaks Prometheus - `remote_write` from Prometheus itself, an agent
+    scraping your services, Grafana querying it - in one binary, with no cluster and with
+    notably less disk per sample than the thing it replaces.
+
+    The usual reason to run it: [Prometheus](prometheus) is excellent at scraping and
+    alerting but keeps fifteen days of data by default and grows awkwardly beyond that.
+    Point Prometheus's `remote_write` here, set a retention you actually want, and query
+    this from [Grafana](grafana).
+
+    **It also scrapes, if you want it to**
+
+    A single VictoriaMetrics can replace Prometheus outright: give it a scrape
+    configuration through `-promscrape.config` and it collects metrics itself. Most people
+    start by writing into it and decide later.
+
+    **Connecting things to it**
+
+    - **Prometheus**: `remote_write` to `http://<this app>:8428/api/v1/write`
+    - **Grafana**: add a Prometheus data source pointing at `http://<this app>:8428`
+    - **Anything else**: the Prometheus query API lives under `/api/v1/`, and the
+      import endpoints accept Influx line protocol, Graphite and OpenTSDB as well
+
+    **There is no password**
+
+    None at all - VictoriaMetrics is built to sit behind something that authenticates. On
+    the project's private network that is the same position as every other database here.
+    If you route it publicly, put basic authentication on it in the app's routing settings
+    first; a metrics store usually says more about a system than its logs do.
+
+    **A sample you just wrote is not queryable yet**
+
+    Instant queries deliberately look half a minute into the past, so that a query does not
+    return a partial answer while data is still arriving. Write a sample and query for it
+    immediately and you get nothing back, which looks exactly like a write that failed. It
+    is not: `/api/v1/export` shows it straight away, and the query finds it thirty seconds
+    later.
+
+    **Retention is the setting that matters**
+
+    Below, and it is the one to think about before the disk fills. A month of a few thousand
+    series costs very little; a year of a hundred thousand does not. Data older than the
+    retention is deleted, not archived.
+  categories: [databases/time-series]
+  tags: [time-series, metrics, analytics, open-source]
+  aliases: [prometheus, metrics, tsdb, promql, monitoring storage]
+  icon: icons/victoriametrics.svg
+  links:
+    website: https://victoriametrics.com
+    documentation: https://docs.victoriametrics.com
+    source: https://github.com/VictoriaMetrics/VictoriaMetrics
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. It has no password of its own, so add basic
+      authentication in routing settings before giving it one. Leave empty to keep it on
+      the private network.
+    type: domain
+    optional: true
+  - name: retentionPeriod
+    title: Retention
+    description: >-
+      How long a sample is kept, as a number followed by d, w, y or h - 12 means twelve
+      months. Older data is deleted.
+    type: string
+    default: "3"
+    pattern: '^[0-9]+[dwyhm]?$'
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      One Go binary. It uses what it is given for caches, and works within a smaller limit
+      rather than failing.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the samples are kept on. Size it for the retention above.
+    type: volume
+
+versions:
+  - name: "1.152"
+    release: "1.152.0"
+    default: true
+    image: victoriametrics/victoria-metrics:v1.152.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Flags to the binary the image runs. The default data path is not on the volume,
+      # which is why it is named here.
+      command: >-
+        -storageDataPath=/storage
+        -retentionPeriod=${{ params.retentionPeriod }}
+        -httpListenAddr=:8428
+    storage:
+      mounts:
+        /storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # wget is what this image carries; /health answers once it is serving.
+        command: wget -q -O /dev/null http://127.0.0.1:8428/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: victoriametrics
+      version: "${{ version.name }}"
+    routing:
+      port: 8428
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

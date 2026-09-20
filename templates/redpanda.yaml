@@ -1,0 +1,130 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: redpanda
+  title: Redpanda
+  tagline: The Kafka API, in one process with no ZooKeeper
+  description: |
+    Redpanda speaks the Kafka protocol, so anything written for Kafka connects to it
+    unchanged - the same client libraries, the same consumer groups, the same offsets. What
+    it does not bring is the rest of a Kafka installation: there is no ZooKeeper, no JVM
+    and no cluster to plan. One binary, one process.
+
+    Reach for it when a piece of software says it needs Kafka, or when what you want is a
+    durable log that consumers read at their own pace and can rewind. For pushing messages
+    between your own services with no replay, [NATS](nats) is smaller and simpler, and
+    [RabbitMQ](rabbitmq) is the one with queues and routing.
+
+    **One node, and what that costs**
+
+    A single broker with one replica of everything. Topics work, consumer groups work,
+    offsets are durable across restarts - and there is nothing to fail over to. Replication
+    factor stays 1 whatever a client asks for.
+
+    **What it answers on**
+
+    - **9092**, the Kafka API, which is what your applications use
+    - **8081**, the schema registry
+    - **8082**, the HTTP proxy, for producing and consuming over plain HTTP
+    - **9644**, the admin API and Prometheus metrics
+
+    Only 9092 is routed. The others are reachable from the project's private network by the
+    app's own name, which is where the things that use them live anyway.
+
+    **There is no password**
+
+    No authentication, like the rest of the databases here: what protects it is the private
+    network. Do not route it publicly.
+
+    **Working with it from the terminal**
+
+    `rpk` is in the image and needs no arguments to find its own broker:
+
+    ```
+    rpk cluster info
+    rpk topic create orders
+    rpk topic produce orders
+    rpk topic consume orders --num 10
+    ```
+
+    **The flags it is started with**
+
+    One CPU, and the memory reservation and startup checks that a container cannot satisfy
+    turned off. Redpanda is built to own a whole machine and to fail loudly when it does
+    not; these say that one core and a memory limit are what it has.
+  categories: [databases/messaging]
+  tags: [messaging, open-source]
+  aliases: [kafka, event streaming, broker, queue, log]
+  icon: icons/redpanda.svg
+  links:
+    website: https://www.redpanda.com
+    documentation: https://docs.redpanda.com
+    source: https://github.com/redpanda-data/redpanda
+  license: BSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      What the broker gets. Redpanda keeps recent segments in memory, so more of this is
+      more throughput rather than more capacity.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the log segments are kept on. This is where the messages live.
+    type: volume
+
+versions:
+  - name: "26.2"
+    release: "26.2.3"
+    default: true
+    image: redpandadata/redpanda:v26.2.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point builds the listener flags itself from INTERNAL and
+      # EXTERNAL below; everything here is appended to what it assembles.
+      #
+      # --overprovisioned and --check=false are what let it run beside other things:
+      # Redpanda otherwise expects a machine of its own and refuses to start without one.
+      command: redpanda start --smp 1 --overprovisioned --check=false --node-id 0
+    storage:
+      mounts:
+        /var/lib/redpanda/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # rpk talks to the broker over the Kafka API, so this fails while the broker is
+        # merely running but not yet serving.
+        command: rpk cluster info >/dev/null
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: redpanda
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # The entry point assembles every listener from these. Both are this app's own
+        # name, so what a client is told to come back to is a name the project network
+        # resolves - not the container address, which changes with every deployment.
+        - {k: ENABLE_DEFAULT_LISTENERS, v: "true"}
+        - {k: INTERNAL, v: "${HIVEPAAS_HOST}"}
+        - {k: EXTERNAL, v: "${HIVEPAAS_HOST}"}
+        - {k: NODE_ID, v: "0"}
+    routing:
+      port: 9092
