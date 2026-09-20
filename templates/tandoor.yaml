@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: tandoor
+  title: Tandoor Recipes
+  tagline: The recipes you actually cook, in one place
+  description: |
+    Tandoor is a recipe manager that takes cooking seriously: import a recipe from almost
+    any website and it arrives parsed into ingredients and steps rather than as a wall of
+    text; scale it to six people and the quantities follow; plan a week of meals and get
+    the shopping list out of it. Several people can share one collection, with their own
+    accounts and their own books.
+
+    **This template creates two apps**
+
+    - **Tandoor** itself, with a volume for the recipe photos and imported files
+    - **a PostgreSQL database**, named with `-db`, holding the recipes
+
+    The database is the recipes; the volume is the pictures of them. Back up both.
+
+    **After it starts**
+
+    It opens on a setup page that makes the first account, and that one becomes the
+    administrator. Do that before the address is known to anyone else: until it is made,
+    the account is there for the taking. Afterwards, whether other people can sign
+    themselves up is a setting - off by default, with invite links as the alternative.
+
+    **Importing from the web**
+
+    Paste a URL into *Import* and Tandoor reads the structured recipe data most cooking
+    sites publish. Sites that publish none need the text pasted in, where the ingredient
+    parser still does most of the work.
+
+    **Sending email**
+
+    Password resets and invitations need an SMTP server, which is not configured here. Add
+    `EMAIL_HOST` and the rest as environment variables when you want them delivered - until
+    then, make accounts from the admin panel rather than by invitation.
+
+    **Keep the secret key**
+
+    It signs the sessions and is generated once. Changing it signs everybody out; losing it
+    with the backup means the same.
+  categories: [webapps/knowledge]
+  tags: [documents, collaboration, open-source]
+  aliases: [recipes, cooking, meal planning, food, shopping list]
+  icon: icons/tandoor.svg
+  links:
+    website: https://tandoor.dev
+    documentation: https://docs.tandoor.dev
+    source: https://github.com/TandoorRecipes/recipes
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: secretKey
+    title: Secret key
+    description: What signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: A Django application behind nginx; the database has a limit of its own.
+    type: size
+    default: 768MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume recipe photos and imported files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: tandoor
+      username: tandoor
+
+versions:
+  - name: "2.6"
+    release: "2.6.15"
+    default: true
+    image: vabene1111/recipes:2.6.15
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # noCopy: the image ships this directory, and docker would copy it into the empty
+        # volume with its own ownership.
+        /opt/recipes/mediafiles:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {noCopy: true}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Neither curl nor wget is in this image. The python the application runs on is,
+        # and nginx in front of gunicorn is what answers on port 80.
+        command: >-
+          /opt/recipes/venv/bin/python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1/')"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: tandoor
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SECRET_KEY, v: "${secrets.TANDOOR_SECRET_KEY}"}
+        # The database this template creates. Tandoor waits for it with pg_isready of its
+        # own and migrates before serving, so there is no retry loop to write here.
+        - {k: DB_ENGINE, v: django.db.backends.postgresql}
+        - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: POSTGRES_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Behind the reverse proxy the request arrives over plain HTTP from an address
+        # Django would otherwise refuse to trust.
+        - {k: ALLOWED_HOSTS, v: "*"}
+        - {k: TZ, v: UTC}
+    secrets:
+      TANDOOR_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

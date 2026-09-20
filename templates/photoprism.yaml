@@ -1,0 +1,172 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: photoprism
+  title: PhotoPrism
+  tagline: Your photo library, indexed and searchable
+  description: |
+    PhotoPrism takes a folder of photos and makes it findable: faces grouped into people,
+    places on a map, colours and subjects recognised without sending anything anywhere, and
+    a search box that understands "dog on a beach last summer". It reads your files where
+    they are and never moves them.
+
+    **This template creates two apps**
+
+    - **PhotoPrism** itself, with a volume holding your originals and its own cache
+    - **a MariaDB database**, named with `-db`, holding the index
+
+    The database is an index, not the pictures: lose it and it can be rebuilt from the
+    originals, slowly. Lose the originals and nothing brings them back.
+
+    **Where the files go**
+
+    Two directories on the volume. `originals` is your library - what you upload, and what
+    you can also fill from outside by copying files into it. `storage` is what PhotoPrism
+    makes of it: thumbnails, sidecar files and the search index cache.
+
+    **After it starts**
+
+    Sign in with the account below, then press *Library → Index* to read what is already
+    there. The first pass on a large library takes hours, and faces and places arrive as it
+    goes. Uploads through the web interface work from the start.
+
+    **Compared with [Immich](immich)**
+
+    Immich is the one to choose if you want phone backup: it has the mobile apps and this
+    does not. PhotoPrism is for a library you already have on disk - it is lighter, it reads
+    a folder in place, and its search is the better of the two.
+
+    **Set the domain before you share links**
+
+    PhotoPrism writes its own address into shared album links, so set the domain first if
+    you intend to share anything. Until it has one, links point at the app's own name on the
+    private network.
+
+    **Plan the storage**
+
+    Originals are kept as they arrived, and thumbnails add roughly a third on top. Put the
+    volume somewhere it can grow, and keep a copy of the originals elsewhere - a photo
+    library is not a backup of itself.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [photos, gallery, pictures, google-photos, image search]
+  icon: icons/photoprism.svg
+  links:
+    website: https://www.photoprism.app
+    documentation: https://docs.photoprism.app
+    source: https://github.com/photoprism/photoprism
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Between 8 and 72 characters. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    maxLength: 72
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Indexing reads every file and recognises what is in it, which is where the memory
+      goes. Below 2GB the first pass on a large library will be killed part way through.
+    type: size
+    default: 3GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume your originals and the thumbnails are kept on. Plan for the size of the
+      library plus about a third.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: photoprism
+      username: photoprism
+
+versions:
+  # The published tags are dates rather than releases, which cannot be checked for a
+  # version, so the image is pinned by digest: this is the 2026-09-19 build.
+  - name: "260919"
+    release: "260919"
+    default: true
+    image: photoprism/photoprism:260919@sha256:cea1af8ce28bd4c4da1ed40d57c86cbe9e58199bea1a6467eaaea10b1b32a925
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # Your library, and what PhotoPrism makes of it. Two directories on one volume so
+        # the pictures and their thumbnails are backed up and moved together.
+        /photoprism/originals:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: originals}
+        /photoprism/storage:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: storage}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:2342/api/v1/status
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: photoprism
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read on the first start, when there is nobody, and ignored afterwards.
+        - {k: PHOTOPRISM_ADMIN_USER, v: "${{ params.adminUsername }}"}
+        - {k: PHOTOPRISM_ADMIN_PASSWORD, v: "${secrets.PHOTOPRISM_ADMIN_PASSWORD}"}
+        - {k: PHOTOPRISM_AUTH_MODE, v: password}
+        # The database this template creates.
+        - {k: PHOTOPRISM_DATABASE_DRIVER, v: mysql}
+        - {k: PHOTOPRISM_DATABASE_SERVER, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: PHOTOPRISM_DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: PHOTOPRISM_DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PHOTOPRISM_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # What it writes into shared links, once the app has a domain.
+        - {k: PHOTOPRISM_SITE_URL, v: "${HIVEPAAS_APP_URL}"}
+        # The reverse proxy terminates TLS; inside, the request arrives over plain HTTP.
+        - {k: PHOTOPRISM_DISABLE_TLS, v: "true"}
+    secrets:
+      PHOTOPRISM_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 2342
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,166 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: espocrm
+  title: EspoCRM
+  tagline: Who your customers are and what was said to them
+  description: |
+    EspoCRM keeps the things a spreadsheet of contacts turns into once there are two of you:
+    accounts, contacts and leads; opportunities moving through a pipeline; calls, meetings
+    and emails logged against the right record; a calendar; and reports over the lot. The
+    entities and fields are yours to change from the admin panel - it is a CRM you shape
+    rather than one you adopt.
+
+    **This template creates two apps**
+
+    - **EspoCRM** itself, with a volume for its configuration, uploads and attachments
+    - **a MariaDB database**, named with `-db`, holding every record
+
+    Both belong in the backup: the database holds the data, and the volume holds the files
+    people attached to it.
+
+    **What does not run: the background daemon**
+
+    EspoCRM normally runs a second process beside the web application, and it is the one
+    that fetches email into the CRM, sends scheduled and mass email, fires reminders, and
+    runs workflows. This template does not start it, because the app format has no way yet
+    to declare a second process sharing this app's files.
+
+    Everything you do in the browser works: records, pipeline, calendar, imports, reports.
+    What waits is anything that was supposed to happen on its own. If you need it, the
+    command is `php /var/www/html/cron.php` and it wants to run every minute - from the
+    app's terminal for a one-off, or from a scheduled job elsewhere.
+
+    **After it starts**
+
+    Sign in with the account below. It is the administrator, and more users are made from
+    *Administration → Users*. The first thing worth doing is *Administration → Settings* to
+    set the site URL and the outbound SMTP server, because EspoCRM sends invitations and
+    notifications by email and has no mail server of its own.
+
+    **Set the domain first if you can**
+
+    Links in notifications are built from the address this app answers at.
+  categories: [webapps/business]
+  tags: [business-intelligence, collaboration, open-source]
+  aliases: [crm, sales, contacts, leads, pipeline]
+  icon: icons/espocrm.svg
+  links:
+    website: https://www.espocrm.com
+    documentation: https://docs.espocrm.com
+    source: https://github.com/espocrm/espocrm
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[a-zA-Z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: A PHP application behind Apache; the database has a limit of its own.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration, uploads and attachments are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: espocrm
+      username: espocrm
+
+versions:
+  - name: "10.0"
+    release: "10.0.8"
+    default: true
+    image: espocrm/espocrm:10.0.8-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The three directories EspoCRM 10 asks to have mounted, and no more. Mounting
+        # /var/www/html itself is what its own start-up calls a legacy installation: it
+        # then skips the installer, leaves the database empty, and says no upgrade will
+        # ever be offered.
+        #
+        # data holds the configuration and everything uploaded; the two custom directories
+        # hold the entities and layouts an administrator adds.
+        /var/www/html/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /var/www/html/custom:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: custom}
+        /var/www/html/client/custom:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: client-custom}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:80/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 180s
+        retries: 8
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: espocrm
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read by the installer on the first start, and ignored afterwards.
+        - {k: ESPOCRM_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: ESPOCRM_ADMIN_PASSWORD, v: "${secrets.ESPOCRM_ADMIN_PASSWORD}"}
+        # The database this template creates.
+        - {k: ESPOCRM_DATABASE_PLATFORM, v: Mysql}
+        - {k: ESPOCRM_DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: ESPOCRM_DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: ESPOCRM_DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: ESPOCRM_DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: ESPOCRM_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # What it writes into the links it sends, once the app has a domain.
+        - {k: ESPOCRM_SITE_URL, v: "${HIVEPAAS_APP_URL}"}
+    secrets:
+      ESPOCRM_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
