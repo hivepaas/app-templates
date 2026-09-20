@@ -147,13 +147,12 @@ metadata:
 
 parameters:
   - name: primaryApp
-    title: Primary app key
+    title: Primary app
     description: >-
-      The key of the MySQL app in this environment to follow. Not its title: the key is what
-      the app answers to on the project's network, and it is shown on that app's page.
-    type: string
-    default: mysql
-    pattern: '^[a-z0-9][a-z0-9_]{0,99}$'
+      The MySQL app in this environment to follow. What is stored is its key - the name it
+      answers to on the project's network - so an app named by hand is written that way too.
+    type: app
+    engine: mysql
   - name: serverId
     title: Server id
     description: >-
