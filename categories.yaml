@@ -26,6 +26,7 @@ categories:
       - {id: communication, title: Chat & Notifications}
       - {id: business, title: Business Intelligence}
       - {id: documents, title: Files & Documents}
+      - {id: networking, title: Networking & VPN}
   - id: observability
     title: Observability
     children:

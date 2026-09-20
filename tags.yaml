@@ -51,3 +51,5 @@ tags:
   - {id: collaboration, title: Collaboration}
   - {id: team-chat, title: Team Chat}
   - {id: files, title: File Sync}
+  - {id: vpn, title: VPN}
+  - {id: networking, title: Networking}

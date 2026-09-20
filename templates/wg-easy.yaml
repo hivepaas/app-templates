@@ -1,0 +1,199 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wg-easy
+  title: wg-easy
+  tagline: A WireGuard server with a web page for handing out client configs
+  description: |
+    wg-easy runs a WireGuard server and puts a web page in front of it: add a client, and it
+    shows the configuration file and a QR code for it. WireGuard itself is in the Linux
+    kernel, so what runs here is the key management, the firewall rules and the page.
+
+    **This app is given a capability, and that is the point**
+
+    A container is not normally allowed to create a network interface. WireGuard is a network
+    interface, so this app is given `NET_ADMIN` - without it the first thing it does fails
+    with "Operation not permitted" and nothing works. It also sets two kernel switches of its
+    own network namespace: `net.ipv4.ip_forward`, so that traffic from a client can be routed
+    on, and `net.ipv4.conf.all.src_valid_mark`, which `wg-quick` needs for its routing rule.
+
+    Creating this app therefore needs Write permission on the Cluster module. NET_ADMIN is a
+    real privilege: it lets whatever runs in this container reconfigure its own networking,
+    including the firewall rules that separate it from the rest of the project. Deploy it
+    because you want a VPN, on a project where that is an acceptable thing to run.
+
+    **The host needs the WireGuard kernel module**
+
+    Any Linux from 5.6 has it, and `modprobe wireguard` loads it if it is not loaded. This
+    template deliberately does not ask for `SYS_MODULE`, the capability that would let the
+    container load the module itself: that capability is a way out of the container onto the
+    host, and loading a module is the host administrator's job.
+
+    **The VPN port has to be published by hand, for now**
+
+    Clients reach WireGuard over UDP, and HivePaaS publishes HTTP and TCP addresses but not
+    yet UDP ones. The admin page works the moment this app has a domain; the VPN itself needs
+    the UDP port published on the node, once, with docker:
+
+        docker service update --publish-add \
+          published=51820,target=51820,protocol=udp <project>_<env>_<appkey>
+
+    Use the same number as the **VPN port** parameter, and open it in whatever firewall the
+    node has. Until then the page will hand out client files that cannot connect.
+
+    **Setup happens once, at first start**
+
+    The username, password, address and DNS below are used to set the server up the first
+    time it runs, and are ignored afterwards - everything later is changed on the page
+    itself. The password is generated if you leave it empty; read it in this app's settings.
+
+    **The address clients dial**
+
+    The **VPN host** parameter goes into every client configuration file as the address to
+    connect to, so it has to be an address that reaches this node from outside: a public IP,
+    or a DNS name pointing at one. It defaults to this app's own domain, which is right when
+    that domain points at the node the app runs on.
+  categories: [webapps/networking]
+  tags: [vpn, networking, open-source]
+  aliases: [wireguard, wg, vpn, wgeasy]
+  icon: icons/wg-easy.svg
+  links:
+    website: https://wg-easy.github.io/wg-easy/latest/
+    documentation: https://wg-easy.github.io/wg-easy/latest/advanced/config/
+    source: https://github.com/wg-easy/wg-easy
+  license: AGPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the admin page answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: vpnHost
+    title: VPN host
+    description: >-
+      The address clients dial - a public IP, or a DNS name pointing at this node. It is
+      written into every client configuration file. The default is this app's own domain.
+    type: string
+    default: "${HIVEPAAS_DOMAIN}"
+  - name: vpnPort
+    title: VPN port
+    description: The UDP port WireGuard listens on, and the one to publish on the node.
+    type: int
+    default: 51820
+    min: 1024
+    max: 65535
+  - name: adminUser
+    title: Admin username
+    type: string
+    default: admin
+  - name: adminPassword
+    title: Admin password
+    description: Leave it empty and one is generated. It is set at first start only.
+    type: secret
+    generate: {length: 24}
+  - name: clientDns
+    title: Client DNS server
+    description: The resolver clients use while connected.
+    type: string
+    default: "1.1.1.1"
+  - name: clientAllowedIps
+    title: Client allowed IPs
+    description: >-
+      What a client sends through the tunnel. 0.0.0.0/0 is everything; a narrower range
+      makes this a way into one network rather than a full VPN.
+    type: string
+    default: "0.0.0.0/0"
+  - name: insecureHttp
+    title: Allow signing in over plain HTTP
+    description: >-
+      Off is right when the app has a domain: HivePaaS terminates TLS and the session cookie
+      is marked secure. Turn it on only to reach the page directly over http, without a
+      domain.
+    type: bool
+    default: false
+  - name: dataVolume
+    title: Data volume
+    description: Keys, clients and the server's own configuration.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: A Node process and the kernel doing the actual work.
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "15"
+    release: "15.4.0"
+    default: true
+    image: ghcr.io/wg-easy/wg-easy:15.4.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /etc/wireguard: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check asks WireGuard whether an interface exists, which is only
+        # true after setup; this asks the page whether it is serving, which is true as soon
+        # as the app is up. wget is in the image, curl is not.
+        command: wget -q -O /dev/null http://127.0.0.1:51821/
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+      capabilities:
+        # Creating the wg0 interface is a network-administration operation: without this
+        # `wg-quick up wg0` answers "Operation not permitted" and the app is useless.
+        capabilityAdd: [NET_ADMIN]
+        sysctls:
+          # Route what arrives from a client onward, rather than dropping it.
+          net.ipv4.ip_forward: "1"
+          # wg-quick marks its own packets and needs this to keep the reverse-path check
+          # from discarding them.
+          net.ipv4.conf.all.src_valid_mark: "1"
+  settings:
+    kind:
+      category: webapp
+      engine: wg-easy
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PORT, v: "51821"}
+        - {k: HOST, v: "0.0.0.0"}
+        - {k: INSECURE, v: "${{ params.insecureHttp }}"}
+        - {k: DISABLE_IPV6, v: "true"}
+        # INIT_* is read once, on a first start with an empty data volume: it creates the
+        # admin account and the server's configuration so that nobody has to walk through
+        # the setup wizard. Later changes are made on the page.
+        - {k: INIT_ENABLED, v: "true"}
+        - {k: INIT_USERNAME, v: "${{ params.adminUser }}"}
+        - {k: INIT_PASSWORD, v: "${secrets.WG_ADMIN_PASSWORD}"}
+        - {k: INIT_HOST, v: "${{ params.vpnHost }}"}
+        - {k: INIT_PORT, v: "${{ params.vpnPort }}"}
+        - {k: INIT_DNS, v: "${{ params.clientDns }}"}
+        - {k: INIT_ALLOWED_IPS, v: "${{ params.clientAllowedIps }}"}
+        - {k: INIT_IPV4_CIDR, v: "10.8.0.0/24"}
+    secrets:
+      WG_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 51821
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
