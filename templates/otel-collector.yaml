@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: otel-collector
+  title: OpenTelemetry Collector
+  tagline: One place your apps send telemetry to, and one place that decides where it goes
+  description: |
+    Applications send traces, metrics and logs here; the collector processes them and
+    forwards them to wherever you keep each kind. That indirection is the whole value: an
+    application is configured once, with this app's address, and changing where the data
+    ends up - or adding a second destination, or dropping what you do not want to store -
+    is a change to this app's configuration file rather than to every service you run.
+
+    **What applications point at**
+
+    `otel-collector:4317` for OTLP over gRPC, `otel-collector:4318` for OTLP over HTTP, from
+    anywhere in the same project. Give the app a domain as well and browsers and mobile apps
+    can send over HTTPS to `/v1/traces` and `/v1/metrics`.
+
+    **Where it sends**
+
+    The configuration this template installs receives OTLP, batches it, and writes a summary
+    of what arrived into the log - which is the safe default, because nothing is assumed
+    about what else you run. The commented exporters beside it are the three that fit the
+    other templates here: traces to Tempo, metrics to Prometheus or VictoriaMetrics, logs to
+    Loki. Uncomment what applies, put it in the matching pipeline, redeploy.
+
+    **There is no health check on this app**
+
+    The image is distroless - the collector binary and nothing else, no shell and no HTTP
+    client - so there is nothing here to run one with. HivePaaS reports it as running rather
+    than as healthy. Its log says what it loaded and what it is receiving; the debug exporter
+    below makes the arriving data visible while you are setting this up.
+
+    **Which distribution this is**
+
+    The *contrib* build, which carries every receiver, processor and exporter the project
+    publishes, so a configuration change rarely means changing the image.
+  categories: [observability/monitoring]
+  tags: [monitoring, metrics, open-source]
+  aliases: [otel, opentelemetry, otlp, telemetry, collector]
+  icon: icons/otel-collector.svg
+  links:
+    website: https://opentelemetry.io/docs/collector/
+    documentation: https://opentelemetry.io/docs/collector/configuration/
+    source: https://github.com/open-telemetry/opentelemetry-collector-contrib
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      An address for OTLP over HTTP, for senders outside this project. Leave it empty if
+      only apps here send to it.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Batching is what holds memory. The configuration caps the collector's own usage at
+      three quarters of this, and pushes back on senders beyond it.
+    type: size
+    default: 512MB
+    min: 256MB
+
+versions:
+  - name: "0.137"
+    release: "0.137.0"
+    default: true
+    image: otel/opentelemetry-collector-contrib:0.137.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        # One static binary, no shell, no HTTP client: nothing here can run a check.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: otel-collector
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      config.yaml:
+        content: |
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                http:
+                  endpoint: 0.0.0.0:4318
+
+          processors:
+            # Send in batches rather than one request per span: fewer, larger writes.
+            batch:
+              timeout: 5s
+              send_batch_size: 1024
+            # Refuse new data instead of being killed when memory runs short. The
+            # percentages are of the container's limit.
+            memory_limiter:
+              check_interval: 5s
+              limit_percentage: 75
+              spike_limit_percentage: 15
+
+          exporters:
+            # What arrives, summarised in the log. Replace it with the ones below.
+            debug:
+              verbosity: normal
+
+            # otlp/tempo:
+            #   endpoint: tempo:4317
+            #   tls:
+            #     insecure: true
+
+            # prometheusremotewrite:
+            #   endpoint: http://victoriametrics:8428/api/v1/write
+            #   tls:
+            #     insecure: true
+
+            # otlphttp/loki:
+            #   endpoint: http://loki:3100/otlp
+
+          service:
+            pipelines:
+              traces:
+                receivers: [otlp]
+                processors: [memory_limiter, batch]
+                exporters: [debug]
+              metrics:
+                receivers: [otlp]
+                processors: [memory_limiter, batch]
+                exporters: [debug]
+              logs:
+                receivers: [otlp]
+                processors: [memory_limiter, batch]
+                exporters: [debug]
+            telemetry:
+              logs:
+                level: info
+        swarmRef:
+          file: {name: /etc/otelcol-contrib/config.yaml, mode: 444}
+    routing:
+      port: 4318
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -493,6 +493,45 @@
       }
     },
     {
+      "name": "alertmanager",
+      "file": {
+        "path": "templates/alertmanager.yaml",
+        "sha256": "f09300a8f4f79273ddde40a31ca56ad3ef4c932f7ff9f22aae25372c1e5cea64"
+      },
+      "icon": {
+        "path": "icons/alertmanager.svg",
+        "sha256": "aa4295ff070d93c6d78ab3cedde2f6ecb251407de28b70e9cdf63a93e6769581"
+      },
+      "title": "Alertmanager",
+      "tagline": "Takes alerts from Prometheus and decides who hears about them",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "metrics",
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "alerts",
+        "prometheus",
+        "paging",
+        "oncall"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.28",
+          "release": "0.28.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "anythingllm",
       "file": {
         "path": "templates/anythingllm.yaml",
@@ -4345,6 +4384,45 @@
       }
     },
     {
+      "name": "otel-collector",
+      "file": {
+        "path": "templates/otel-collector.yaml",
+        "sha256": "e6a9e8f392e15fcad012ca4d2657d8535c6aa667cc998b02e5bec48e7ec222ce"
+      },
+      "icon": {
+        "path": "icons/otel-collector.svg",
+        "sha256": "8d250db1ddaba2e3e20d88ec96a06ccc79593f2563fcdad5ffc49f04b6416ddb"
+      },
+      "title": "OpenTelemetry Collector",
+      "tagline": "One place your apps send telemetry to, and one place that decides where it goes",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "metrics",
+        "open-source"
+      ],
+      "aliases": [
+        "otel",
+        "opentelemetry",
+        "otlp",
+        "telemetry",
+        "collector"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.137",
+          "release": "0.137.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "paperless-ngx",
       "file": {
         "path": "templates/paperless-ngx.yaml",
@@ -5670,6 +5748,45 @@
         {
           "name": "13",
           "release": "13.6.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "tempo",
+      "file": {
+        "path": "templates/tempo.yaml",
+        "sha256": "1008392ca3aac5bfbb686487f1fe261317a972a995f2a5462509c2dd9cef7754"
+      },
+      "icon": {
+        "path": "icons/tempo.svg",
+        "sha256": "5ef37e93cda4c4091e7e0eac0cf06a421049ba8037bd740de444d5be0308e241"
+      },
+      "title": "Grafana Tempo",
+      "tagline": "Stores traces cheaply, and finds them by id",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "metrics",
+        "open-source"
+      ],
+      "aliases": [
+        "tracing",
+        "traces",
+        "opentelemetry",
+        "jaeger-alternative",
+        "apm"
+      ],
+      "license": "AGPL-3.0",
+      "versions": [
+        {
+          "name": "2.8",
+          "release": "2.8.1",
           "default": true
         }
       ],

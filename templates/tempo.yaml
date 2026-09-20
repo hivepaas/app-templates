@@ -1,0 +1,166 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: tempo
+  title: Grafana Tempo
+  tagline: Stores traces cheaply, and finds them by id
+  description: |
+    Tempo keeps distributed traces: every span an application emits, written to disk and
+    read back by trace id from Grafana. It has no index and no database - that is the point.
+    Storing a trace costs what the bytes cost, so keeping all of them is affordable, and
+    finding one means having its id, which is what a log line or an exception gives you.
+
+    **Where traces come from**
+
+    Applications send them over OTLP, to this app's key and port - `tempo:4317` for gRPC,
+    `tempo:4318` for HTTP - from anywhere in the same project. Point an OpenTelemetry SDK
+    or an OpenTelemetry Collector at that and nothing has to be exposed publicly.
+
+    **Reading them**
+
+    Add Tempo as a data source in the Grafana app here, URL `http://tempo:3200`. Grafana's
+    Explore then takes a trace id and shows the whole span tree. If your logs carry the
+    trace id, Grafana links from a log line straight to the trace.
+
+    **What this template sets up**
+
+    Single-binary Tempo with local storage on the app's volume, both OTLP receivers on, and
+    a retention of 14 days. It is the shape that suits one machine; the same Tempo scales
+    out to S3 and separate components, which is a different template.
+
+    **Metrics from spans**
+
+    Tempo can generate request-rate and latency metrics from the spans it receives and write
+    them to a Prometheus. That is off here because it needs somewhere to send them - turn on
+    `metrics_generator` in the configuration file and point `remote_write` at the Prometheus
+    or VictoriaMetrics app in this project.
+  categories: [observability/monitoring]
+  tags: [monitoring, metrics, open-source]
+  aliases: [tracing, traces, opentelemetry, jaeger-alternative, apm]
+  icon: icons/tempo.svg
+  links:
+    website: https://grafana.com/oss/tempo/
+    documentation: https://grafana.com/docs/tempo/latest/configuration/
+    source: https://github.com/grafana/tempo
+  license: AGPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      An address for Tempo's API. It is usually not needed: Grafana reaches it inside the
+      project, by key.
+    type: domain
+    optional: true
+  - name: retention
+    title: Trace retention
+    description: How long a trace is kept. Written as a duration - 336h is fourteen days.
+    type: string
+    default: "336h"
+  - name: dataVolume
+    title: Data volume
+    description: The trace blocks themselves, and the write-ahead log in front of them.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Ingesting spans is what uses memory; reading a trace by id barely touches it.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "2.8"
+    release: "2.8.1"
+    default: true
+    image: grafana/tempo:2.8.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the binary; this is the flag it needs.
+      command: -config.file=/etc/tempo/tempo.yaml
+    storage:
+      mounts:
+        /var/tempo: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image keeps busybox at /busybox rather than /bin, so there is no
+        # /bin/sh for CMD-SHELL to use and the check is exec'd directly. Tempo's own
+        # readiness answers only once its ingester has joined the ring, which takes a
+        # couple of minutes on a first start - hence the long start period.
+        mode: CMD
+        command: /busybox/wget -q -O /dev/null http://127.0.0.1:3200/ready
+        interval: 30s
+        timeout: 10s
+        startPeriod: 240s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: tempo
+      version: "${{ version.name }}"
+      database: {}
+    configFiles:
+      tempo.yaml:
+        content: |
+          server:
+            http_listen_port: 3200
+            grpc_listen_port: 9095
+
+          distributor:
+            receivers:
+              otlp:
+                protocols:
+                  # What applications and collectors in this project send to.
+                  grpc:
+                    endpoint: 0.0.0.0:4317
+                  http:
+                    endpoint: 0.0.0.0:4318
+
+          ingester:
+            # A block is cut when it is old enough or big enough; both are small here
+            # so that a trace is searchable soon after it arrives.
+            max_block_duration: 5m
+
+          compactor:
+            compaction:
+              block_retention: ${{ params.retention }}
+
+          storage:
+            trace:
+              backend: local
+              local:
+                path: /var/tempo/blocks
+              wal:
+                path: /var/tempo/wal
+
+          # Tempo can turn spans into request-rate and latency metrics. It needs
+          # somewhere to write them, so it is off:
+          # metrics_generator:
+          #   storage:
+          #     path: /var/tempo/generator/wal
+          #     remote_write:
+          #       - url: http://prometheus:9090/api/v1/write
+          # overrides:
+          #   defaults:
+          #     metrics_generator:
+          #       processors: [service-graphs, span-metrics]
+
+          usage_report:
+            reporting_enabled: false
+        swarmRef:
+          file: {name: /etc/tempo/tempo.yaml, mode: 444}
+    routing:
+      port: 3200
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

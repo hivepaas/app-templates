@@ -1,0 +1,149 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: alertmanager
+  title: Alertmanager
+  tagline: Takes alerts from Prometheus and decides who hears about them
+  description: |
+    Prometheus decides when something is wrong; Alertmanager decides what happens next. It
+    groups alerts that belong together, silences the ones you are already dealing with,
+    holds back the noise while a bigger outage is in progress, and sends what is left to
+    email, Slack, Telegram, PagerDuty, ntfy, a webhook - whatever you configure.
+
+    **Its configuration is this app's config file**
+
+    The template installs a working `alertmanager.yml` that groups alerts and sends them
+    nowhere. Edit it in this app's configuration files to add a receiver, redeploy, and it
+    is live. The commented examples show the two shapes people need first: a webhook to
+    something in this project, and email.
+
+    **Pointing Prometheus at it**
+
+    In the Prometheus app here, under `alerting`, the target is this app's key and port:
+
+        alerting:
+          alertmanagers:
+            - static_configs:
+                - targets: ["alertmanager:9093"]
+
+    Nothing has to be exposed publicly for that; it is one app in a project talking to
+    another.
+
+    **Links in notifications**
+
+    An alert that arrives in Slack carries a link back to this app, built from the address
+    it was started with - which is its own container by default. Add
+    `--web.external-url=https://<your domain>` to the app's command once it has a domain,
+    and the links will point somewhere people can open.
+
+    **What the volume holds**
+
+    Silences and the log of what has already been sent. Losing it means silences are gone
+    and a notification may be repeated, not that alerts are lost.
+  categories: [observability/monitoring]
+  tags: [monitoring, metrics, notifications, open-source]
+  aliases: [alerts, prometheus, paging, oncall]
+  icon: icons/alertmanager.svg
+  links:
+    website: https://prometheus.io/docs/alerting/latest/alertmanager/
+    documentation: https://prometheus.io/docs/alerting/latest/configuration/
+    source: https://github.com/prometheus/alertmanager
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web interface answers at. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: dataVolume
+    title: Data volume
+    description: Silences, and the record of what has already been sent.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: One small Go binary.
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "0.28"
+    release: "0.28.1"
+    default: true
+    image: prom/alertmanager:v0.28.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the binary, so these are its flags. Add
+      # --web.external-url=https://<domain> here once the app has one.
+      command: --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
+    storage:
+      mounts:
+        /alertmanager: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:9093/-/healthy
+        interval: 30s
+        timeout: 10s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: alertmanager
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      alertmanager.yml:
+        content: |
+          route:
+            # Alerts about the same thing arrive together rather than one message each.
+            group_by: [alertname, job]
+            group_wait: 30s
+            group_interval: 5m
+            repeat_interval: 4h
+            receiver: none
+
+          receivers:
+            # Accepts everything and does nothing with it. Replace it, or add another
+            # receiver and point the route at it.
+            - name: none
+
+            # - name: ntfy
+            #   webhook_configs:
+            #     - url: http://ntfy/alertmanager
+            #       send_resolved: true
+
+            # - name: email
+            #   email_configs:
+            #     - to: oncall@example.com
+            #       from: alertmanager@example.com
+            #       smarthost: smtp.example.com:587
+            #       auth_username: alertmanager@example.com
+            #       auth_password: put-it-in-a-secret
+
+          inhibit_rules:
+            # While something is critical, stop the warnings about the same thing.
+            - source_matchers: [severity = "critical"]
+              target_matchers: [severity = "warning"]
+              equal: [alertname, job]
+        swarmRef:
+          file: {name: /etc/alertmanager/alertmanager.yml, mode: 444}
+    routing:
+      port: 9093
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
