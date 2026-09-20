@@ -1,0 +1,201 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: headscale
+  title: Headscale
+  tagline: Your own control server for Tailscale clients
+  description: |
+    Headscale is an open implementation of Tailscale's coordination server: the part that
+    knows which machines are in your network, hands out addresses, distributes keys and
+    tells each client how to reach the others. The clients are Tailscale's own, on every
+    platform, pointed at this server instead of at Tailscale's.
+
+    **It needs a domain, and it is the only address that matters**
+
+    Clients are told where the control server is, so this app must have a domain before it
+    is any use: `tailscale up --login-server https://<domain>` on each machine. The address
+    is taken from the app's own URL, so give it a domain in the deploy dialog or in the
+    routing settings and redeploy.
+
+    **Everything is done from the command line**
+
+    Headscale has no web console. In this app's shell:
+
+        headscale users create alice
+        headscale preauthkeys create --user 1 --expiration 24h
+        headscale nodes list
+
+    The key that second command prints is what a client registers with:
+    `tailscale up --login-server https://<domain> --authkey <key>`.
+
+    **The MagicDNS suffix is not this app's domain**
+
+    Machines get names under the suffix below - `laptop.tailnet.example.com` - and it must
+    be a name you are not otherwise using: if it is the same as the app's own domain, the
+    clients will resolve the control server to a machine in the tailnet and lose it.
+
+    **An app with no domain still starts**
+
+    It falls back to answering on its own container address, which no client can use. That
+    is the one thing to check if machines cannot register: the app's URL is what it tells
+    them, and it is empty until the app has a domain.
+
+    **Relays**
+
+    Where two machines cannot reach each other directly, traffic is relayed. This template
+    uses Tailscale's public relays, which is what the Tailscale clients do anyway and costs
+    nothing but the hop. Headscale can run its own relay instead - `derp.server.enabled` in
+    the configuration file, and a UDP port published in the app's network settings.
+
+    **What this is not**
+
+    A Tailscale *client*. Joining a tailnet needs a TUN device, which a Swarm service cannot
+    be given, so the machines that join this control server are your own laptops, phones and
+    servers - not apps running here.
+  categories: [webapps/networking]
+  tags: [vpn, networking, privacy, open-source]
+  aliases: [tailscale, tailnet, wireguard, mesh-vpn, coordination-server]
+  icon: icons/headscale.svg
+  links:
+    website: https://headscale.net
+    documentation: https://headscale.net/stable/setup/requirements/
+    source: https://github.com/juanfont/headscale
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      Where clients find the control server. This app is not usable without one - it is the
+      address every machine is pointed at.
+    type: domain
+    optional: true
+  - name: baseDomain
+    title: MagicDNS suffix
+    description: >-
+      Machines are named under this - laptop.tailnet.example.com. It must not be the app's
+      own domain, or clients will lose the control server.
+    type: string
+    default: "tailnet.example.com"
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The database of machines, users and keys, and the server's noise key - the identity
+      every client has trusted.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: One Go binary and a SQLite database.
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "0.26"
+    release: "0.26.1"
+    default: true
+    image: headscale/headscale:v0.26.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is the binary itself, so this is the subcommand.
+      command: serve
+    storage:
+      mounts:
+        /var/lib/headscale: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image is distroless - one binary, no shell, no HTTP client - so the check
+        # is the binary itself, which answers only by talking to the running server over
+        # its socket. CMD rather than CMD-SHELL for the same reason.
+        mode: CMD
+        command: /ko-app/headscale nodes list
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: headscale
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Headscale reads HEADSCALE_* over the file, which is how the two values that
+        # depend on this installation get in without rewriting the configuration.
+        - {k: HEADSCALE_SERVER_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: HEADSCALE_DNS_BASE_DOMAIN, v: "${{ params.baseDomain }}"}
+    configFiles:
+      config.yaml:
+        content: |
+          # server_url and dns.base_domain are set from the environment; what is here
+          # is what they fall back to and everything that does not change per install.
+          server_url: http://127.0.0.1:8080
+          listen_addr: 0.0.0.0:8080
+          # Metrics and the gRPC endpoint stay on the loopback: the first is for this
+          # container, and the second would otherwise be a second way in.
+          metrics_listen_addr: 127.0.0.1:9090
+          grpc_listen_addr: 127.0.0.1:50443
+          grpc_allow_insecure: false
+
+          noise:
+            private_key_path: /var/lib/headscale/noise_private.key
+
+          prefixes:
+            v4: 100.64.0.0/10
+            v6: fd7a:115c:a1e0::/48
+            allocation: sequential
+
+          derp:
+            # Tailscale's public relays, which its clients use anyway. Turn the embedded
+            # server on here to relay through this node instead, and publish its UDP port
+            # in the app's network settings.
+            server:
+              enabled: false
+            urls:
+              - https://controlplane.tailscale.com/derpmap/default
+            auto_update_enabled: true
+            update_frequency: 24h
+
+          database:
+            type: sqlite
+            sqlite:
+              path: /var/lib/headscale/db.sqlite
+
+          log:
+            format: text
+            level: info
+
+          dns:
+            magic_dns: true
+            base_domain: tailnet.example.com
+            # What machines in the tailnet resolve names outside it with. Change it in
+            # this app's configuration files if you would rather they used your own.
+            nameservers:
+              global:
+                - 1.1.1.1
+
+          # On the data volume rather than under /var/run: the image has no shell to
+          # create a directory with, and this one already exists.
+          unix_socket: /var/lib/headscale/headscale.sock
+          unix_socket_permission: "0770"
+
+          policy:
+            mode: file
+        swarmRef:
+          file: {name: /etc/headscale/config.yaml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

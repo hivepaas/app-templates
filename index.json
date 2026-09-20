@@ -2100,6 +2100,46 @@
       }
     },
     {
+      "name": "headscale",
+      "file": {
+        "path": "templates/headscale.yaml",
+        "sha256": "5bf1d90b78e531ba8325d820333b4fdfa74fb851764acf6da6cd20816a14feaf"
+      },
+      "icon": {
+        "path": "icons/headscale.svg",
+        "sha256": "d2e7e5bcea96946a075e78545fe0a4832e23738c6e06cecd77b30225c0f65771"
+      },
+      "title": "Headscale",
+      "tagline": "Your own control server for Tailscale clients",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "vpn",
+        "networking",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "tailscale",
+        "tailnet",
+        "wireguard",
+        "mesh-vpn",
+        "coordination-server"
+      ],
+      "license": "BSD-3-Clause",
+      "versions": [
+        {
+          "name": "0.26",
+          "release": "0.26.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "healthchecks",
       "file": {
         "path": "templates/healthchecks.yaml",
