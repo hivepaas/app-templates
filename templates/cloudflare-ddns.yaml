@@ -1,0 +1,137 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cloudflare-ddns
+  title: Cloudflare DDNS
+  tagline: Keeps a Cloudflare DNS record pointing at this machine's changing address
+  description: |
+    A home or office connection is usually given a new IP address every so often. This app
+    notices when that happens and updates the A record of the names you list, through
+    Cloudflare's API - which is what lets a domain keep pointing at a server that has no
+    fixed address.
+
+    It is a small Go program on a timer: no port, no domain, no storage, nothing to sign in
+    to. Its log says what it found and what it changed.
+
+    **The API token, and how small it should be**
+
+    Make one at Cloudflare under **My Profile - API Tokens**, with the *Edit zone DNS*
+    template, and scope it to the one zone it has to change. A token that can edit every
+    zone on the account is a much larger thing to lose than one that can edit
+    `home.example.com`.
+
+    **The records have to exist first**
+
+    Create them in Cloudflare once, with any address; this app then keeps them current. It
+    updates what is listed in **Domains** and nothing else.
+
+    **Proxied or not**
+
+    Proxied means Cloudflare answers for the name and passes traffic on - the real address
+    is hidden, and only HTTP and HTTPS pass. Leave it off for anything that is not a web
+    server: SSH, a VPN, a game, a mail server. There is no health check on this app: the
+    image is a single binary with no shell to run one, so HivePaaS reports it as running
+    rather than as healthy, and the log is what tells you it is working.
+  categories: [webapps/networking]
+  tags: [dns, networking, cloudflare, open-source]
+  aliases: [ddns, dynamic-dns, duckdns, no-ip]
+  icon: icons/cloudflare-ddns.svg
+  links:
+    website: https://github.com/favonia/cloudflare-ddns
+    documentation: https://github.com/favonia/cloudflare-ddns#readme
+    source: https://github.com/favonia/cloudflare-ddns
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: apiToken
+    title: Cloudflare API token
+    description: >-
+      A token with Edit zone DNS on the zone these records are in. Not the global API key.
+    type: secret
+  - name: domains
+    title: Domains
+    description: >-
+      The names to keep current, comma separated - home.example.com, vpn.example.com. They
+      must already exist in Cloudflare.
+    type: string
+    optional: true
+  - name: proxied
+    title: Proxy through Cloudflare
+    description: >-
+      On hides the address behind Cloudflare and passes only HTTP and HTTPS. Off for
+      anything else - SSH, a VPN, a game.
+    type: bool
+    default: false
+  - name: ttl
+    title: Record TTL
+    description: Seconds. 1 means automatic, which is what Cloudflare recommends.
+    type: int
+    default: 1
+    min: 1
+    max: 86400
+  - name: updateCron
+    title: Update schedule
+    description: >-
+      How often to check, as a cron expression or an interval. Checking costs nothing when
+      the address has not changed.
+    type: string
+    default: "@every 5m"
+  - name: ipv6Provider
+    title: IPv6 (AAAA) records
+    description: >-
+      Leave them alone unless this machine really has a routable IPv6 address: asking for
+      one it has not got fails every run and fills the log.
+    type: select
+    default: none
+    options:
+      - {value: none, title: Do not touch AAAA records}
+      - {value: cloudflare.trace, title: Update them with the address Cloudflare sees}
+  - name: memoryLimit
+    title: Memory limit
+    description: One small binary that sleeps most of the time.
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "1.15"
+    release: "1.15.1"
+    default: true
+    image: favonia/cloudflare-ddns:1.15.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        # The image is one static binary with no shell and no HTTP client, so there is
+        # nothing here to run a check with. Its log is the status.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: cloudflare-ddns
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: CLOUDFLARE_API_TOKEN, v: "${secrets.CLOUDFLARE_API_TOKEN}"}
+        - {k: DOMAINS, v: "${{ params.domains }}"}
+        - {k: PROXIED, v: "${{ params.proxied }}"}
+        - {k: TTL, v: "${{ params.ttl }}"}
+        - {k: UPDATE_CRON, v: "${{ params.updateCron }}"}
+        # Asking for an address the machine has not got is the usual reason this app
+        # logs failures, so IPv6 is off unless it is turned on deliberately.
+        - {k: IP6_PROVIDER, v: "${{ params.ipv6Provider }}"}
+        # Say what it is doing in words rather than emoji, which read badly in a log.
+        - {k: EMOJI, v: "false"}
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        value: "${{ params.apiToken }}"

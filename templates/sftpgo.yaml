@@ -1,0 +1,154 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: sftpgo
+  title: SFTPGo
+  tagline: SFTP, FTPS and WebDAV over storage you choose, with a web console
+  description: |
+    SFTPGo is a file transfer server: clients connect over SFTP, FTPS or WebDAV, and what
+    they read and write can sit on the app's own disk or in S3, Google Cloud Storage, Azure
+    Blob or another SFTP server. Accounts, quotas, permissions per directory, virtual
+    folders and shares are all in the web console.
+
+    **Two addresses**
+
+    The console is a normal web app on this app's domain. SFTP is not HTTP, so it is
+    published on the node's own port - 2022 by default rather than 22, which the node's own
+    SSH server usually has. Open that port in the node's firewall for anyone outside to
+    reach it, and tell clients the port along with the address.
+
+    **The administrator, and the accounts that actually transfer files**
+
+    The parameters below create the console administrator at first start. Accounts for
+    people and machines are made in the console afterwards: they are what connects over
+    SFTP, and they are separate from the administrator, which cannot.
+
+    **Where the files go**
+
+    Both directories are on the data volume: the account database and the server's SSH host
+    keys, and the home directories of every local account. Storage that is not local - S3
+    and the rest - is configured per account in the console and needs nothing here.
+
+    **The host keys matter**
+
+    They are generated on the first start and kept on the volume. Deleting the volume means
+    new keys, and every client that has connected before will refuse to reconnect until its
+    known-hosts entry is cleared.
+  categories: [storage/files]
+  tags: [file-transfer, files, s3, open-source]
+  aliases: [sftp, ftp, webdav, file-server, filezilla]
+  icon: icons/sftpgo.svg
+  links:
+    website: https://sftpgo.com
+    documentation: https://docs.sftpgo.com
+    source: https://github.com/drakkan/sftpgo
+  license: AGPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web console answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Admin username
+    description: The console administrator, created at first start.
+    type: string
+    default: admin
+  - name: adminPassword
+    title: Admin password
+    description: Leave it empty and one is generated.
+    type: secret
+    generate: {length: 24}
+  - name: sftpPort
+    title: SFTP port
+    description: >-
+      The port published on the node for SFTP. Not 22: the node's own SSH server is
+      usually there.
+    type: int
+    default: 2022
+    min: 1024
+    max: 65535
+  - name: dataVolume
+    title: Data volume
+    description: The account database, the SSH host keys, and every local account's files.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: One Go binary. Raise it for many parallel transfers.
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "2.6"
+    release: "2.6.6"
+    default: true
+    image: drakkan/sftpgo:v2.6.6-alpine
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The database and the host keys, which clients pin.
+        /var/lib/sftpgo:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+        # Every local account's home directory.
+        /srv/sftpgo:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: "${{ params.sftpPort }}", published: "${{ params.sftpPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own endpoint, which answers only once the data provider is up. The
+        # image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/healthz
+        interval: 30s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: storage
+      engine: sftpgo
+      version: "${{ version.name }}"
+      storage: {}
+    envVars:
+      data:
+        # Without this the administrator is not created and the console opens a setup
+        # page instead, ignoring the two below.
+        - {k: SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN, v: "1"}
+        - {k: SFTPGO_DEFAULT_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: SFTPGO_DEFAULT_ADMIN_PASSWORD, v: "${secrets.SFTPGO_ADMIN_PASSWORD}"}
+        - {k: SFTPGO_SFTPD__BINDINGS__0__PORT, v: "${{ params.sftpPort }}"}
+        - {k: SFTPGO_HTTPD__BINDINGS__0__PORT, v: "8080"}
+        - {k: SFTPGO_HTTPD__BINDINGS__0__ADDRESS, v: "0.0.0.0"}
+        # The reverse proxy is in front, so the console sees its address rather than
+        # the client's until it is told which header carries it.
+        - {k: SFTPGO_HTTPD__BINDINGS__0__CLIENT_IP_PROXY_HEADER, v: "X-Forwarded-For"}
+    secrets:
+      SFTPGO_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

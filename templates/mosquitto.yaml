@@ -1,0 +1,171 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mosquitto
+  title: Eclipse Mosquitto
+  tagline: The MQTT broker everything that speaks MQTT already talks to
+  description: |
+    Mosquitto is a small MQTT broker: devices and services connect to it, publish to topics
+    and subscribe to topics, and it delivers between them. It is what Home Assistant,
+    Zigbee2MQTT, ESPHome, Node-RED and most IoT firmware expect to find.
+
+    **Two ways in, for two kinds of client**
+
+    - **MQTT on the node's own port**, 1883 by default, published directly because MQTT is
+      not HTTP. That is the one devices on your network use. It is plain TCP: anything on
+      that network can read what passes, so publish it where you trust the network, and open
+      it in the node's firewall deliberately.
+    - **MQTT over WebSockets on this app's domain**, which goes through the reverse proxy and
+      is therefore encrypted end to end. Browsers and anything outside your network should
+      use this: `wss://<domain>`, port 443.
+
+    **Anonymous connections are off**
+
+    The template creates one account from the parameters below and writes the password file
+    at startup - Mosquitto stores passwords hashed, and hashing is something only it can do,
+    so it happens in the container rather than in the template. Add more accounts later with
+    `mosquitto_passwd` in this app's shell, or mount your own password file.
+
+    **Messages that outlive a restart**
+
+    Persistence is on and the database is on the data volume, so retained messages and
+    queued messages for offline subscribers survive a redeploy.
+  categories: [databases/messaging]
+  tags: [mqtt, iot, messaging, open-source]
+  aliases: [mqtt, broker, iot, home-assistant]
+  icon: icons/mosquitto.svg
+  links:
+    website: https://mosquitto.org
+    documentation: https://mosquitto.org/man/mosquitto-conf-5.html
+    source: https://github.com/eclipse-mosquitto/mosquitto
+  license: EPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address for MQTT over WebSockets. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: username
+    title: Username
+    description: The account devices connect with.
+    type: string
+    default: mqtt
+  - name: password
+    title: Password
+    description: Leave it empty and one is generated.
+    type: secret
+    generate: {length: 24}
+  - name: mqttPort
+    title: MQTT port
+    description: The port published on the node for plain MQTT, which devices use.
+    type: int
+    default: 1883
+    min: 1024
+    max: 65535
+  - name: dataVolume
+    title: Data volume
+    description: Retained messages and queues for subscribers that are offline.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      A broker of a few megabytes. Raise it if you keep large retained payloads or many
+      queued messages.
+    type: size
+    default: 128MB
+    min: 64MB
+
+versions:
+  - name: "2.0"
+    release: "2.0.22"
+    default: true
+    image: eclipse-mosquitto:2.0.22
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point ends in `exec "$@"`, so this replaces the command it
+      # would have run. The password file has to be written by mosquitto_passwd - the
+      # file holds a hash - and it is written every start, from the app's own secret.
+      command: >-
+        /bin/ash -c 'mosquitto_passwd -c -b /mosquitto/config/passwd "$MQTT_USERNAME"
+        "$MQTT_PASSWORD" && chown mosquitto:mosquitto /mosquitto/config/passwd &&
+        exec /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf'
+    storage:
+      mounts:
+        /mosquitto/data: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: "${{ params.mqttPort }}", published: "${{ params.mqttPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Asking the broker for one of its own statistics topics: it proves the
+        # listener answers and that the account the template made can sign in.
+        command: >-
+          mosquitto_sub -h 127.0.0.1 -p 1883 -u "$MQTT_USERNAME" -P "$MQTT_PASSWORD"
+          -t '$SYS/broker/uptime' -C 1 -W 3 >/dev/null
+        interval: 30s
+        timeout: 10s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mosquitto
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MQTT_USERNAME, v: "${{ params.username }}"}
+        - {k: MQTT_PASSWORD, v: "${secrets.MQTT_PASSWORD}"}
+    secrets:
+      MQTT_PASSWORD:
+        value: "${{ params.password }}"
+    configFiles:
+      mosquitto.conf:
+        content: |
+          # Devices on the network connect here, in plain MQTT.
+          listener 1883
+          protocol mqtt
+
+          # Browsers and anything outside connect here, through the reverse proxy,
+          # which makes it wss:// with the app's own certificate.
+          listener 9001
+          protocol websockets
+
+          # One account, written at startup by the entry command.
+          allow_anonymous false
+          password_file /mosquitto/config/passwd
+
+          # Retained messages and queues for offline subscribers, on the data volume.
+          persistence true
+          persistence_location /mosquitto/data/
+          # Write it out every five minutes rather than only on a clean shutdown: a
+          # container that is killed would otherwise lose everything retained since
+          # it started.
+          autosave_interval 300
+
+          log_dest stdout
+          log_type error
+          log_type warning
+          log_type notice
+        swarmRef:
+          file: {name: /mosquitto/config/mosquitto.conf, mode: 444}
+    routing:
+      port: 9001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

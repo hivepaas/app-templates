@@ -1,0 +1,114 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cloudflared
+  title: Cloudflare Tunnel
+  tagline: Publish an app through Cloudflare without opening a port on the node
+  description: |
+    cloudflared makes an outbound connection to Cloudflare and serves your apps through it.
+    Nothing listens on the node, nothing is forwarded in the router, and the machine's own
+    address is never published - which is what makes it useful behind a home connection, a
+    mobile connection, or anywhere the address changes or cannot be reached from outside.
+
+    **What it connects to here**
+
+    Other apps of this project are reached by their key and their own port. In the tunnel's
+    configuration - on Cloudflare's dashboard, under **Zero Trust - Networks - Tunnels** -
+    a public hostname points at a service such as `http://myapp:8080`, where `myapp` is the
+    app's key in this environment. Nothing in that app has to change, and it does not need
+    a domain of its own in HivePaaS.
+
+    **The token is the tunnel**
+
+    Create the tunnel on the dashboard, choose the Docker install method, and copy the token
+    out of the command it shows - the long string after `--token`. It identifies the tunnel
+    and authorises this connector to serve it, so treat it as a password: anyone holding it
+    can answer for your hostnames.
+
+    **When to use this rather than a domain on the app**
+
+    A domain in HivePaaS routes through the reverse proxy on this node, which needs the node
+    reachable from the internet on 80 and 443. A tunnel needs none of that, at the cost of
+    every request passing through Cloudflare. Use whichever fits the machine; they can be
+    used together, on different names.
+
+    **There is no health check on this app**
+
+    The image carries the cloudflared binary and nothing else - no shell, no HTTP client -
+    so there is nothing here to run one with. HivePaaS reports it as running rather than as
+    healthy; the tunnel's own page on the dashboard says whether it is connected, and the
+    app's log says what it is doing.
+  categories: [webapps/networking]
+  tags: [networking, cloudflare, privacy, open-source]
+  aliases: [tunnel, argo, zero-trust, ngrok-alternative, reverse-tunnel]
+  icon: icons/cloudflared.svg
+  links:
+    website: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+    documentation: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/
+    source: https://github.com/cloudflare/cloudflared
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: tunnelToken
+    title: Tunnel token
+    description: >-
+      From the dashboard, the string after `--token` in the Docker command it shows for
+      your tunnel.
+    type: secret
+  - name: protocol
+    title: Transport
+    description: >-
+      How the connector talks to Cloudflare. Automatic prefers QUIC, which needs outbound
+      UDP 7844; choose HTTP/2 where that is blocked.
+    type: select
+    default: auto
+    options:
+      - {value: auto, title: Automatic}
+      - {value: quic, title: QUIC (UDP 7844)}
+      - {value: http2, title: HTTP/2 (TCP 7844)}
+  - name: memoryLimit
+    title: Memory limit
+    description: One Go binary proxying requests; raise it for heavy traffic.
+    type: size
+    default: 128MB
+    min: 64MB
+
+versions:
+  - name: "2026.8"
+    release: "2026.8.1"
+    default: true
+    image: cloudflare/cloudflared:2026.8.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is `cloudflared --no-autoupdate`, so this is the
+      # subcommand: run the tunnel the token names. The token comes from the
+      # environment rather than the command line, where it would be in the process list.
+      command: tunnel run
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: one static binary, no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: cloudflared
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TUNNEL_TOKEN, v: "${secrets.TUNNEL_TOKEN}"}
+        - {k: TUNNEL_TRANSPORT_PROTOCOL, v: "${{ params.protocol }}"}
+        # Say it in one line per event rather than as a stream of key-value pairs.
+        - {k: TUNNEL_LOGLEVEL, v: "info"}
+    secrets:
+      TUNNEL_TOKEN:
+        value: "${{ params.tunnelToken }}"

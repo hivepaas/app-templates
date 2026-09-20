@@ -1,0 +1,143 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mumble
+  title: Mumble Server
+  tagline: Low-latency voice chat for people who talk while doing something else
+  description: |
+    Mumble is a voice server: people join channels and talk, with latency low enough for
+    games and for working together, and with positional audio where a game supports it.
+    Clients exist for Windows, macOS, Linux, Android and iOS, and they all talk to this.
+
+    **It does not go through the reverse proxy**
+
+    Mumble is its own protocol, not HTTP: the app publishes its port directly on the node,
+    over TCP for control and UDP for voice, and both have to be the same number. Open it in
+    the node's firewall, and give people the address and the port - the client asks for
+    both.
+
+    **Encryption is the server's own**
+
+    Mumble encrypts everything itself with a certificate it generates on the first start and
+    keeps on the data volume. Clients will report it as self-signed and ask once whether to
+    trust it; that is normal for a server that is not registered publicly.
+
+    **Two passwords, doing different things**
+
+    - The **superuser password** is administration: the `SuperUser` account registers other
+      users, creates channels and hands out permissions. It is set at every start from the
+      parameter, so it is the one to change if it is ever lost.
+    - The **server password** is the door. Set it and everyone needs it to join; leave it
+      empty and anybody who knows the address can.
+  categories: [webapps/communication]
+  tags: [voice, chat, team-chat, open-source]
+  aliases: [murmur, voice, voip, teamspeak-alternative, discord-alternative]
+  icon: icons/mumble.svg
+  links:
+    website: https://www.mumble.info
+    documentation: https://github.com/mumble-voip/mumble-docker#configuration
+    source: https://github.com/mumble-voip/mumble
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: superuserPassword
+    title: SuperUser password
+    description: >-
+      The administrator account of the server. Leave it empty and one is generated; it is
+      applied at every start.
+    type: secret
+    generate: {length: 24}
+  - name: serverPassword
+    title: Server password
+    description: >-
+      What everyone needs to join. Leave it empty and the server is open to anyone who knows
+      the address.
+    type: secret
+    optional: true
+  - name: mumblePort
+    title: Mumble port
+    description: The port published on the node, over TCP and UDP. Clients ask for it.
+    type: int
+    default: 64738
+    min: 1024
+    max: 65535
+  - name: welcomeText
+    title: Welcome message
+    description: Shown to each client as it connects.
+    type: string
+    default: "Welcome to this Mumble server."
+  - name: maxUsers
+    title: Maximum users
+    description: How many people may be connected at once.
+    type: int
+    default: 100
+    min: 1
+    max: 1000
+  - name: dataVolume
+    title: Data volume
+    description: The registered users, channels, permissions and the server's certificate.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: A small C++ server; voice is relayed, not mixed.
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "1.5"
+    release: "1.5.735"
+    default: true
+    image: mumblevoip/mumble-server:v1.5.735
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # Control and voice, on one number. Published on the node rather than
+          # through the ingress mesh, which would hide which client sent what.
+          - {target: 64738, published: "${{ params.mumblePort }}", protocol: tcp, publishMode: host}
+          - {target: 64738, published: "${{ params.mumblePort }}", protocol: udp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has openssl and no HTTP client, and Mumble's control port is TLS,
+        # so a handshake is both available and the right thing to ask for.
+        command: echo | openssl s_client -connect 127.0.0.1:64738 >/dev/null 2>&1
+        interval: 30s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mumble
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MUMBLE_SUPERUSER_PASSWORD, v: "${secrets.MUMBLE_SUPERUSER_PASSWORD}"}
+        - {k: MUMBLE_CONFIG_SERVERPASSWORD, v: "${secrets.MUMBLE_SERVER_PASSWORD}"}
+        - {k: MUMBLE_CONFIG_WELCOMETEXT, v: "${{ params.welcomeText }}"}
+        - {k: MUMBLE_CONFIG_USERS, v: "${{ params.maxUsers }}"}
+        # The address clients are told to use is the published one, which the server
+        # itself cannot know; this only keeps it from registering publicly.
+        - {k: MUMBLE_CONFIG_REGISTERNAME, v: ""}
+    secrets:
+      MUMBLE_SUPERUSER_PASSWORD:
+        value: "${{ params.superuserPassword }}"
+      MUMBLE_SERVER_PASSWORD:
+        value: "${{ params.serverPassword }}"

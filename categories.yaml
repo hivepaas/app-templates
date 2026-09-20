@@ -37,3 +37,4 @@ categories:
     children:
       - {id: object-storage, title: Object Storage}
       - {id: backup, title: Backup}
+      - {id: files, title: File Transfer}

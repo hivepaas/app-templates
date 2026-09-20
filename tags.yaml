@@ -53,3 +53,9 @@ tags:
   - {id: files, title: File Sync}
   - {id: vpn, title: VPN}
   - {id: networking, title: Networking}
+  - {id: dns, title: DNS}
+  - {id: mqtt, title: MQTT}
+  - {id: iot, title: IoT}
+  - {id: voice, title: Voice Chat}
+  - {id: file-transfer, title: File Transfer}
+  - {id: cloudflare, title: Cloudflare}

@@ -1,0 +1,146 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: technitium-dns
+  title: Technitium DNS Server
+  tagline: Your own DNS resolver, with ad blocking and a web console
+  description: |
+    Technitium is a DNS server you run yourself: a recursive resolver for your network, an
+    authoritative server for your own zones, a blocker of whatever lists you subscribe to,
+    and a web console to see every query it answered.
+
+    **It takes port 53 on the node**
+
+    DNS is not HTTP, so this app does not go through the reverse proxy: it publishes its
+    port directly on the node it runs on, over both UDP and TCP, and no other app on this
+    installation can take the same one. Two things worth checking before deploying:
+
+    - Most Linux distributions already have something on 53. `systemd-resolved` is the usual
+      one - `ss -lnup 'sport = :53'` says what has it. Either free the port, or set the
+      **DNS port** parameter to something else and point your clients at that.
+    - Open the port in the node's firewall for anything outside to use the server, and think
+      about who that is: a resolver open to the whole internet is used to amplify attacks.
+      Technitium has allowed-network settings in the console for exactly this.
+
+    **The console is a normal web app**
+
+    Give it a domain and the console is reached over HTTPS like anything else here. The
+    administrator is created at first start from the parameters below.
+
+    **DNS over HTTPS and TLS**
+
+    Both are in the console, under Settings - Optional Protocols. DoH answers on its own port
+    (8053 by default) and DoT on 853; publishing those is an app networks change afterwards,
+    once you have decided which you want.
+  categories: [webapps/networking]
+  tags: [dns, networking, privacy, open-source]
+  aliases: [dns, adguard-alternative, pihole-alternative, resolver, bind]
+  icon: icons/technitium-dns.svg
+  links:
+    website: https://technitium.com/dns/
+    documentation: https://github.com/TechnitiumSoftware/DnsServer/blob/master/DockerEnvironmentVariables.md
+    source: https://github.com/TechnitiumSoftware/DnsServer
+  license: GPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web console answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Admin password
+    description: The password for the `admin` account. Leave it empty and one is generated.
+    type: secret
+    generate: {length: 24}
+  - name: dnsPort
+    title: DNS port
+    description: >-
+      The port on the node, published over UDP and TCP. The server itself always listens on
+      53 inside the project, so other apps here reach it by this app's key on the usual
+      port; this is only what the outside connects to. 53 is what clients use without being
+      told otherwise.
+    type: int
+    default: 53
+    min: 1
+    max: 65535
+  - name: forwarders
+    title: Forwarders
+    description: >-
+      Where this server sends what it cannot answer itself, comma separated. Leave it empty
+      to resolve from the root servers instead.
+    type: string
+    default: "1.1.1.1, 8.8.8.8"
+    optional: true
+  - name: dataVolume
+    title: Data volume
+    description: Zones, settings, blocklists and the query log.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: A .NET server plus the cache it keeps; the query log grows with traffic.
+    type: size
+    default: 512MB
+    min: 256MB
+
+versions:
+  - name: "13"
+    release: "13.6.0"
+    default: true
+    image: technitium/dns-server:13.6.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /etc/dns: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # Published on the node rather than through the ingress mesh: a resolver
+          # wants to see which client asked, and the mesh would rewrite that address.
+          - {target: 53, published: "${{ params.dnsPort }}", protocol: udp, publishMode: host}
+          - {target: 53, published: "${{ params.dnsPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has dig and no HTTP client. localhost is answered by the server
+        # itself, so the check needs neither the internet nor a forwarder.
+        command: dig +time=2 +tries=1 +short @127.0.0.1 localhost | grep -q 127.0.0.1
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: technitium-dns
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DNS_SERVER_DOMAIN, v: "${HIVEPAAS_HOST}"}
+        - {k: DNS_SERVER_ADMIN_PASSWORD, v: "${secrets.DNS_ADMIN_PASSWORD}"}
+        - {k: DNS_SERVER_WEB_SERVICE_HTTP_PORT, v: "5380"}
+        # The console sits behind the reverse proxy, which terminates TLS for it.
+        - {k: DNS_SERVER_WEB_SERVICE_ENABLE_HTTPS, v: "false"}
+        - {k: DNS_SERVER_FORWARDERS, v: "${{ params.forwarders }}"}
+    secrets:
+      DNS_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 5380
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
