@@ -42,13 +42,59 @@ metadata:
     Every connection is read-only. An `INSERT` fails with "cannot execute INSERT in a
     read-only transaction", which is the standby doing its job.
 
+    **What it costs the primary: nothing on the write path**
+
+    Replication here is asynchronous, which is PostgreSQL's default and what this template
+    leaves in place. A transaction on the primary commits when the primary's own disk has
+    it; nothing waits for this standby to confirm anything, and a standby that is slow,
+    unreachable or switched off does not hold up a single commit. `pg_stat_replication`
+    shows it as `async`, and `synchronous_standby_names` is empty.
+
+    What the primary does spend is one process sending the changes and the bandwidth to
+    carry them - both small next to the work that produced the changes in the first place.
+
+    Nor does this standby create a replication slot, and that is deliberate. A slot would
+    guarantee the standby can always catch up, by making the primary keep every WAL file
+    until it does - which is exactly how a forgotten standby fills a primary's disk and
+    stops it. Nothing this template creates can harm the database it follows.
+
     **Watching it keep up**
 
     On the primary, `SELECT client_addr, state, replay_lag FROM pg_stat_replication;` shows
     this standby and how far behind it is. On the standby,
     `SELECT now() - pg_last_xact_replay_timestamp();` says the same thing from its own side.
-    A lag that grows and does not come back means the standby cannot keep up with the write
-    rate, or the connection between them is gone.
+    That second one is worth a look now and then, because of what comes next.
+
+    **When replication breaks**
+
+    Stopped and started again, or a network that came back: the standby resumes on its own
+    and catches up. Nothing to do.
+
+    Away long enough that the primary has recycled the WAL it still needed, though, and it
+    cannot resume at all - `requested WAL segment ... has already been removed`, retried
+    every five seconds, forever. The fix is to build it again: delete this app along with
+    its data, and create it from this template once more.
+
+    **The trap is that a stuck standby looks fine.** It keeps answering queries and it keeps
+    passing its health check, because it is still a working database - serving exactly what
+    it held when the stream broke. Only the lag says otherwise, which is why it is the thing
+    to watch. Query it, alert on it, or read it in the app's terminal; nothing here will
+    tell you on its own.
+
+    If you would rather the primary held the WAL than have to rebuild, make a slot for this
+    standby and give the primary a limit that protects it:
+
+    ```
+    -- on the primary
+    SELECT pg_create_physical_replication_slot('standby1');
+    ALTER SYSTEM SET max_slot_wal_keep_size = '10GB';
+    SELECT pg_reload_conf();
+    -- on this standby, then restart the app
+    ALTER SYSTEM SET primary_slot_name = 'standby1';
+    ```
+
+    The limit is what keeps the trade honest: the primary keeps up to 10GB of WAL for a
+    standby that is behind, and abandons it rather than itself beyond that.
 
     **What happens when the primary dies**
 
@@ -83,13 +129,13 @@ metadata:
 
 parameters:
   - name: primaryApp
-    title: Primary app
+    title: Primary app key
     description: >-
-      The name of the PostgreSQL app in this environment to follow, as it appears in its
-      address - lower case, words joined by `-` or `_`.
+      The key of the PostgreSQL app in this environment to follow. Not its title: the key is
+      what the app answers to on the project's network, and it is shown on that app's page.
     type: string
     default: postgres
-    pattern: '^[a-z0-9][a-z0-9_-]{0,62}$'
+    pattern: '^[a-z0-9][a-z0-9_]{0,99}$'
   - name: memoryLimit
     title: Memory limit
     description: >-
