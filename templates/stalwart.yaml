@@ -1,0 +1,237 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: stalwart
+  title: Stalwart Mail Server
+  tagline: A whole mail server - SMTP, IMAP, JMAP and a web console - in one process
+  description: |
+    Stalwart receives, sends and stores mail: SMTP for what arrives and what goes out, IMAP
+    and JMAP for what clients read, spam filtering, DKIM signing, sieve rules, and a web
+    console to run all of it. One process, one data directory, no database beside it.
+
+    **Running your own mail is mostly DNS, and none of it is here**
+
+    The app is the easy half. Before mail works you need, at your registrar or DNS provider:
+
+    - an **MX** record for the domain, pointing at this server's name;
+    - an **A** record for that name, pointing at this node's public address;
+    - a **reverse DNS (PTR)** record for that address, matching the same name - most
+      providers let you set this, and mail without it is widely refused;
+    - **SPF**, **DKIM** and **DMARC** records, which the console generates for you once a
+      domain is added.
+
+    Port 25 outbound is also blocked by many hosting providers; ask yours before deciding
+    this is broken.
+
+    **The ports it takes on the node**
+
+    Four, fixed, because mail clients and other mail servers expect exactly these: **25**
+    for mail arriving from other servers, **465** and **587** for your own clients sending,
+    and **993** for reading over IMAP. They must be free on the node - a host MTA such as
+    Postfix usually has 25 - and open in its firewall. IMAP without TLS (143), POP3 and
+    ManageSieve are listening inside the container as well, and can be published later in
+    the app's network settings.
+
+    **Certificates**
+
+    On the first start Stalwart answers on 465 and 993 with a certificate it signed itself,
+    which mail clients will refuse. The reverse proxy here cannot help - it serves HTTP, and
+    these are not - so TLS for the mail ports is set up in the console, under **Settings -
+    TLS - ACME**. Use a DNS-01 provider: the HTTP and TLS-ALPN challenges need ports 80 and
+    443, which the proxy already has on this node.
+
+    **The console**
+
+    Give the app a domain and the console is reached over HTTPS like any other app here.
+    Sign in with `admin` and the password below; it is the fallback administrator, and the
+    first thing to do in the console is add your domain and a real account.
+
+    One thing the console does for you that its API does not: an account created through
+    `POST /api/principal` with no role is refused at submission with *"Your account is not
+    authorized to use this service"*. Give it `"roles": ["user"]` if you script this.
+
+    **It takes about a minute to start**
+
+    Stalwart opens its store and builds its spam-filter configuration before it listens, so
+    the first start is slow and the app shows as unhealthy while that happens.
+  categories: [webapps/communication]
+  tags: [email, privacy, open-source]
+  aliases: [mail-server, smtp, imap, jmap, postfix-alternative, mailcow-alternative]
+  icon: icons/stalwart.svg
+  links:
+    website: https://stalw.art
+    documentation: https://stalw.art/docs/get-started
+    source: https://github.com/stalwartlabs/stalwart
+  license: AGPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web console answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: mailHostname
+    title: Mail server hostname
+    description: >-
+      The name this server calls itself when it talks to other mail servers, and the name
+      your MX and PTR records point at - mail.example.com. It has to resolve to this node.
+    type: string
+    default: "${HIVEPAAS_DOMAIN}"
+  - name: adminPassword
+    title: Admin password
+    description: >-
+      The password for the fallback `admin` account of the console. Leave it empty and one
+      is generated.
+    type: secret
+    generate: {length: 24}
+  - name: dataVolume
+    title: Data volume
+    description: Every message, account, key and setting. This is the mail.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Idle it uses well under 100MB; the spam filter and the store want room as mail
+      arrives.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "0.13"
+    release: "0.13.4"
+    default: true
+    image: stalwartlabs/stalwart:v0.13.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /opt/stalwart: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # Published on the node rather than through the ingress mesh: a mail server
+          # decides what to accept by who connected, and the mesh would rewrite that
+          # address to its own.
+          - {target: 25, published: 25, protocol: tcp, publishMode: host}
+          - {target: 465, published: 465, protocol: tcp, publishMode: host}
+          - {target: 587, published: 587, protocol: tcp, publishMode: host}
+          - {target: 993, published: 993, protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has openssl and no HTTP client. Asking SMTP to start TLS proves
+        # the server is listening and answering, which nothing else here does.
+        command: openssl s_client -connect 127.0.0.1:25 -starttls smtp </dev/null 2>&1 | grep -q "^250"
+        interval: 30s
+        timeout: 15s
+        # It opens the store and builds the spam-filter rules before it listens; a
+        # minute is normal on the first start.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: stalwart
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: STALWART_ADMIN_SECRET, v: "${secrets.STALWART_ADMIN_SECRET}"}
+        - {k: STALWART_HOSTNAME, v: "${{ params.mailHostname }}"}
+    secrets:
+      STALWART_ADMIN_SECRET:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      config.toml:
+        # What the image writes for itself on a first start, with three changes: the
+        # log goes to stdout where HivePaaS reads it, the hostname and the fallback
+        # admin's password come from the environment, so neither is baked into a file
+        # on the volume.
+        content: |
+          [server]
+          hostname = "%{env:STALWART_HOSTNAME}%"
+
+          [server.listener.smtp]
+          bind = "[::]:25"
+          protocol = "smtp"
+
+          [server.listener.submission]
+          bind = "[::]:587"
+          protocol = "smtp"
+
+          [server.listener.submissions]
+          bind = "[::]:465"
+          protocol = "smtp"
+          tls.implicit = true
+
+          [server.listener.imap]
+          bind = "[::]:143"
+          protocol = "imap"
+
+          [server.listener.imaptls]
+          bind = "[::]:993"
+          protocol = "imap"
+          tls.implicit = true
+
+          [server.listener.pop3]
+          bind = "[::]:110"
+          protocol = "pop3"
+
+          [server.listener.pop3s]
+          bind = "[::]:995"
+          protocol = "pop3"
+          tls.implicit = true
+
+          [server.listener.sieve]
+          bind = "[::]:4190"
+          protocol = "managesieve"
+
+          [server.listener.http]
+          protocol = "http"
+          bind = "[::]:8080"
+
+          [storage]
+          data = "rocksdb"
+          fts = "rocksdb"
+          blob = "rocksdb"
+          lookup = "rocksdb"
+          directory = "internal"
+
+          [store.rocksdb]
+          type = "rocksdb"
+          path = "/opt/stalwart/data"
+          compression = "lz4"
+
+          [directory.internal]
+          type = "internal"
+          store = "rocksdb"
+
+          [tracer.stdout]
+          type = "stdout"
+          level = "info"
+          ansi = false
+          enable = true
+
+          [authentication.fallback-admin]
+          user = "admin"
+          secret = "%{env:STALWART_ADMIN_SECRET}%"
+        swarmRef:
+          file: {name: /opt/stalwart/etc/config.toml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

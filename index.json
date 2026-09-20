@@ -5338,6 +5338,46 @@
       }
     },
     {
+      "name": "stalwart",
+      "file": {
+        "path": "templates/stalwart.yaml",
+        "sha256": "db129ea2a1059b7d0ade8e49629cac06b98be6cbc49219618784ab0103a222da"
+      },
+      "icon": {
+        "path": "icons/stalwart.svg",
+        "sha256": "1dd984ee20aa8f98bde6a52f689781440f54b58a057c807e66495ad8b954d0eb"
+      },
+      "title": "Stalwart Mail Server",
+      "tagline": "A whole mail server - SMTP, IMAP, JMAP and a web console - in one process",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "email",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "mail-server",
+        "smtp",
+        "imap",
+        "jmap",
+        "postfix-alternative",
+        "mailcow-alternative"
+      ],
+      "license": "AGPL-3.0",
+      "versions": [
+        {
+          "name": "0.13",
+          "release": "0.13.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "surrealdb",
       "file": {
         "path": "templates/surrealdb.yaml",
