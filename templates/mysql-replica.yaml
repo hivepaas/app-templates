@@ -1,0 +1,297 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mysql-replica
+  title: MySQL read replica
+  tagline: A second copy of a database, kept current from the binary log
+  description: |
+    This is a replica of a [MySQL](mysql) app that already exists here. It copies that app's
+    database once, then follows it: every change the primary records in its binary log is
+    applied here within milliseconds, and this copy serves it read-only. Use it to run
+    reports and exports somewhere other than the database your app depends on.
+
+    **Prepare the primary first**
+
+    A MySQL primary writes a binary log out of the box, but it does not hand it to anybody,
+    and it does not track transactions in the form a replica needs. Open a terminal on the
+    primary app and run, as root:
+
+    ```
+    SET PERSIST enforce_gtid_consistency = ON;
+    SET PERSIST gtid_mode = OFF_PERMISSIVE;
+    SET PERSIST gtid_mode = ON_PERMISSIVE;
+    SET PERSIST gtid_mode = ON;
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT, RELOAD ON *.* TO 'the_app_user'@'%';
+    ```
+
+    The four steps are how MySQL turns global transaction identifiers on while it is running
+    - no restart, no downtime. The grant goes to the primary's own application user, which is
+    the account this replica connects with; `RELOAD` is there because the first copy takes a
+    consistent snapshot.
+
+    Until that is done this app waits, saying so in its log every ten seconds, and starts by
+    itself once the primary is ready.
+
+    **What it copies: the primary's database, not the whole server**
+
+    The first copy is a logical dump of the one database the primary app was created with,
+    and from then on only changes to that database are applied. Other databases on the same
+    server are left alone - an empty database name can appear here, because a bare
+    `CREATE DATABASE` names no table to filter on, but nothing inside it is copied. The
+    `mysql` schema is skipped entirely, so accounts created on the primary afterwards do not
+    disturb this copy.
+
+    **Reading from it**
+
+    Apps reach it at this app's name on port 3306, with the primary's user name and password
+    - the account is recreated here when the copy is made, allowed to read and nothing else.
+    So an app that reads here is configured with `${<this app>.HIVEPAAS_HOST}` and the
+    primary's `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`.
+
+    **It refuses writes, and that matters here**
+
+    A MySQL replica is an ordinary server that happens to be applying somebody else's binary
+    log; nothing about it is inherently read-only. This one is started with
+    `super_read_only` on, so a write arrives as *"The MySQL server is running with the
+    --read-only option"* rather than as data that silently diverges from the primary and is
+    then overwritten. Leave it on.
+
+    **What it costs the primary: nothing on the write path**
+
+    Replication is asynchronous. A transaction commits on the primary when the primary has
+    written it; nothing waits for this replica to confirm anything, and a replica that is
+    slow, unreachable or switched off holds up no commit. The binary log it reads is written
+    whether this app exists or not.
+
+    **Watching it keep up**
+
+    In a terminal here, `SHOW REPLICA STATUS\G` answers all of it: `Replica_IO_Running` and
+    `Replica_SQL_Running` should both say `Yes`, `Seconds_Behind_Source` should sit near
+    zero, and `Last_SQL_Error` should be empty. It is worth a look now and then, because of
+    what comes next.
+
+    **When replication breaks**
+
+    Stopped and started again, or a network that came back: it resumes on its own.
+
+    A statement it cannot apply stops the applier, and it stays stopped - `Last_SQL_Error`
+    says which one. Away for longer than the primary keeps its binary logs - thirty days by
+    default - and it cannot resume at all, because the transactions it missed are gone. In
+    both cases the fix is to build it again: delete this app along with its data, and create
+    it from this template once more.
+
+    **The trap is that a stopped replica looks fine.** It keeps answering queries and it
+    keeps passing its health check, because it is still a working database - serving exactly
+    what it held when the applier stopped. Only `SHOW REPLICA STATUS` says otherwise.
+
+    **What happens when the primary dies**
+
+    Nothing automatic. This is replication, not failover. Making this one the primary is a
+    decision you take, in a terminal here:
+
+    ```
+    STOP REPLICA;
+    RESET REPLICA ALL;
+    SET PERSIST super_read_only = OFF;
+    SET PERSIST read_only = OFF;
+    ```
+
+    After that it is a separate database that follows nothing, every app that used the old
+    primary has to be pointed at it, and building a replica again means starting one from
+    scratch.
+
+    **It is not a backup**
+
+    A replica copies everything faithfully, including the `DELETE` you regret. For getting
+    yesterday back, use a backup repository on the primary's volume.
+
+    **The first copy takes as long as the database is large**
+
+    Nothing answers until the dump has been copied in, and the health check allows about
+    twenty minutes for it. A database large enough to need longer needs a longer start
+    period in this app's container settings.
+  categories: [databases/sql]
+  tags: [sql, relational, mysql-compatible, open-source]
+  aliases: [replica, read replica, mysql replication, standby, binlog]
+  icon: icons/mysql.svg
+  links:
+    website: https://www.mysql.com
+    documentation: https://dev.mysql.com/doc/refman/8.4/en/replication.html
+    source: https://github.com/mysql/mysql-server
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: primaryApp
+    title: Primary app key
+    description: >-
+      The key of the MySQL app in this environment to follow. Not its title: the key is what
+      the app answers to on the project's network, and it is shown on that app's page.
+    type: string
+    default: mysql
+    pattern: '^[a-z0-9][a-z0-9_]{0,99}$'
+  - name: serverId
+    title: Server id
+    description: >-
+      Every server in a replication setup needs a different one, and a primary made from the
+      MySQL template is 1. Change this only if you are building a second replica.
+    type: int
+    default: 2
+    min: 2
+    max: 4294967295
+  - name: rootPassword
+    title: Root password
+    description: >-
+      This copy's own administrative account - not the primary's, which is not copied. Leave
+      empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      What this copy gets. Reads here cost what they cost on the primary, so size it for the
+      queries you intend to move over.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the copy is kept on. It holds the whole database, so plan for the size of
+      the primary's.
+    type: volume
+
+versions:
+  - name: "8.4"
+    release: "8.4.11"
+    default: true
+    image: mysql:8.4.11
+  - name: "9.7"
+    release: "9.7.2"
+    image: mysql:9.7.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Three things happen before the image's own entry point is reached.
+      #
+      # The first is a guard: an interrupted copy leaves a data directory that looks
+      # initialised, and the image would then never run the bootstrap again - so a directory
+      # without the marker the bootstrap writes is thrown away and started over.
+      #
+      # The second is the wait. Until the primary has GTIDs turned on there is nothing to
+      # copy from, and starting would only produce a half-built server.
+      #
+      # The third is the arguments: the replication filters have to be startup options,
+      # because CHANGE REPLICATION FILTER is forgotten when the temporary server the
+      # bootstrap runs against is stopped.
+      command: >-
+        sh -c 'if [ -d /var/lib/mysql/mysql ] && [ ! -f /var/lib/mysql/.hivepaas-replica-ready ];
+        then echo "[replica] a previous copy did not finish - starting it again";
+        rm -rf /var/lib/mysql/..?* /var/lib/mysql/.[!.]* /var/lib/mysql/*; fi;
+        until [ "$(MYSQL_PWD="$PRIMARY_PASSWORD" mysql -h "$PRIMARY_HOST" -P "$PRIMARY_PORT"
+        -u "$PRIMARY_USER" -N -B -e "SELECT @@gtid_mode" 2>/dev/null)" = ON ];
+        do echo "[replica] the primary does not have GTID turned on yet - see this app description";
+        sleep 10; done;
+        exec docker-entrypoint.sh mysqld --server-id="$SERVER_ID"
+        --gtid-mode=ON --enforce-gtid-consistency=ON
+        --replicate-wild-do-table="$PRIMARY_DB.%" --replicate-ignore-db=mysql'
+    storage:
+      mounts:
+        /var/lib/mysql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Over TCP on purpose: the server the image runs while it copies the primary listens
+        # on the socket only, so this passes once the real server is up.
+        command: mysqladmin ping -h 127.0.0.1 --silent
+        interval: 30s
+        timeout: 10s
+        startPeriod: 600s
+        retries: 20
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mysql
+      version: "${{ version.name }}"
+      # No credentials of its own: apps read here with the primary's user and password,
+      # which the bootstrap recreates on this server.
+    envVars:
+      data:
+        # This copy's own root account. The primary's is neither copied nor shared.
+        - {k: MYSQL_ROOT_PASSWORD, v: "${secrets.MYSQL_ROOT_PASSWORD}"}
+        # The primary, by its own key in this environment. Nothing is copied by hand:
+        # these follow whatever that app publishes.
+        - {k: PRIMARY_HOST, v: "${${{ params.primaryApp }}.HIVEPAAS_HOST}"}
+        - {k: PRIMARY_PORT, v: "${${{ params.primaryApp }}.HIVEPAAS_PORT}"}
+        - {k: PRIMARY_USER, v: "${${{ params.primaryApp }}.HIVEPAAS_USER}"}
+        - {k: PRIMARY_PASSWORD, v: "${${{ params.primaryApp }}.HIVEPAAS_PASSWORD}"}
+        - {k: PRIMARY_DB, v: "${${{ params.primaryApp }}.HIVEPAAS_DATABASE_NAME}"}
+        - {k: SERVER_ID, v: "${{ params.serverId }}"}
+    secrets:
+      MYSQL_ROOT_PASSWORD:
+        value: "${{ params.rootPassword }}"
+    configFiles:
+      replica-bootstrap.sh:
+        # Runs once, against the temporary server the image starts while the data directory
+        # is new. Everything it configures is stored in the data directory, so the real
+        # server that follows finds a database and a source to follow.
+        content: |
+          #!/bin/bash
+          set -u -o pipefail
+
+          local_sql() {
+            MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --protocol=socket "$@"
+          }
+
+          bootstrap() {
+            # Nothing has been replicated yet, so the transaction history has to be empty
+            # for the position the dump carries to be accepted.
+            local_sql -e "RESET BINARY LOGS AND GTIDS" || return 1
+
+            MYSQL_PWD="$PRIMARY_PASSWORD" mysqldump --host="$PRIMARY_HOST" \
+              --port="$PRIMARY_PORT" --user="$PRIMARY_USER" --databases "$PRIMARY_DB" \
+              --single-transaction --set-gtid-purged=ON --add-drop-database \
+              --routines --triggers --events 2>/tmp/dump.err | local_sql || {
+              sed "s/^/  [replica] /" /tmp/dump.err >&2
+              return 1
+            }
+
+            local_sql <<-SQL || return 1
+              CHANGE REPLICATION SOURCE TO
+                SOURCE_HOST='$PRIMARY_HOST', SOURCE_PORT=$PRIMARY_PORT,
+                SOURCE_USER='$PRIMARY_USER', SOURCE_PASSWORD='$PRIMARY_PASSWORD',
+                SOURCE_AUTO_POSITION=1, GET_SOURCE_PUBLIC_KEY=1;
+          SQL
+          }
+
+          until bootstrap; do
+            echo "[replica] the copy did not finish; trying again in 10 seconds"
+            sleep 10
+          done
+
+          # The account apps connect with. A logical copy carries the data, never the
+          # users, so the primary's application user is recreated here - reading only.
+          local_sql <<-SQL
+            CREATE USER IF NOT EXISTS '$PRIMARY_USER'@'%' IDENTIFIED BY '$PRIMARY_PASSWORD';
+            GRANT SELECT, SHOW VIEW, EXECUTE ON \`$PRIMARY_DB\`.* TO '$PRIMARY_USER'@'%';
+          SQL
+
+          # Reads only, from the next start on. PERSIST_ONLY rather than PERSIST so the
+          # rest of this initialisation can still write; replication applies changes
+          # either way.
+          local_sql -e "SET PERSIST_ONLY super_read_only = ON"
+          touch /var/lib/mysql/.hivepaas-replica-ready
+          echo "[replica] copied $PRIMARY_DB from $PRIMARY_HOST and set to follow it"
+        swarmRef:
+          file: {name: /docker-entrypoint-initdb.d/10-replica.sh, mode: 755}
+    routing:
+      port: 3306

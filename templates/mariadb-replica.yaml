@@ -1,0 +1,299 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mariadb-replica
+  title: MariaDB read replica
+  tagline: A second copy of a database, kept current from the binary log
+  description: |
+    This is a replica of a [MariaDB](mariadb) app that already exists here. It copies that
+    app's database once, then follows it: every change the primary records in its binary log
+    is applied here within milliseconds, and this copy serves it read-only. Use it to run
+    reports and exports somewhere other than the database your app depends on.
+
+    **Prepare the primary first - and this one needs a restart**
+
+    MariaDB does not write a binary log unless it is told to, and unlike MySQL it cannot be
+    told while it is running: `log_bin` is a read-only variable. So the primary has to be
+    restarted once, with the setting in place.
+
+    In the primary app's deployment settings, set the command to:
+
+    ```
+    --log-bin=binlog --binlog-format=ROW --server-id=1
+    ```
+
+    and deploy. The database is down for as long as a restart takes. Name the log
+    explicitly, as above: left to itself MariaDB names it after the machine, and every
+    deployment here gives the container a new name - which would start a new series of logs
+    each time and lose this replica.
+
+    Then, in a terminal on the primary, as root:
+
+    ```
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT, RELOAD ON *.* TO 'the_app_user'@'%';
+    ```
+
+    That goes to the primary's own application user, which is the account this replica
+    connects with; `RELOAD` is there because the first copy takes a consistent snapshot.
+
+    Until the binary log is on, this app waits, saying so in its log every ten seconds, and
+    starts by itself once the primary is ready.
+
+    **What it copies: the primary's database, not the whole server**
+
+    The first copy is a logical dump of the one database the primary app was created with,
+    and from then on only changes to that database are applied. Other databases on the same
+    server are left alone - an empty database name can appear here, because a bare
+    `CREATE DATABASE` names no table to filter on, but nothing inside it is copied. The
+    `mysql` schema is skipped entirely, so accounts created on the primary afterwards do not
+    disturb this copy.
+
+    **Reading from it**
+
+    Apps reach it at this app's name on port 3306, with the primary's user name and password
+    - the account is recreated here when the copy is made, allowed to read and nothing else.
+    So an app that reads here is configured with `${<this app>.HIVEPAAS_HOST}` and the
+    primary's `HIVEPAAS_USER` and `HIVEPAAS_PASSWORD`.
+
+    **It refuses writes, and that matters here**
+
+    A MariaDB replica is an ordinary server that happens to be applying somebody else's
+    binary log; nothing about it is inherently read-only. This one runs with `read_only` on,
+    so an application write arrives as *"The MariaDB server is running with the --read-only
+    option"* rather than as data that silently diverges from the primary. Note that
+    `read_only` does not stop an administrator: connected as root you can still write here,
+    and doing so is how a replica quietly stops matching what it followed.
+
+    **What it costs the primary**
+
+    Replication is asynchronous. A transaction commits on the primary when the primary has
+    written it; nothing waits for this replica to confirm anything, and a replica that is
+    slow, unreachable or switched off holds up no commit.
+
+    What it does cost is the binary log itself, which the primary was not writing before:
+    every change is now recorded twice, once in the data files and once in the log. Ten days
+    of those logs are kept by default and then dropped.
+
+    **Watching it keep up**
+
+    In a terminal here, `SHOW SLAVE STATUS\G` answers all of it: `Slave_IO_Running` and
+    `Slave_SQL_Running` should both say `Yes`, `Seconds_Behind_Master` should sit near zero,
+    and `Last_SQL_Error` should be empty. It is worth a look now and then, because of what
+    comes next.
+
+    **When replication breaks**
+
+    Stopped and started again, or a network that came back: it resumes on its own.
+
+    A statement it cannot apply stops the applier, and it stays stopped - `Last_SQL_Error`
+    says which one. Away for longer than the primary keeps its binary logs - ten days by
+    default - and it cannot resume at all, because the changes it missed are gone. In both
+    cases the fix is to build it again: delete this app along with its data, and create it
+    from this template once more.
+
+    **The trap is that a stopped replica looks fine.** It keeps answering queries and it
+    keeps passing its health check, because it is still a working database - serving exactly
+    what it held when the applier stopped. Only `SHOW SLAVE STATUS` says otherwise.
+
+    **What happens when the primary dies**
+
+    Nothing automatic. This is replication, not failover. Making this one the primary is a
+    decision you take, in a terminal here:
+
+    ```
+    STOP SLAVE;
+    RESET SLAVE ALL;
+    SET GLOBAL read_only = OFF;
+    ```
+
+    and then removing `--read-only=ON` from this app's command so it stays that way. After
+    that it is a separate database that follows nothing, every app that used the old primary
+    has to be pointed at it, and building a replica again means starting one from scratch.
+
+    **It is not a backup**
+
+    A replica copies everything faithfully, including the `DELETE` you regret. For getting
+    yesterday back, use a backup repository on the primary's volume.
+
+    **The first copy takes as long as the database is large**
+
+    Nothing answers until the dump has been copied in, and the health check allows about
+    twenty minutes for it. A database large enough to need longer needs a longer start
+    period in this app's container settings.
+  categories: [databases/sql]
+  tags: [sql, relational, mysql-compatible, open-source]
+  aliases: [replica, read replica, mariadb replication, standby, binlog]
+  icon: icons/mariadb.svg
+  links:
+    website: https://mariadb.org
+    documentation: https://mariadb.com/kb/en/standard-replication/
+    source: https://github.com/MariaDB/server
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: primaryApp
+    title: Primary app key
+    description: >-
+      The key of the MariaDB app in this environment to follow. Not its title: the key is
+      what the app answers to on the project's network, and it is shown on that app's page.
+    type: string
+    default: mariadb
+    pattern: '^[a-z0-9][a-z0-9_]{0,99}$'
+  - name: serverId
+    title: Server id
+    description: >-
+      Every server in a replication setup needs a different one, and the primary is told to
+      be 1 when it is prepared. Change this only if you are building a second replica.
+    type: int
+    default: 2
+    min: 2
+    max: 4294967295
+  - name: rootPassword
+    title: Root password
+    description: >-
+      This copy's own administrative account - not the primary's, which is not copied. Leave
+      empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      What this copy gets. Reads here cost what they cost on the primary, so size it for the
+      queries you intend to move over.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the copy is kept on. It holds the whole database, so plan for the size of
+      the primary's.
+    type: volume
+
+versions:
+  - name: "11.8"
+    release: "11.8.9"
+    default: true
+    image: mariadb:11.8.9-noble
+  - name: "11.4"
+    release: "11.4.13"
+    image: mariadb:11.4.13-noble
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Three things happen before the image's own entry point is reached.
+      #
+      # The first is a guard: an interrupted copy leaves a data directory that looks
+      # initialised, and the image would then never run the bootstrap again - so a directory
+      # without the marker the bootstrap writes is thrown away and started over.
+      #
+      # The second is the wait. Until the primary writes a binary log there is nothing to
+      # follow, and starting would only produce a half-built server.
+      #
+      # The third is the arguments: read-only, and the replication filters, which have to be
+      # startup options because CHANGE MASTER filters are forgotten when the temporary
+      # server the bootstrap runs against is stopped. read_only does not apply to root, so
+      # the bootstrap can still load the copy.
+      command: >-
+        sh -c 'if [ -d /var/lib/mysql/mysql ] && [ ! -f /var/lib/mysql/.hivepaas-replica-ready ];
+        then echo "[replica] a previous copy did not finish - starting it again";
+        rm -rf /var/lib/mysql/..?* /var/lib/mysql/.[!.]* /var/lib/mysql/*; fi;
+        until [ "$(MYSQL_PWD="$PRIMARY_PASSWORD" mariadb -h "$PRIMARY_HOST" -P "$PRIMARY_PORT"
+        -u "$PRIMARY_USER" -N -B -e "SELECT @@log_bin" 2>/dev/null)" = 1 ];
+        do echo "[replica] the primary does not have the binary log turned on yet - see this app description";
+        sleep 10; done;
+        exec docker-entrypoint.sh mariadbd --server-id="$SERVER_ID" --read-only=ON
+        --replicate-wild-do-table="$PRIMARY_DB.%" --replicate-ignore-db=mysql'
+    storage:
+      mounts:
+        /var/lib/mysql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: healthcheck.sh --connect --innodb_initialized
+        interval: 30s
+        timeout: 10s
+        startPeriod: 600s
+        retries: 20
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mariadb
+      version: "${{ version.name }}"
+      # No credentials of its own: apps read here with the primary's user and password,
+      # which the bootstrap recreates on this server.
+    envVars:
+      data:
+        # This copy's own root account. The primary's is neither copied nor shared.
+        - {k: MARIADB_ROOT_PASSWORD, v: "${secrets.MARIADB_ROOT_PASSWORD}"}
+        # The primary, by its own key in this environment. Nothing is copied by hand:
+        # these follow whatever that app publishes.
+        - {k: PRIMARY_HOST, v: "${${{ params.primaryApp }}.HIVEPAAS_HOST}"}
+        - {k: PRIMARY_PORT, v: "${${{ params.primaryApp }}.HIVEPAAS_PORT}"}
+        - {k: PRIMARY_USER, v: "${${{ params.primaryApp }}.HIVEPAAS_USER}"}
+        - {k: PRIMARY_PASSWORD, v: "${${{ params.primaryApp }}.HIVEPAAS_PASSWORD}"}
+        - {k: PRIMARY_DB, v: "${${{ params.primaryApp }}.HIVEPAAS_DATABASE_NAME}"}
+        - {k: SERVER_ID, v: "${{ params.serverId }}"}
+    secrets:
+      MARIADB_ROOT_PASSWORD:
+        value: "${{ params.rootPassword }}"
+    configFiles:
+      replica-bootstrap.sh:
+        # Runs once, against the temporary server the image starts while the data directory
+        # is new. Everything it configures is stored in the data directory, so the real
+        # server that follows finds a database and a source to follow.
+        content: |
+          #!/bin/bash
+          set -u -o pipefail
+
+          local_sql() {
+            MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb --user=root --protocol=socket "$@"
+          }
+
+          bootstrap() {
+            # --gtid --master-data=1 makes the dump carry the position it was taken at, as
+            # a global transaction id, and set it here as the dump is loaded.
+            MYSQL_PWD="$PRIMARY_PASSWORD" mariadb-dump --host="$PRIMARY_HOST" \
+              --port="$PRIMARY_PORT" --user="$PRIMARY_USER" --databases "$PRIMARY_DB" \
+              --single-transaction --gtid --master-data=1 --add-drop-database \
+              --routines --triggers --events 2>/tmp/dump.err | local_sql || {
+              sed "s/^/  [replica] /" /tmp/dump.err >&2
+              return 1
+            }
+
+            local_sql <<-SQL || return 1
+              CHANGE MASTER TO
+                MASTER_HOST='$PRIMARY_HOST', MASTER_PORT=$PRIMARY_PORT,
+                MASTER_USER='$PRIMARY_USER', MASTER_PASSWORD='$PRIMARY_PASSWORD',
+                MASTER_USE_GTID=slave_pos;
+          SQL
+          }
+
+          until bootstrap; do
+            echo "[replica] the copy did not finish; trying again in 10 seconds"
+            sleep 10
+          done
+
+          # The account apps connect with. A logical copy carries the data, never the
+          # users, so the primary's application user is recreated here - reading only.
+          local_sql <<-SQL
+            CREATE USER IF NOT EXISTS '$PRIMARY_USER'@'%' IDENTIFIED BY '$PRIMARY_PASSWORD';
+            GRANT SELECT, SHOW VIEW, EXECUTE ON \`$PRIMARY_DB\`.* TO '$PRIMARY_USER'@'%';
+          SQL
+
+          touch /var/lib/mysql/.hivepaas-replica-ready
+          echo "[replica] copied $PRIMARY_DB from $PRIMARY_HOST and set to follow it"
+        swarmRef:
+          file: {name: /docker-entrypoint-initdb.d/10-replica.sh, mode: 755}
+    routing:
+      port: 3306
