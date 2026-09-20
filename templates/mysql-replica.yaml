@@ -13,25 +13,41 @@ metadata:
 
     **Prepare the primary first**
 
-    A MySQL primary writes a binary log out of the box, but it does not hand it to anybody,
-    and it does not track transactions in the form a replica needs. Open a terminal on the
-    primary app and run, as root:
+    A MySQL primary writes a binary log out of the box, but it does not hand it to anybody.
+    Open a terminal on the primary app and run this, as root:
+
+    ```
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT, RELOAD ON *.* TO 'the_app_user'@'%';
+    ```
+
+    It goes to the primary's own application user, which is the account this replica connects
+    with. `RELOAD` is there because the first copy takes a consistent snapshot, and leaving it
+    out is the one mistake that looks like something else: the copy fails with *"you need (at
+    least one of) the RELOAD or FLUSH_TABLES privilege(s)"* and this app keeps retrying.
+
+    Then check whether the primary tracks transactions the way a replica needs:
+
+    ```
+    SELECT @@gtid_mode;
+    ```
+
+    **MySQL 9 answers `ON` and there is nothing more to do.** MySQL 8.4 answers `OFF`, and
+    turning it on takes four steps, in this order, one at a time:
 
     ```
     SET PERSIST enforce_gtid_consistency = ON;
     SET PERSIST gtid_mode = OFF_PERMISSIVE;
     SET PERSIST gtid_mode = ON_PERMISSIVE;
     SET PERSIST gtid_mode = ON;
-    GRANT REPLICATION SLAVE, REPLICATION CLIENT, RELOAD ON *.* TO 'the_app_user'@'%';
     ```
 
-    The four steps are how MySQL turns global transaction identifiers on while it is running
-    - no restart, no downtime. The grant goes to the primary's own application user, which is
-    the account this replica connects with; `RELOAD` is there because the first copy takes a
-    consistent snapshot.
+    That is how MySQL turns global transaction identifiers on while it is running - no
+    restart, no downtime. Run them on a server that is already `ON` and they stop at
+    *"GTID_MODE can only be changed one step at a time"*, which is why the grant goes first:
+    pasted as one block, a failure here would take the grant with it.
 
-    Until that is done this app waits, saying so in its log every ten seconds, and starts by
-    itself once the primary is ready.
+    Until the primary is ready this app waits, saying so in its log every ten seconds, and
+    starts by itself once it is - including after a grant that arrives late.
 
     **What it copies: the primary's database, not the whole server**
 
@@ -66,10 +82,16 @@ metadata:
 
     **Watching it keep up**
 
-    In a terminal here, `SHOW REPLICA STATUS\G` answers all of it: `Replica_IO_Running` and
-    `Replica_SQL_Running` should both say `Yes`, `Seconds_Behind_Source` should sit near
-    zero, and `Last_SQL_Error` should be empty. It is worth a look now and then, because of
-    what comes next.
+    In a terminal here:
+
+    ```
+    mysql -E -e "SHOW REPLICA STATUS"
+    ```
+
+    `Replica_IO_Running` and `Replica_SQL_Running` should both say `Yes`,
+    `Seconds_Behind_Source` should sit near zero, and `Last_SQL_Error` should be empty. Use
+    `-E` rather than the familiar `\G`, which the MySQL 9 client no longer accepts. It is
+    worth a look now and then, because of what comes next.
 
     **When replication breaks**
 
