@@ -1,0 +1,178 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: homepage
+  title: Homepage
+  tagline: One page listing everything you run, with live status on each
+  description: |
+    Homepage is a start page for a server: the things you host, grouped how you like, each
+    with a link, an icon and - where the service has an API - something live beside it, such
+    as how many torrents are downloading or how full a disk is. It is configured in YAML
+    files and holds no state of its own.
+
+    **Everything is in the configuration files**
+
+    This app's configuration files are its whole interface. The template installs a starting
+    set: `services.yaml` for what is listed, `widgets.yaml` for the row at the top,
+    `bookmarks.yaml` for links, and `settings.yaml` for the layout. Edit them here, redeploy,
+    and the page follows.
+
+    **Pointing it at the other apps in this project**
+
+    An app in the same project and environment is reached by its key and its own port -
+    `http://myapp:8080` - without anything being exposed publicly. That is the usual way to
+    list what you run here. Services that need an API key for their live status take it in
+    the same entry, under `widget:`.
+
+    **It has no login**
+
+    Homepage does not authenticate anybody: whoever opens the address sees the page and the
+    links on it. Put it behind the basic authentication in this app's routing settings, or
+    on a domain only you use.
+
+    **What it refuses**
+
+    Since version 1.0 it answers only requests whose Host header it was told to expect. The
+    parameter below is that list; `*` accepts anything, which is reasonable when the only
+    way in is the reverse proxy in front of it.
+  categories: [observability/monitoring]
+  tags: [dashboards, monitoring, open-source]
+  aliases: [dashboard, start-page, heimdall, dashy, homer]
+  icon: icons/homepage.svg
+  links:
+    website: https://gethomepage.dev
+    documentation: https://gethomepage.dev/configs/
+    source: https://github.com/gethomepage/homepage
+  license: GPL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the page answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: title
+    title: Page title
+    description: Shown in the browser tab and at the top of the page.
+    type: string
+    default: "My Services"
+  - name: allowedHosts
+    title: Allowed hosts
+    description: >-
+      Host headers this app answers to, comma separated. `*` accepts any, which is safe
+      enough when the reverse proxy is the only way in.
+    type: string
+    default: "*"
+  - name: configVolume
+    title: Config volume
+    description: >-
+      Where Homepage keeps the configuration files it writes for itself, beside the ones
+      this template installs.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: A small Next.js server that renders one page.
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "1.4"
+    release: "1.4.0"
+    default: true
+    image: ghcr.io/gethomepage/homepage:v1.4.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # Homepage writes the files it is missing into this directory on the first
+        # start, beside the ones the template installs.
+        /app/config: {type: volume, source: "${{ params.configVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl. Its own page: 500 until the configuration
+        # directory exists, 200 once it is serving.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: homepage
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: HOMEPAGE_ALLOWED_HOSTS, v: "${{ params.allowedHosts }}"}
+    configFiles:
+      settings.yaml:
+        content: |
+          title: "${{ params.title }}"
+          headerStyle: clean
+          layout:
+            Applications:
+              style: row
+              columns: 3
+        swarmRef:
+          file: {name: /app/config/settings.yaml, mode: 444}
+      services.yaml:
+        # An app of this project is reached by its key and its own port. Replace these
+        # with what you run; the icons come from the dashboard-icons set by name.
+        content: |
+          - Applications:
+              - Example app:
+                  href: https://example.com
+                  description: Replace this with something you run
+                  icon: si-docker
+              # - Gitea:
+              #     href: https://git.example.com
+              #     description: Repositories
+              #     icon: gitea
+              #     server: gitea
+              # An app in this project, by its key, without exposing it publicly:
+              # - Grafana:
+              #     href: http://grafana:3000
+              #     icon: grafana
+        swarmRef:
+          file: {name: /app/config/services.yaml, mode: 444}
+      widgets.yaml:
+        content: |
+          - search:
+              provider: duckduckgo
+              target: _blank
+          - datetime:
+              text_size: xl
+              format:
+                dateStyle: long
+                timeStyle: short
+                hourCycle: h23
+        swarmRef:
+          file: {name: /app/config/widgets.yaml, mode: 444}
+      bookmarks.yaml:
+        content: |
+          - Documentation:
+              - Homepage docs:
+                  - abbr: HP
+                    href: https://gethomepage.dev/configs/
+        swarmRef:
+          file: {name: /app/config/bookmarks.yaml, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: baserow
+  title: Baserow
+  tagline: Spreadsheets that are really a database, with an API for every table
+  description: |
+    Baserow is a database that looks like a spreadsheet: tables with typed fields, grid,
+    gallery and kanban views, filters, links between tables, forms to collect rows from
+    outside, and a REST API for every table so the rest of your software can read and write
+    what people edit by hand.
+
+    **The first person to sign up owns it**
+
+    There is no administrator to create here: whoever opens the app first registers, and
+    that account is the one with staff rights. Do it as soon as it is deployed, then turn
+    registration off under *Admin - Settings* if the address is public.
+
+    **What runs where**
+
+    The image is the all-in-one build, which runs the API, the web front end and the
+    background workers together, but it is pointed at the PostgreSQL and the Valkey created
+    alongside it rather than at the ones it can start for itself - so the data is in a
+    database this platform manages, backs up and lets you reach.
+
+    **The public URL matters more than usual**
+
+    Baserow writes its own address into the pages it serves and into the links it emails.
+    It is taken from the app's URL, so an app without a domain will load but its front end
+    will call an address nobody can reach. Give it a domain, then redeploy.
+
+    **Its own volume is for uploads**
+
+    Files people attach to rows, and the thumbnails made from them. Rows and tables live in
+    the database app.
+
+    **It is a big image**
+
+    About 3.4GB, and the first start takes a few minutes while it migrates the database -
+    the health check waits five.
+  categories: [webapps/low-code]
+  tags: [low-code, spreadsheet, relational, open-source]
+  aliases: [airtable, nocodb, tables, no-code]
+  icon: icons/baserow.svg
+  links:
+    website: https://baserow.io
+    documentation: https://baserow.io/docs/installation%2Fconfiguration
+    source: https://github.com/bram2w/baserow
+  license: MIT
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: baserow
+      username: baserow
+  - name: cache
+    title: Cache
+    template: valkey
+    version: "9.1"
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Baserow answers at. Its front end calls this address, so the app is not
+      usable without one.
+    type: domain
+    optional: true
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Signs sessions and tokens. Leave it empty and one is generated; changing it later
+      signs everybody out.
+    type: secret
+    generate: {length: 50}
+  - name: dataVolume
+    title: Data volume
+    description: Files attached to rows, and the thumbnails made from them.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: The API, the front end and the workers in one container.
+    type: size
+    default: 2GB
+    min: 1GB
+
+versions:
+  - name: "1.35"
+    release: "1.35.1"
+    default: true
+    image: baserow/baserow:1.35.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /baserow/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The backend's own health endpoint, asked on its own port rather than through
+        # the Caddy in front: Caddy routes by Host, and a request to 127.0.0.1 is
+        # answered by the app builder with a 404 rather than by the API. The image
+        # has curl.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8000/api/_health/
+        interval: 30s
+        timeout: 15s
+        # Migrations on a first start take minutes on a small machine.
+        startPeriod: 300s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: baserow
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Written into the pages it serves and the links it sends.
+        - {k: BASEROW_PUBLIC_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: SECRET_KEY, v: "${secrets.BASEROW_SECRET_KEY}"}
+        # Setting these is what turns the image's own PostgreSQL and Redis off.
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        # The reverse proxy in front terminates TLS and adds the usual headers.
+        - {k: BASEROW_CADDY_ADDRESSES, v: ":80"}
+    secrets:
+      BASEROW_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

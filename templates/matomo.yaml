@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: matomo
+  title: Matomo
+  tagline: Web analytics you host yourself, with the raw data staying yours
+  description: |
+    Matomo counts visits the way Google Analytics does and keeps every row in a database you
+    own: no sampling, no data sold on, no third party between you and what your site did.
+    It reports visitors, pages, referrers, campaigns, goals, ecommerce and site search, and
+    it can run without cookies where you would rather not ask for consent.
+
+    **The installer finishes the job**
+
+    The database this template creates is already filled in, so the first three steps of the
+    installer pass straight through. What it still asks for is the **superuser account** and
+    the first website to track - that is deliberate, and it is the first thing to do after
+    deploying, because until somebody creates that account anyone who finds the address can.
+
+    **Getting a site tracked**
+
+    The installer prints a JavaScript snippet for the site you added; paste it before
+    `</head>` on every page. More sites are added later under *Administration - Websites*.
+
+    **Archiving**
+
+    Matomo processes reports when a report is opened, which is fine for a small site and
+    slow once traffic grows. The usual answer is to turn browser archiving off and run
+    `core:archive` on a schedule - a scheduled job on this app, once you have enough traffic
+    to notice.
+
+    **Where the data is**
+
+    Everything measured is in the database app created alongside this one. The app's own
+    volume holds Matomo's files: its configuration, plugins you install and the GeoIP
+    database if you add one.
+  categories: [observability/analytics]
+  tags: [web-analytics, analytics, privacy, open-source]
+  aliases: [analytics, piwik, google-analytics-alternative, statistics]
+  icon: icons/matomo.svg
+  links:
+    website: https://matomo.org
+    documentation: https://matomo.org/docs/installation/
+    source: https://github.com/matomo-org/matomo
+  license: GPL-3.0
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: matomo
+      username: matomo
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Matomo answers at, and the address the tracking snippet points at. Leave
+      it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      Matomo's own files: configuration, plugins, and anything it caches. The measurements
+      are in the database.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: PHP and Apache. Archiving large reports is what makes it want more.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "5"
+    release: "5.3.2"
+    default: true
+    image: matomo:5.3.2-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own index, which answers the installer before there is anything installed
+        # and the dashboard afterwards. The image has curl.
+        command: curl -fsS -o /dev/null http://127.0.0.1/index.php
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: matomo
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The installer reads these and skips its database step.
+        - {k: MATOMO_DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: MATOMO_DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: MATOMO_DATABASE_ADAPTER, v: "mysql"}
+        - {k: MATOMO_DATABASE_TABLES_PREFIX, v: "matomo_"}
+        - {k: MATOMO_DATABASE_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: MATOMO_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: MATOMO_DATABASE_DBNAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        # The reverse proxy terminates TLS, so Matomo has to be told that what reached
+        # it over plain HTTP was an HTTPS request - otherwise it writes http:// links
+        # into the tracking snippet and its own redirects.
+        - {k: MATOMO_GENERAL_ASSUME_SECURE_PROTOCOL, v: "1"}
+        - {k: MATOMO_GENERAL_PROXY_CLIENT_HEADERS, v: "HTTP_X_FORWARDED_FOR"}
+        - {k: MATOMO_GENERAL_PROXY_HOST_HEADERS, v: "HTTP_X_FORWARDED_HOST"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

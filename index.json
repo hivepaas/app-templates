@@ -699,6 +699,57 @@
       }
     },
     {
+      "name": "baserow",
+      "file": {
+        "path": "templates/baserow.yaml",
+        "sha256": "051c137f4a4ae34972fed09ef5ebc703d439bb028577b65fd454c05c79912007"
+      },
+      "icon": {
+        "path": "icons/baserow.svg",
+        "sha256": "765ce7ec49443ecefb669b536b73aa179315e08e24e51055bfe016f008bb8a20"
+      },
+      "title": "Baserow",
+      "tagline": "Spreadsheets that are really a database, with an API for every table",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "spreadsheet",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "airtable",
+        "nocodb",
+        "tables",
+        "no-code"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.35",
+          "release": "1.35.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "beszel",
       "file": {
         "path": "templates/beszel.yaml",
@@ -2185,6 +2236,45 @@
       }
     },
     {
+      "name": "homepage",
+      "file": {
+        "path": "templates/homepage.yaml",
+        "sha256": "793003208f9ef2736d48930217c33f64e35ccfadea033662adc01882c8a49dfb"
+      },
+      "icon": {
+        "path": "icons/homepage.svg",
+        "sha256": "48528e537bee8498c5da889e29d5e99a67d3f5872b80c2c55e9d0ddaf61c02e2"
+      },
+      "title": "Homepage",
+      "tagline": "One page listing everything you run, with live status on each",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "dashboards",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "dashboard",
+        "start-page",
+        "heimdall",
+        "dashy",
+        "homer"
+      ],
+      "license": "GPL-3.0",
+      "versions": [
+        {
+          "name": "1.4",
+          "release": "1.4.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "immich",
       "file": {
         "path": "templates/immich.yaml",
@@ -3097,6 +3187,52 @@
         {
           "name": "11.4",
           "release": "11.4.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "matomo",
+      "file": {
+        "path": "templates/matomo.yaml",
+        "sha256": "da364201279272557f4bd661704d762da35b65781ed0bf5e50841fe7df1f5487"
+      },
+      "icon": {
+        "path": "icons/matomo.svg",
+        "sha256": "363cdaa03d3e393faf579d4f4b17c129e6745f2b65631d5ea7ff00ac9c879e4d"
+      },
+      "title": "Matomo",
+      "tagline": "Web analytics you host yourself, with the raw data staying yours",
+      "categories": [
+        "observability/analytics"
+      ],
+      "tags": [
+        "web-analytics",
+        "analytics",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "analytics",
+        "piwik",
+        "google-analytics-alternative",
+        "statistics"
+      ],
+      "license": "GPL-3.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5",
+          "release": "5.3.2",
+          "default": true
         }
       ],
       "requires": {
