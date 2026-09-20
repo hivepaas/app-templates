@@ -87,6 +87,10 @@
         {
           "id": "documents",
           "title": "Files & Documents"
+        },
+        {
+          "id": "networking",
+          "title": "Networking & VPN"
         }
       ]
     },
@@ -115,6 +119,10 @@
         {
           "id": "backup",
           "title": "Backup"
+        },
+        {
+          "id": "files",
+          "title": "File Transfer"
         }
       ]
     }
@@ -319,9 +327,96 @@
     {
       "id": "files",
       "title": "File Sync"
+    },
+    {
+      "id": "vpn",
+      "title": "VPN"
+    },
+    {
+      "id": "networking",
+      "title": "Networking"
+    },
+    {
+      "id": "dns",
+      "title": "DNS"
+    },
+    {
+      "id": "mqtt",
+      "title": "MQTT"
+    },
+    {
+      "id": "iot",
+      "title": "IoT"
+    },
+    {
+      "id": "voice",
+      "title": "Voice Chat"
+    },
+    {
+      "id": "file-transfer",
+      "title": "File Transfer"
+    },
+    {
+      "id": "cloudflare",
+      "title": "Cloudflare"
     }
   ],
   "templates": [
+    {
+      "name": "activepieces",
+      "file": {
+        "path": "templates/activepieces.yaml",
+        "sha256": "ce60aa633ea9430ca7f41a29c73d884b9b0b2c76a20a47bc2ee4ef7c8d015d78"
+      },
+      "icon": {
+        "path": "icons/activepieces.svg",
+        "sha256": "65f7776cbb0776fcdf01644096f8fa65d610169815648ece8e9364e771f8754b"
+      },
+      "title": "Activepieces",
+      "tagline": "Automations built by dragging pieces together, with AI where you want it",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation",
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "zapier",
+        "make",
+        "workflow",
+        "n8n-alternative",
+        "integrations"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Queue",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.91",
+          "release": "0.91.0",
+          "default": true
+        },
+        {
+          "name": "0.90",
+          "release": "0.90.4"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
     {
       "name": "actual",
       "file": {
@@ -437,6 +532,250 @@
       }
     },
     {
+      "name": "appsmith",
+      "file": {
+        "path": "templates/appsmith.yaml",
+        "sha256": "96a8eea6ea4ce51e2ce9e7e42e9a6a05f20e0c7789368bfb57ca4d59625b3e73"
+      },
+      "icon": {
+        "path": "icons/appsmith.svg",
+        "sha256": "e718b46ad95a3e36de3ab75c9af54988e1cac57c38324132ad5414223208186b"
+      },
+      "title": "Appsmith",
+      "tagline": "Internal tools built by dragging widgets and wiring them to your data",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "internal-tools",
+        "admin-panel",
+        "retool",
+        "tooljet"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.4",
+          "release": "v2.4.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "audiobookshelf",
+      "file": {
+        "path": "templates/audiobookshelf.yaml",
+        "sha256": "0050d99e418680294ef38bb88330b737339b16e11355fc455f4a1eeb5c039f53"
+      },
+      "icon": {
+        "path": "icons/audiobookshelf.svg",
+        "sha256": "d65d8f64ac00a3e9bb90aebb39857140c9c9b10d87faf2a95091855ff01c8ed8"
+      },
+      "title": "Audiobookshelf",
+      "tagline": "Audiobooks and podcasts that remember where you stopped",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "audiobooks",
+        "podcasts",
+        "plex-alternative",
+        "books"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "2.36",
+          "release": "2.36.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "authelia",
+      "file": {
+        "path": "templates/authelia.yaml",
+        "sha256": "7dfe271d8d8f65a082915dfdcab233265123958fd1a693f74bf0fa7db6ec756a"
+      },
+      "icon": {
+        "path": "icons/authelia.svg",
+        "sha256": "7402a43071be397ebf2d46c1fee5d001398e9d7212ee0fd52d4fffc310207bcd"
+      },
+      "title": "Authelia",
+      "tagline": "One sign-in page in front of the apps that have none",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "sso",
+        "forward-auth",
+        "2fa",
+        "login",
+        "oidc"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "4.39",
+          "release": "4.39.28",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "authentik",
+      "file": {
+        "path": "templates/authentik.yaml",
+        "sha256": "47c88b268af5032132b7bda33c4e7ef25bac939beb15732efd97c68115c835c4"
+      },
+      "icon": {
+        "path": "icons/authentik.svg",
+        "sha256": "ec40a834e984aed487633f9d9339c9bf6598c6e50a3fd7e21d62c17cdf6ebe44"
+      },
+      "title": "authentik",
+      "tagline": "One account for every app, and the protocols to prove it",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "sso",
+        "oidc",
+        "oauth",
+        "saml",
+        "ldap",
+        "keycloak alternative"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Cache",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.8",
+          "release": "2026.8.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "beszel",
+      "file": {
+        "path": "templates/beszel.yaml",
+        "sha256": "df9130f07cdb51b354fe28a98192265fdc08e9a1b42361dfa5b32bd77c1b4d83"
+      },
+      "icon": {
+        "path": "icons/beszel.svg",
+        "sha256": "bbbf5be91dca5820dc8c36af54227d167a8e6ebf00123afa49d7db7d06efc597"
+      },
+      "title": "Beszel",
+      "tagline": "Server monitoring small enough to forget about, with alerts that work",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "metrics",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "server-monitoring",
+        "netdata-alternative",
+        "resources"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.20",
+          "release": "0.20.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "changedetection",
+      "file": {
+        "path": "templates/changedetection.yaml",
+        "sha256": "57002ed913e8bb7dbd513742438a8de6b11529bfff322f95dd467457edd3e30f"
+      },
+      "icon": {
+        "path": "icons/changedetection.svg",
+        "sha256": "e00feca9886862f1cca4b9e9bba9b2d3d933f9a162e991b0bf895df963e1417a"
+      },
+      "title": "changedetection.io",
+      "tagline": "Watches web pages and tells you the moment they change",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation",
+        "monitoring",
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "website-monitor",
+        "price-watch",
+        "diff",
+        "scraper"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.60",
+          "release": "0.60.7",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "clickhouse",
       "file": {
         "path": "templates/clickhouse.yaml",
@@ -472,6 +811,85 @@
         {
           "name": "26.3",
           "release": "26.3.33.24"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "cloudflare-ddns",
+      "file": {
+        "path": "templates/cloudflare-ddns.yaml",
+        "sha256": "88fe6b23d983c1ceb55b4882aa6a19c4e1bf33f62a060d4cc8d040970fff11f0"
+      },
+      "icon": {
+        "path": "icons/cloudflare-ddns.svg",
+        "sha256": "058e135ec938e90bd0b50e59ebf3e08dd3d0196f74aba23031cbe97348db14d5"
+      },
+      "title": "Cloudflare DDNS",
+      "tagline": "Keeps a Cloudflare DNS record pointing at this machine's changing address",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "dns",
+        "networking",
+        "cloudflare",
+        "open-source"
+      ],
+      "aliases": [
+        "ddns",
+        "dynamic-dns",
+        "duckdns",
+        "no-ip"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.15",
+          "release": "1.15.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "cloudflared",
+      "file": {
+        "path": "templates/cloudflared.yaml",
+        "sha256": "ce3efad5c737181f8998e4fbc72dd9ac7acdfdb8ba299d62f1439e0c4ba034e0"
+      },
+      "icon": {
+        "path": "icons/cloudflared.svg",
+        "sha256": "e9063e155ac4142e0d6ac7404cbf5850350ac318e2f4820b11338f534e4c61e0"
+      },
+      "title": "Cloudflare Tunnel",
+      "tagline": "Publish an app through Cloudflare without opening a port on the node",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "cloudflare",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "tunnel",
+        "argo",
+        "zero-trust",
+        "ngrok-alternative",
+        "reverse-tunnel"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2026.8",
+          "release": "2026.8.1",
+          "default": true
         }
       ],
       "requires": {
@@ -686,6 +1104,45 @@
       }
     },
     {
+      "name": "docuseal",
+      "file": {
+        "path": "templates/docuseal.yaml",
+        "sha256": "d2e868535e9579894c1a61019315808bebe571baee550b9d6ea378fd88330ee3"
+      },
+      "icon": {
+        "path": "icons/docuseal.svg",
+        "sha256": "5f406b876f158f669564636cb3936ed80becef5ef137c6287e8970bb4d9ed151"
+      },
+      "title": "DocuSeal",
+      "tagline": "Send a document, get it signed back",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "esign",
+        "signature",
+        "docusign",
+        "e-signature",
+        "pdf sign"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2.3",
+          "release": "2.3.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "dolt",
       "file": {
         "path": "templates/dolt.yaml",
@@ -798,6 +1255,94 @@
       }
     },
     {
+      "name": "espocrm",
+      "file": {
+        "path": "templates/espocrm.yaml",
+        "sha256": "f79ab302de24baab04b4155a554ec65820e8c681ccf6ab1b7f93b06aec966f98"
+      },
+      "icon": {
+        "path": "icons/espocrm.svg",
+        "sha256": "40b7ef9d83678eb963ac4d0f83d027682725d99cb9fd53f35a255cf663070014"
+      },
+      "title": "EspoCRM",
+      "tagline": "Who your customers are and what was said to them",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "crm",
+        "sales",
+        "contacts",
+        "leads",
+        "pipeline"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "10.0",
+          "release": "10.0.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "etcd",
+      "file": {
+        "path": "templates/etcd.yaml",
+        "sha256": "5e30a23cd61e0af6db8278b0c7be1c5f366af3a70669acacd3b5bbe0d802d2d6"
+      },
+      "icon": {
+        "path": "icons/etcd.svg",
+        "sha256": "81409e79ceb7f5a1e0b658c4334411efe4db36011e9e27bf23fd1e631fb4b04d"
+      },
+      "title": "etcd",
+      "tagline": "The small key-value store distributed systems agree through",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "key-value",
+        "open-source"
+      ],
+      "aliases": [
+        "key value",
+        "coordination",
+        "service discovery",
+        "locks",
+        "raft"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.6",
+          "release": "3.6.14",
+          "default": true
+        },
+        {
+          "name": "3.5",
+          "release": "3.5.33"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "firefly-iii",
       "file": {
         "path": "templates/firefly-iii.yaml",
@@ -884,6 +1429,55 @@
       }
     },
     {
+      "name": "flowise-postgres",
+      "file": {
+        "path": "templates/flowise-postgres.yaml",
+        "sha256": "1fcfb5a93621ca9ef01ab23b0cd1e9df162729547b609071848234d98ceee81d"
+      },
+      "icon": {
+        "path": "icons/flowise.svg",
+        "sha256": "5dc7230821d8582b58b0d9a31faa043f8aae1b4164bfd81d5ef0614062b7cf5d"
+      },
+      "title": "Flowise with PostgreSQL",
+      "tagline": "The visual builder for LLM flows, with its flows in a database",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "low-code",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "langchain",
+        "chatbot",
+        "agents",
+        "no-code",
+        "rag",
+        "flowise postgres"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "freshrss",
       "file": {
         "path": "templates/freshrss.yaml",
@@ -914,6 +1508,90 @@
         {
           "name": "1.30",
           "release": "1.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "freshrss-postgres",
+      "file": {
+        "path": "templates/freshrss-postgres.yaml",
+        "sha256": "968e4455441cb50cffd8ae88a534f71ec0320acf70575e11070be9e6846702b8"
+      },
+      "icon": {
+        "path": "icons/freshrss.svg",
+        "sha256": "7d0386a76986aa148c875337c17a2cbdf2e96a312ab0ab991b7268e721bc8408"
+      },
+      "title": "FreshRSS with PostgreSQL",
+      "tagline": "The feed reader, with its feeds and articles in a database",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "rss",
+        "feeds",
+        "reader",
+        "atom",
+        "news",
+        "freshrss postgres"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.30",
+          "release": "1.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gatus",
+      "file": {
+        "path": "templates/gatus.yaml",
+        "sha256": "8409b5f2ad2d6ccad583d8fa684bf5684f93807d3f14f4a61543b5b830a2cd61"
+      },
+      "icon": {
+        "path": "icons/gatus.svg",
+        "sha256": "ac1f83736d661479ecea1aeae30602bc6f078e5e58f4d323ee3925bf77fda530"
+      },
+      "title": "Gatus",
+      "tagline": "A status page that is a YAML file and nothing else",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "uptime",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "status-page",
+        "healthchecks",
+        "uptime"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "5.36",
+          "release": "v5.36.0",
           "default": true
         }
       ],
@@ -1056,6 +1734,87 @@
       }
     },
     {
+      "name": "gitea-sqlite",
+      "file": {
+        "path": "templates/gitea-sqlite.yaml",
+        "sha256": "7e8541a026b318301e4d320725aa9d92c99f4710f33a1584fdea2d427005a798"
+      },
+      "icon": {
+        "path": "icons/gitea.svg",
+        "sha256": "72e13379b6f0ddfb083558f6c7d0212c311860949f07d7295269bc186f8bf5d8"
+      },
+      "title": "Gitea with SQLite",
+      "tagline": "A git server in one app, with nothing else to run beside it",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "git",
+        "forge",
+        "gitea sqlite",
+        "small git server"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.27",
+          "release": "1.27.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gitlab",
+      "file": {
+        "path": "templates/gitlab.yaml",
+        "sha256": "5242c8546f582a679ff7771207318514fdc0b423aa6ee496efbe4dbef0428659"
+      },
+      "icon": {
+        "path": "icons/gitlab.svg",
+        "sha256": "cd4d2d0ccb97b3e828ff4ee1886927b262cc8b1587e496926aff9f1bd6954916"
+      },
+      "title": "GitLab",
+      "tagline": "Repositories, reviews, CI and issues, all in one place",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "automation",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "git-server",
+        "repositories",
+        "merge-requests",
+        "ci",
+        "devops"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "19.4",
+          "release": "19.4.0",
+          "default": true
+        },
+        {
+          "name": "19.3",
+          "release": "19.3.2"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "glance",
       "file": {
         "path": "templates/glance.yaml",
@@ -1086,6 +1845,49 @@
           "name": "0.8",
           "release": "0.8.6",
           "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gotenberg",
+      "file": {
+        "path": "templates/gotenberg.yaml",
+        "sha256": "ba007469925d4224931509faa7e32cc475be92212cc86e7118e2f8f176443aec"
+      },
+      "icon": {
+        "path": "icons/gotenberg.svg",
+        "sha256": "ccb562545f4a2d9ad24e9bdcc675a499ff24a6664085c06d03cc5d6d11cd2799"
+      },
+      "title": "Gotenberg",
+      "tagline": "Turns documents and web pages into PDFs, over HTTP",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "documents",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "pdf",
+        "convert",
+        "libreoffice",
+        "chromium",
+        "document-conversion"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "8.37",
+          "release": "8.37.0",
+          "default": true
+        },
+        {
+          "name": "8.36",
+          "release": "8.36.0"
         }
       ],
       "requires": {
@@ -1130,6 +1932,51 @@
       }
     },
     {
+      "name": "gotify-postgres",
+      "file": {
+        "path": "templates/gotify-postgres.yaml",
+        "sha256": "693ae1d17d071c1b65cb4d998c786ebb12cf6aaf68f09d8a474342d033d55619"
+      },
+      "icon": {
+        "path": "icons/gotify.svg",
+        "sha256": "3a6149a91f177193a1e09ea14eea3f9b7c5241ec00554e5df945e0f9505b9750"
+      },
+      "title": "Gotify with PostgreSQL",
+      "tagline": "Push notifications to your own phone, with the messages in a database",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "push",
+        "notify",
+        "alerts",
+        "messages",
+        "gotify postgres"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "grafana",
       "file": {
         "path": "templates/grafana.yaml",
@@ -1159,6 +2006,92 @@
         {
           "name": "13.0",
           "release": "13.0.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "grafana-postgres",
+      "file": {
+        "path": "templates/grafana-postgres.yaml",
+        "sha256": "d8c21c75bfde5258ce80dcba8466d3db0146a05f5b41cf09a8abdb641c7248ac"
+      },
+      "icon": {
+        "path": "icons/grafana.svg",
+        "sha256": "0576670432e4443be142f4e5ca6e9df7c3ccb38245acf4c0da4dbcb663656f4c"
+      },
+      "title": "Grafana with PostgreSQL",
+      "tagline": "Grafana keeping its dashboards in a database rather than in a file",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "dashboards",
+        "monitoring",
+        "metrics",
+        "open-source"
+      ],
+      "aliases": [
+        "grafana postgres",
+        "grafana postgresql",
+        "dashboard",
+        "graphs"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "13.0",
+          "release": "13.0.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "grist",
+      "file": {
+        "path": "templates/grist.yaml",
+        "sha256": "56a0e6887d511770fab4e4d09ef68c7b0eec2f235db0d2eb182483aea7927a21"
+      },
+      "icon": {
+        "path": "icons/grist.svg",
+        "sha256": "d7d5da7eccbbe6a0539cb2d363a6330922577675fa7ac6f240b3a53b0bec86d5"
+      },
+      "title": "Grist",
+      "tagline": "A spreadsheet that is really a database",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "spreadsheet",
+        "low-code",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "spreadsheet",
+        "airtable",
+        "excel",
+        "tables",
+        "database ui"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.7",
+          "release": "1.7.6",
           "default": true
         }
       ],
@@ -1215,7 +2148,7 @@
       "name": "immich",
       "file": {
         "path": "templates/immich.yaml",
-        "sha256": "e74d18ea748a2ac9e8b3cdd492fee02f5ccce624a2e86d0943ae44034baac300"
+        "sha256": "97487f4aaf8bb73991b95b772b9c5eb0fb427bed8effad9eca36ac35691dc76c"
       },
       "icon": {
         "path": "icons/immich.svg",
@@ -1340,6 +2273,50 @@
       }
     },
     {
+      "name": "it-tools",
+      "file": {
+        "path": "templates/it-tools.yaml",
+        "sha256": "628bd3d1a71a9162a58dad625410a8baebcf5471a919433c2022d3dfca04d9bc"
+      },
+      "icon": {
+        "path": "icons/it-tools.svg",
+        "sha256": "271b502b44cab21b83a51f7c17f48836396f9e441afc45ebdea861a55741f55e"
+      },
+      "title": "IT Tools",
+      "tagline": "The small conversions a developer does all day, on your own server",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source",
+        "privacy"
+      ],
+      "aliases": [
+        "tools",
+        "utilities",
+        "converter",
+        "encoder",
+        "decoder",
+        "jwt",
+        "base64"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "2024.10",
+          "release": "2024.10.22",
+          "default": true
+        },
+        {
+          "name": "2024.5",
+          "release": "2024.5.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "jaeger",
       "file": {
         "path": "templates/jaeger.yaml",
@@ -1371,6 +2348,89 @@
           "name": "2.21",
           "release": "2.21.0",
           "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "jellyfin",
+      "file": {
+        "path": "templates/jellyfin.yaml",
+        "sha256": "b2bfab05ad28a2bbdfcc30959671a7ad7a620cde8d2e8ed4c29f3f5a9a366b6b"
+      },
+      "icon": {
+        "path": "icons/jellyfin.svg",
+        "sha256": "35eb35ee649f731ce9e91029ba655e68d124f380908b942c3ad8db03d4358716"
+      },
+      "title": "Jellyfin",
+      "tagline": "Your films and series, on your own server, with no account anywhere",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "media-server",
+        "movies",
+        "tv",
+        "plex-alternative",
+        "emby"
+      ],
+      "license": "GPL-2.0-only",
+      "versions": [
+        {
+          "name": "12.1",
+          "release": "12.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "jenkins",
+      "file": {
+        "path": "templates/jenkins.yaml",
+        "sha256": "a99b2e0c6ce6262f06d1b92ceb3139ad7b3113d48aba779675b269251ac1e599"
+      },
+      "icon": {
+        "path": "icons/jenkins.svg",
+        "sha256": "17de4687996e27d51898a083c6d104a157d92ee29951fa904b625a506fbf1c02"
+      },
+      "title": "Jenkins",
+      "tagline": "The build server that has run everybody's pipelines for twenty years",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "automation",
+        "testing",
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "ci",
+        "cd",
+        "build-server",
+        "pipeline",
+        "hudson"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.568",
+          "release": "2.568.3 LTS",
+          "default": true
+        },
+        {
+          "name": "2.568-slim",
+          "release": "2.568.3 LTS, slim"
         }
       ],
       "requires": {
@@ -1505,6 +2565,88 @@
       }
     },
     {
+      "name": "komga",
+      "file": {
+        "path": "templates/komga.yaml",
+        "sha256": "90cc4d009665ef89ada6429eff238f652f54a07e6eba10959d09504d741126ba"
+      },
+      "icon": {
+        "path": "icons/komga.svg",
+        "sha256": "0e1248742b183047abdbd78473e15f3a55c81a863517c17262029beee43495c0"
+      },
+      "title": "Komga",
+      "tagline": "A library for comics, manga and magazines, with a reader in the browser",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "comics",
+        "manga",
+        "cbz",
+        "opds",
+        "ebooks"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.27",
+          "release": "1.27.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kopia",
+      "file": {
+        "path": "templates/kopia.yaml",
+        "sha256": "5037c779ac87630fcc32d46d58d57feac42c066b12cc6b5b5107c3fa27521e74"
+      },
+      "icon": {
+        "path": "icons/kopia.svg",
+        "sha256": "881e06262d2c9c56922071dc0b663a2324e0e1ca4ef0455ebd0e86157b7b411d"
+      },
+      "title": "Kopia",
+      "tagline": "Backups that deduplicate, encrypt and verify themselves",
+      "categories": [
+        "storage/backup"
+      ],
+      "tags": [
+        "backup",
+        "files",
+        "s3",
+        "open-source"
+      ],
+      "aliases": [
+        "snapshot",
+        "restore",
+        "restic-alternative",
+        "deduplication"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.23",
+          "release": "0.23.1",
+          "default": true
+        },
+        {
+          "name": "0.22",
+          "release": "0.22.1"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "linkding",
       "file": {
         "path": "templates/linkding.yaml",
@@ -1535,6 +2677,143 @@
         {
           "name": "1.47",
           "release": "1.47.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "linkding-postgres",
+      "file": {
+        "path": "templates/linkding-postgres.yaml",
+        "sha256": "dbb8d21d3d426ee62b390c7624e3ece2083c476f3b2b97db9f3d310d634697ec"
+      },
+      "icon": {
+        "path": "icons/linkding.svg",
+        "sha256": "a804d8ed7b5dbf4f2b7b554033b9f78079bd5cd09970072d8b35de9ba266f39d"
+      },
+      "title": "linkding with PostgreSQL",
+      "tagline": "The bookmark manager, keeping its bookmarks in a database",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "bookmarks",
+        "read-later",
+        "linkding postgres",
+        "pinboard"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.47",
+          "release": "1.47.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "linkwarden",
+      "file": {
+        "path": "templates/linkwarden.yaml",
+        "sha256": "706eea4659b0909eaa689164724485573d28832632f9c086302f144887de3b0a"
+      },
+      "icon": {
+        "path": "icons/linkwarden.svg",
+        "sha256": "843e43b7465cb4ce975bf4d8d34c01f2edb56a45f78d1b16861274d35a8d7b5e"
+      },
+      "title": "Linkwarden",
+      "tagline": "Bookmarks that keep the page, not just the link",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "bookmarks",
+        "read-later",
+        "archive",
+        "pocket",
+        "pinboard"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.14",
+          "release": "2.14.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "listmonk",
+      "file": {
+        "path": "templates/listmonk.yaml",
+        "sha256": "2f2052548337230507ff697512636c13c455484f12c17ce2bb1396385d250697"
+      },
+      "icon": {
+        "path": "icons/listmonk.svg",
+        "sha256": "771087d2f00ef0892e217554db3c409321c5645d3e1e85fade7f4cad713cd3b9"
+      },
+      "title": "listmonk",
+      "tagline": "Your mailing list, without the per-subscriber bill",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "email",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "newsletter",
+        "mailing list",
+        "mailchimp",
+        "email marketing",
+        "campaigns"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.2",
+          "release": "6.2.0",
           "default": true
         }
       ],
@@ -1581,6 +2860,44 @@
         {
           "name": "1.61",
           "release": "1.61.7",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "lldap",
+      "file": {
+        "path": "templates/lldap.yaml",
+        "sha256": "55d6abcab2db0236459d4d7fd84fcaa5b86acb4ff0120ef3032dd858d0d57ff4"
+      },
+      "icon": {
+        "path": "icons/lldap.svg",
+        "sha256": "74e8b467428ace58fc17c0f20c79cec0bb0cf7744a5906226ea17856b5875bc3"
+      },
+      "title": "LLDAP",
+      "tagline": "A small LDAP server with a web interface, for apps that want a directory",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "ldap",
+        "directory",
+        "users",
+        "openldap"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "2026-08",
+          "release": "2026-08-28",
           "default": true
         }
       ],
@@ -1687,6 +3004,50 @@
         "mysql"
       ],
       "license": "GPL-2.0",
+      "versions": [
+        {
+          "name": "11.8",
+          "release": "11.8.9",
+          "default": true
+        },
+        {
+          "name": "11.4",
+          "release": "11.4.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mariadb-replica",
+      "file": {
+        "path": "templates/mariadb-replica.yaml",
+        "sha256": "9ba3f572d2435b164dcea4ce62ed3ce8350b41b00d08777547f7f6bcf04ade69"
+      },
+      "icon": {
+        "path": "icons/mariadb.svg",
+        "sha256": "89951d6e8abc9786602859be82605ba1b1a8003409eebf15037a5620e6ea2fd4"
+      },
+      "title": "MariaDB read replica",
+      "tagline": "A second copy of a database, kept current from the binary log",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "mysql-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "replica",
+        "read replica",
+        "mariadb replication",
+        "standby",
+        "binlog"
+      ],
+      "license": "GPL-2.0-only",
       "versions": [
         {
           "name": "11.8",
@@ -1845,6 +3206,49 @@
         "note-taking"
       ],
       "license": "MIT",
+      "versions": [
+        {
+          "name": "0.30",
+          "release": "0.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "memos-postgres",
+      "file": {
+        "path": "templates/memos-postgres.yaml",
+        "sha256": "95a87c90a89a2eec038f6306443d98bd9c6cbfb426e0a50e9e9800f864371f9f"
+      },
+      "icon": {
+        "path": "icons/memos.svg",
+        "sha256": "c18d39e0f3d28537351e77e3ff5bb3bb12a4b8199301df9285ed1045ff03e8a4"
+      },
+      "title": "Memos with PostgreSQL",
+      "tagline": "The note-taking server, keeping its notes in a database",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "notes",
+        "memos postgres",
+        "microblog"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
       "versions": [
         {
           "name": "0.30",
@@ -2028,6 +3432,85 @@
       }
     },
     {
+      "name": "mosquitto",
+      "file": {
+        "path": "templates/mosquitto.yaml",
+        "sha256": "0c8ed767475102ca3406d7fad229c7cb11971af43adfad98187b7dfe40f0bd16"
+      },
+      "icon": {
+        "path": "icons/mosquitto.svg",
+        "sha256": "4c840d4f9deaea9fca63b3b4b6f1f0a10980fc0ec78652503738545e46a0cae8"
+      },
+      "title": "Eclipse Mosquitto",
+      "tagline": "The MQTT broker everything that speaks MQTT already talks to",
+      "categories": [
+        "databases/messaging"
+      ],
+      "tags": [
+        "mqtt",
+        "iot",
+        "messaging",
+        "open-source"
+      ],
+      "aliases": [
+        "mqtt",
+        "broker",
+        "iot",
+        "home-assistant"
+      ],
+      "license": "EPL-2.0",
+      "versions": [
+        {
+          "name": "2.0",
+          "release": "2.0.22",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mumble",
+      "file": {
+        "path": "templates/mumble.yaml",
+        "sha256": "87d05f17c8eeb530986d7447e5b1ac49d5ac147cafb2c358e077ab082e384fb6"
+      },
+      "icon": {
+        "path": "icons/mumble.svg",
+        "sha256": "575e8aa49132ff995412f2e44ceb7c871a6f8edb79d2a2cefe7dc796e258e544"
+      },
+      "title": "Mumble Server",
+      "tagline": "Low-latency voice chat for people who talk while doing something else",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "voice",
+        "chat",
+        "team-chat",
+        "open-source"
+      ],
+      "aliases": [
+        "murmur",
+        "voice",
+        "voip",
+        "teamspeak-alternative",
+        "discord-alternative"
+      ],
+      "license": "BSD-3-Clause",
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.735",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mysql",
       "file": {
         "path": "templates/mysql.yaml",
@@ -2051,6 +3534,50 @@
         "mysql-server"
       ],
       "license": "GPL-2.0",
+      "versions": [
+        {
+          "name": "8.4",
+          "release": "8.4.11",
+          "default": true
+        },
+        {
+          "name": "9.7",
+          "release": "9.7.2"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mysql-replica",
+      "file": {
+        "path": "templates/mysql-replica.yaml",
+        "sha256": "c2f7c7fa40090479efef2830dda423c73f4414d110a0a1950a840b4d8aea7d18"
+      },
+      "icon": {
+        "path": "icons/mysql.svg",
+        "sha256": "a6b4206adaaf2e56e842df3f9a93b1c174c01f23439cab71e9412520d5a610da"
+      },
+      "title": "MySQL read replica",
+      "tagline": "A second copy of a database, kept current from the binary log",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "mysql-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "replica",
+        "read replica",
+        "mysql replication",
+        "standby",
+        "binlog"
+      ],
+      "license": "GPL-2.0-only",
       "versions": [
         {
           "name": "8.4",
@@ -2107,6 +3634,40 @@
       }
     },
     {
+      "name": "n8n-sqlite",
+      "file": {
+        "path": "templates/n8n-sqlite.yaml",
+        "sha256": "aea7ec6276c0fd79a32239f9cab5176565e735ef425bb68a4f5331d79eb459ca"
+      },
+      "icon": {
+        "path": "icons/n8n.svg",
+        "sha256": "2a415d5d2dea1903450d0df1b2b76866948d12a704e13378e54ed6896830c2e9"
+      },
+      "title": "n8n with SQLite",
+      "tagline": "The workflow automation tool in one app, with nothing beside it",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation"
+      ],
+      "aliases": [
+        "n8n-io",
+        "n8n sqlite"
+      ],
+      "license": "Sustainable-Use-License",
+      "versions": [
+        {
+          "name": "2.40",
+          "release": "2.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "nats",
       "file": {
         "path": "templates/nats.yaml",
@@ -2136,6 +3697,44 @@
         {
           "name": "2.15",
           "release": "2.15.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "navidrome",
+      "file": {
+        "path": "templates/navidrome.yaml",
+        "sha256": "893e6c05afeffb02aa53ebdf15090928931ab1e848dc89d7ad05341a7a02d65b"
+      },
+      "icon": {
+        "path": "icons/navidrome.svg",
+        "sha256": "40358035f72f2ea795424cb047afc439241fa6f4288ee550bc809d01a457251f"
+      },
+      "title": "Navidrome",
+      "tagline": "Your music collection, streamed to anything that speaks Subsonic",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "music",
+        "subsonic",
+        "streaming",
+        "airsonic"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.64",
+          "release": "0.64.0",
           "default": true
         }
       ],
@@ -2211,6 +3810,58 @@
           "name": "db",
           "title": "Database",
           "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "32",
+          "release": "32.0.2",
+          "default": true
+        },
+        {
+          "name": "31",
+          "release": "31.0.10"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "nextcloud-mariadb",
+      "file": {
+        "path": "templates/nextcloud-mariadb.yaml",
+        "sha256": "69e4e4819c001ac7d8e70d30ac94197a7abac5a2f6b4c8964274ef716a38811a"
+      },
+      "icon": {
+        "path": "icons/nextcloud.svg",
+        "sha256": "aa433216de59b9867d23a152c418f917afaa2f7cffa896343672a7e6e375aab1"
+      },
+      "title": "Nextcloud with MariaDB",
+      "tagline": "Your files on your own server, synced to every desktop and phone",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "files",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "files",
+        "drive",
+        "storage",
+        "sync",
+        "nextcloud mariadb",
+        "nextcloud mysql"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
         }
       ],
       "versions": [
@@ -2349,6 +4000,57 @@
       }
     },
     {
+      "name": "odoo",
+      "file": {
+        "path": "templates/odoo.yaml",
+        "sha256": "6805c895b1623407a0158b4ae93049859927ee18502c8e7afa67afee197c1cdb"
+      },
+      "icon": {
+        "path": "icons/odoo.svg",
+        "sha256": "a1be9612c5a5b20928d760e5aa4f66fdde12d136e92f001f40394d87ef5560f9"
+      },
+      "title": "Odoo",
+      "tagline": "Invoicing, inventory, CRM and the rest of a company, in one application",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "project-management",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "erp",
+        "crm",
+        "invoicing",
+        "accounting",
+        "inventory"
+      ],
+      "license": "LGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "19.0",
+          "release": "19.0",
+          "default": true
+        },
+        {
+          "name": "18.0",
+          "release": "18.0"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "ollama",
       "file": {
         "path": "templates/ollama.yaml",
@@ -2423,6 +4125,155 @@
       }
     },
     {
+      "name": "opensearch",
+      "file": {
+        "path": "templates/opensearch.yaml",
+        "sha256": "d2bcaffda904908d849ee6ab4b249c631541e519572fbb291060692926ccbf3f"
+      },
+      "icon": {
+        "path": "icons/opensearch.svg",
+        "sha256": "c6551c4bc1b5fcca3416ca4cc7bf128f02719bbdaf34be27eb318bc608454239"
+      },
+      "title": "OpenSearch",
+      "tagline": "The search and log engine other software expects to find",
+      "categories": [
+        "databases/search"
+      ],
+      "tags": [
+        "search",
+        "full-text",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "elasticsearch",
+        "elastic",
+        "lucene",
+        "full text search",
+        "log search"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.8",
+          "release": "3.8.0",
+          "default": true
+        },
+        {
+          "name": "2.19",
+          "release": "2.19.6"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "paperless-ngx",
+      "file": {
+        "path": "templates/paperless-ngx.yaml",
+        "sha256": "f052e21920b6b976bad6d6304f6818d974ea26bc0fc6671f095a96687fcfef49"
+      },
+      "icon": {
+        "path": "icons/paperless-ngx.svg",
+        "sha256": "f9cc57248b9990d0a3cee50ccc2cc7055129a4fda9ca42de06c9be51e1f208f7"
+      },
+      "title": "Paperless-ngx",
+      "tagline": "Scan a document once, find it again forever",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "search",
+        "open-source"
+      ],
+      "aliases": [
+        "paperless",
+        "dms",
+        "scanner",
+        "ocr",
+        "archive",
+        "documents"
+      ],
+      "license": "GPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "broker",
+          "title": "Broker",
+          "template": "valkey"
+        },
+        {
+          "name": "gotenberg",
+          "title": "Document conversion",
+          "template": "gotenberg"
+        },
+        {
+          "name": "tika",
+          "title": "Text extraction",
+          "template": "tika"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.2",
+          "release": "3.2.0",
+          "default": true
+        },
+        {
+          "name": "3.1",
+          "release": "3.1.3"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "pgbouncer",
+      "file": {
+        "path": "templates/pgbouncer.yaml",
+        "sha256": "e6619c919874eea9f1aef5b8388e2258704e81b08acc15610acf5c2eae78f4c1"
+      },
+      "icon": {
+        "path": "icons/pgbouncer.svg",
+        "sha256": "bd919ea54486ab0045feb7be4c5dc53472c332a30da162f41f7b5b762a83214e"
+      },
+      "title": "PgBouncer",
+      "tagline": "One pool of connections in front of a PostgreSQL that has run out",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "connection pool",
+        "pooler",
+        "pgbouncer",
+        "max_connections"
+      ],
+      "license": "ISC",
+      "versions": [
+        {
+          "name": "1.25",
+          "release": "1.25.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "pgvector",
       "file": {
         "path": "templates/pgvector.yaml",
@@ -2471,6 +4322,52 @@
             "pg17",
             "pg16"
           ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "photoprism",
+      "file": {
+        "path": "templates/photoprism.yaml",
+        "sha256": "59d420ed0dc7f94e291eda50ae15666910795538b64096c7c330ae9845fb77f6"
+      },
+      "icon": {
+        "path": "icons/photoprism.svg",
+        "sha256": "6edb3998834edae9fa0dba627f779af2b01dc8f43719436d4d46742c3259d142"
+      },
+      "title": "PhotoPrism",
+      "tagline": "Your photo library, indexed and searchable",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "photos",
+        "gallery",
+        "pictures",
+        "google-photos",
+        "image search"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "260919",
+          "release": "260919",
+          "default": true
         }
       ],
       "requires": {
@@ -2679,10 +4576,78 @@
       }
     },
     {
+      "name": "postgres-replica",
+      "file": {
+        "path": "templates/postgres-replica.yaml",
+        "sha256": "5f7def084118b10ff6871a46c11083e2b2f655deebb10674ff4df206ece19b74"
+      },
+      "icon": {
+        "path": "icons/postgres.svg",
+        "sha256": "bc45b1c56d0b1501dea387dbec4fda450d2ebc35244a620791815509d8c41dba"
+      },
+      "title": "PostgreSQL read replica",
+      "tagline": "A second copy of a database, kept current by streaming",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "replica",
+        "standby",
+        "streaming replication",
+        "read replica",
+        "hot standby"
+      ],
+      "license": "PostgreSQL",
+      "variants": [
+        {
+          "name": "alpine",
+          "default": true
+        },
+        {
+          "name": "debian"
+        }
+      ],
+      "versions": [
+        {
+          "name": "18",
+          "release": "18.6",
+          "default": true,
+          "variants": [
+            "alpine",
+            "debian"
+          ]
+        },
+        {
+          "name": "17",
+          "release": "17.11",
+          "variants": [
+            "alpine",
+            "debian"
+          ]
+        },
+        {
+          "name": "16",
+          "release": "16.15",
+          "variants": [
+            "alpine",
+            "debian"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "postgres-vectorchord",
       "file": {
         "path": "templates/postgres-vectorchord.yaml",
-        "sha256": "5e4442769b2e1c726553bc21a5987903540a1f0cb6806964827424c620036c2b"
+        "sha256": "f3079921a4edda225960d45bd2e9457269be0e9b0c0aa665bb5044b7413a8cf3"
       },
       "icon": {
         "path": "icons/postgres-vectorchord.svg",
@@ -2987,6 +4952,87 @@
       }
     },
     {
+      "name": "redisinsight",
+      "file": {
+        "path": "templates/redisinsight.yaml",
+        "sha256": "512062216a661e9df855143076b2f58a4570fc0ae49f2572b1f1cdc5e365aa13"
+      },
+      "icon": {
+        "path": "icons/redisinsight.svg",
+        "sha256": "90ae1fc1848816a60f46d18d4f12c42e08b51c7d52c45647232e5322d98e7479"
+      },
+      "title": "RedisInsight",
+      "tagline": "Look inside Redis and Valkey, and ask them things",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "redis-compatible",
+        "key-value",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "redis-gui",
+        "redis-insight",
+        "valkey-gui",
+        "redis-browser"
+      ],
+      "license": "SSPL-1.0",
+      "versions": [
+        {
+          "name": "3.8",
+          "release": "3.8.0",
+          "default": true
+        },
+        {
+          "name": "3.6",
+          "release": "3.6.0"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "redpanda",
+      "file": {
+        "path": "templates/redpanda.yaml",
+        "sha256": "82063c48eab065e2488125344da44a5c4cecc07243348fdf04f86a5a7fd573ec"
+      },
+      "icon": {
+        "path": "icons/redpanda.svg",
+        "sha256": "651b19fec8991599f4ee62187e4575933ffc68df2044f0785b4dec32aba1ff34"
+      },
+      "title": "Redpanda",
+      "tagline": "The Kafka API, in one process with no ZooKeeper",
+      "categories": [
+        "databases/messaging"
+      ],
+      "tags": [
+        "messaging",
+        "open-source"
+      ],
+      "aliases": [
+        "kafka",
+        "event streaming",
+        "broker",
+        "queue",
+        "log"
+      ],
+      "license": "BSL-1.1",
+      "versions": [
+        {
+          "name": "26.2",
+          "release": "26.2.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "restic-rest-server",
       "file": {
         "path": "templates/restic-rest-server.yaml",
@@ -3015,6 +5061,43 @@
         {
           "name": "0.14",
           "release": "0.14.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "roundcube",
+      "file": {
+        "path": "templates/roundcube.yaml",
+        "sha256": "5b88627d425b593b165b6a7511aea2469799e88868192ddb041340764512bc80"
+      },
+      "icon": {
+        "path": "icons/roundcube.svg",
+        "sha256": "8ed64dbbe54a6c0517d64eb0455ab298a9111810b224974761b4797447b6583c"
+      },
+      "title": "Roundcube",
+      "tagline": "Webmail for a mailbox you already have",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "email",
+        "open-source"
+      ],
+      "aliases": [
+        "webmail",
+        "imap",
+        "mail client",
+        "email"
+      ],
+      "license": "GPL-3.0-or-later",
+      "versions": [
+        {
+          "name": "1.6",
+          "release": "1.6.19",
           "default": true
         }
       ],
@@ -3135,6 +5218,46 @@
       }
     },
     {
+      "name": "sftpgo",
+      "file": {
+        "path": "templates/sftpgo.yaml",
+        "sha256": "8c191755fa8595bc59ec018030e2c0b2e2744829665f6a305421410fb4debc61"
+      },
+      "icon": {
+        "path": "icons/sftpgo.svg",
+        "sha256": "4cafdcdbdd5f263683ec0a0358c5d757d918c66fdfbf61b92e5039e1bf46ad72"
+      },
+      "title": "SFTPGo",
+      "tagline": "SFTP, FTPS and WebDAV over storage you choose, with a web console",
+      "categories": [
+        "storage/files"
+      ],
+      "tags": [
+        "file-transfer",
+        "files",
+        "s3",
+        "open-source"
+      ],
+      "aliases": [
+        "sftp",
+        "ftp",
+        "webdav",
+        "file-server",
+        "filezilla"
+      ],
+      "license": "AGPL-3.0",
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "shlink",
       "file": {
         "path": "templates/shlink.yaml",
@@ -3159,6 +5282,50 @@
         "redirects"
       ],
       "license": "MIT",
+      "versions": [
+        {
+          "name": "5.1",
+          "release": "5.1.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "shlink-postgres",
+      "file": {
+        "path": "templates/shlink-postgres.yaml",
+        "sha256": "c9c50e3461d16ad92f105de2bcd27416050d8f9fa89361fae7230b9e2432c49f"
+      },
+      "icon": {
+        "path": "icons/shlink.svg",
+        "sha256": "4bc351fc81a643f75da82a47b2a1cb52326d54b12654517bf982a32267543b02"
+      },
+      "title": "Shlink with PostgreSQL",
+      "tagline": "The short-link server, with its links and visits in a database",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "url-shortener",
+        "short-links",
+        "bitly",
+        "redirects",
+        "shlink postgres"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
       "versions": [
         {
           "name": "5.1",
@@ -3202,6 +5369,136 @@
           "name": "3.1",
           "release": "3.1.6",
           "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "tandoor",
+      "file": {
+        "path": "templates/tandoor.yaml",
+        "sha256": "2ebfafb6ffba02849caf99347ce9a1331256995617541d77b5f1288771c1e644"
+      },
+      "icon": {
+        "path": "icons/tandoor.svg",
+        "sha256": "50b72336cb05acfb4c16ab4dcbae3a06ba72201d227ca2b014946170d5d3a7d5"
+      },
+      "title": "Tandoor Recipes",
+      "tagline": "The recipes you actually cook, in one place",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "recipes",
+        "cooking",
+        "meal planning",
+        "food",
+        "shopping list"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.15",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "technitium-dns",
+      "file": {
+        "path": "templates/technitium-dns.yaml",
+        "sha256": "7a813e07cfcda4ce701edbefed43f7908dd66706d4f1dea24c8fb261089dd848"
+      },
+      "icon": {
+        "path": "icons/technitium-dns.svg",
+        "sha256": "b6601059db85766891106b013f997952108f1d10bde1b4d1bd907b81de05681c"
+      },
+      "title": "Technitium DNS Server",
+      "tagline": "Your own DNS resolver, with ad blocking and a web console",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "dns",
+        "networking",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "dns",
+        "adguard-alternative",
+        "pihole-alternative",
+        "resolver",
+        "bind"
+      ],
+      "license": "GPL-3.0",
+      "versions": [
+        {
+          "name": "13",
+          "release": "13.6.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "tika",
+      "file": {
+        "path": "templates/tika.yaml",
+        "sha256": "1a347ccd89362538aa9691018266515e1f2398c03468146f1147cf45dd31cc96"
+      },
+      "icon": {
+        "path": "icons/tika.svg",
+        "sha256": "dad431b4ad16f8bba7c85b9adb05912512d66cb310844657646246ce1c0cd30e"
+      },
+      "title": "Apache Tika",
+      "tagline": "Reads the text out of a thousand file formats",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "documents",
+        "search",
+        "full-text",
+        "open-source"
+      ],
+      "aliases": [
+        "text-extraction",
+        "metadata",
+        "parser",
+        "ocr",
+        "content"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.3",
+          "release": "3.3.1.0",
+          "default": true
+        },
+        {
+          "name": "3.2",
+          "release": "3.2.3.0"
         }
       ],
       "requires": {
@@ -3385,6 +5682,51 @@
       }
     },
     {
+      "name": "uptime-kuma-mariadb",
+      "file": {
+        "path": "templates/uptime-kuma-mariadb.yaml",
+        "sha256": "2eb4a5778998d71cb876f3c95aa6bb4f0a2e1d9063a4f152883735a4303bd4a8"
+      },
+      "icon": {
+        "path": "icons/uptime-kuma.svg",
+        "sha256": "df9add4327827339712e1bd1ba00775ecf3bc95260b9b3d4388d42e5d94d0ea9"
+      },
+      "title": "Uptime Kuma with MariaDB",
+      "tagline": "Uptime monitoring with its history in a database",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "uptime",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "uptime",
+        "status-page",
+        "monitoring",
+        "uptime kuma mariadb"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.5",
+          "release": "2.5.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "valkey",
       "file": {
         "path": "templates/valkey.yaml",
@@ -3462,6 +5804,50 @@
       }
     },
     {
+      "name": "vaultwarden-postgres",
+      "file": {
+        "path": "templates/vaultwarden-postgres.yaml",
+        "sha256": "e6df17fff679da3e0823a5a061931a6ca272315f1d9eb7cbeadc56dadd4b70c3"
+      },
+      "icon": {
+        "path": "icons/vaultwarden.svg",
+        "sha256": "e4a25471bb1342380cc5066e2edf46400fa8f11e7119933783c9a951a368e840"
+      },
+      "title": "Vaultwarden with PostgreSQL",
+      "tagline": "The Bitwarden-compatible vault, kept in a database rather than a file",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "passwords",
+        "open-source"
+      ],
+      "aliases": [
+        "bitwarden",
+        "password-manager",
+        "vault",
+        "vaultwarden postgres"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.37",
+          "release": "1.37.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "verdaccio",
       "file": {
         "path": "templates/verdaccio.yaml",
@@ -3491,6 +5877,46 @@
         {
           "name": "6.10",
           "release": "6.10.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "victoriametrics",
+      "file": {
+        "path": "templates/victoriametrics.yaml",
+        "sha256": "b61547b2d9f0ba1afc1de6864a5fba70f1c438c6b0a6d13677961ff3eabb99a0"
+      },
+      "icon": {
+        "path": "icons/victoriametrics.svg",
+        "sha256": "463bc00559af2cd44fb5fe97c04e85c8d1f4a532d7cffac6a21878643fe8320a"
+      },
+      "title": "VictoriaMetrics",
+      "tagline": "Prometheus metrics, kept for longer on less disk",
+      "categories": [
+        "databases/time-series"
+      ],
+      "tags": [
+        "time-series",
+        "metrics",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "prometheus",
+        "metrics",
+        "tsdb",
+        "promql",
+        "monitoring storage"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.152",
+          "release": "1.152.0",
           "default": true
         }
       ],
@@ -3580,6 +6006,45 @@
       "requires": {
         "versionCode": "v000001"
       }
+    },
+    {
+      "name": "wg-easy",
+      "file": {
+        "path": "templates/wg-easy.yaml",
+        "sha256": "2e6aa880493325c90b598583058a8627768207838a79f29a3c9c8246bb9a7448"
+      },
+      "icon": {
+        "path": "icons/wg-easy.svg",
+        "sha256": "a65ddd2777d1df391d2b1be493191d345a4522358e2a102e6d5f066072002989"
+      },
+      "title": "wg-easy",
+      "tagline": "A WireGuard server with a web page for handing out client configs",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "vpn",
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "wireguard",
+        "wg",
+        "vpn",
+        "wgeasy"
+      ],
+      "license": "AGPL-3.0",
+      "versions": [
+        {
+          "name": "15",
+          "release": "15.4.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      },
+      "requiresCapabilities": true
     },
     {
       "name": "wikijs",
