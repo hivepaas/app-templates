@@ -4852,6 +4852,45 @@
       }
     },
     {
+      "name": "pocketbase",
+      "file": {
+        "path": "templates/pocketbase.yaml",
+        "sha256": "4bb5898b802545c420ac6e1a014df69e747d51e97bf810e083d5187cb0dd933b"
+      },
+      "icon": {
+        "path": "icons/pocketbase.svg",
+        "sha256": "b6e146ba1c973619cc16be8ab497e4dbf14d1e72a8fc3c12e187af8ac20f0c28"
+      },
+      "title": "PocketBase",
+      "tagline": "A backend in one file - database, auth, file storage and an admin interface",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "backend",
+        "baas",
+        "firebase-alternative",
+        "supabase-alternative",
+        "sqlite"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.30",
+          "release": "0.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "postgres",
       "file": {
         "path": "templates/postgres.yaml",

@@ -1,0 +1,144 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pocketbase
+  title: PocketBase
+  tagline: A backend in one file - database, auth, file storage and an admin interface
+  description: |
+    PocketBase is a whole backend in a single binary: an embedded SQLite database with a
+    schema you design in the browser, a REST API over every collection, users and OAuth
+    sign-in, file uploads with thumbnails, realtime subscriptions, and an admin interface to
+    run it all. It is what you reach for when an application needs a backend and you do not
+    want to write one.
+
+    **Ready before anyone can reach it**
+
+    The superuser below is created on the first start, so there is no setup page for a
+    stranger to complete. Sign in at `/_/` on this app's domain; the API your application
+    calls is at `/api/`.
+
+    **Designing the data**
+
+    Collections are made in the admin interface, or from a migration file. Every collection
+    gets its endpoints immediately - list, view, create, update, delete, realtime - with the
+    access rules you write on the collection itself rather than in code.
+
+    **What the volume holds**
+
+    Everything: the SQLite database, uploaded files, and the migrations PocketBase writes
+    when the schema changes. It is the whole application state, so it is the whole backup.
+
+    **Extending it**
+
+    JavaScript hooks go in `pb_hooks` on the same volume - `*.pb.js` files that run inside
+    PocketBase on its own events - and static files served at the root go in `pb_public`.
+    Both are directories on the data volume, reachable from this app's file browser.
+
+    **One process, one file**
+
+    SQLite means one writer: PocketBase suits an application with real traffic but not one
+    that needs several instances. There is nothing to scale out to, which is the trade for
+    how little there is to operate.
+  categories: [webapps/low-code]
+  tags: [low-code, sql, open-source]
+  aliases: [backend, baas, firebase-alternative, supabase-alternative, sqlite]
+  icon: icons/pocketbase.svg
+  links:
+    website: https://pocketbase.io
+    documentation: https://pocketbase.io/docs/
+    source: https://github.com/pocketbase/pocketbase
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the API and the admin interface answer at. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Superuser email
+    description: What is typed at /_/ to sign in.
+    type: string
+    default: "admin@example.com"
+  - name: adminPassword
+    title: Superuser password
+    description: >-
+      Leave it empty and one is generated. It is applied at every start, so it is also how
+      to reset a lost password.
+    type: secret
+    generate: {length: 24}
+  - name: dataVolume
+    title: Data volume
+    description: The database, the uploaded files, the hooks and the static files.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: One Go binary over SQLite.
+    type: size
+    default: 512MB
+    min: 128MB
+
+versions:
+  - name: "0.30"
+    release: "0.30.0"
+    default: true
+    image: ghcr.io/muchobien/pocketbase:0.30.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /pb_data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /pb_public:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: public}
+        /pb_hooks:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: hooks}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # PocketBase's own health endpoint. The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8090/api/health
+        interval: 30s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: pocketbase
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The image's entry point creates or updates this account before serving,
+        # which is what keeps the setup page from being anybody's to complete.
+        - {k: PB_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: PB_ADMIN_PASSWORD, v: "${secrets.PB_ADMIN_PASSWORD}"}
+        - {k: PB_HOST, v: "0.0.0.0"}
+        - {k: PB_PORT, v: "8090"}
+    secrets:
+      PB_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8090
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
