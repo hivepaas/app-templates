@@ -1,0 +1,212 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: drupal
+  title: Drupal
+  tagline: A content framework for sites whose structure is the hard part
+  description: |
+    Drupal is what you reach for when the content has shape: custom entity types, fields
+    with their own validation, editorial workflows, translations, and per-role access to any
+    of it. It is heavier than a blogging engine on purpose - the structure you define is the
+    application.
+
+    **The database is filled in for you**
+
+    The installer normally asks for database credentials nobody memorises. This template
+    writes them into `settings.php` on the first start, from the database created alongside
+    this app, so the installer goes straight to choosing a profile and creating the
+    administrator.
+
+    **Finish the install before anybody else does**
+
+    What is left of the wizard is the site name, the profile and the first account. Open the
+    app as soon as it is deployed and complete it: whoever reaches it first becomes user 1,
+    the account no permission check can refuse, and until that is done the site is unclaimed.
+
+    Drupal has no way to do this from the command line against a real database - its
+    `core/scripts/drupal install` is the SQLite quick-start and refuses a site that already
+    has settings.php - so this is the wizard or nothing.
+
+    **Adding modules and themes**
+
+    Drupal 11 expects composer: `composer require drupal/pathauto` in this app's shell, then
+    enable it in the interface. The four directories composer writes into are on the volume,
+    so what you add survives a redeploy.
+
+    **What the volume holds**
+
+    `sites` - which is `settings.php`, the uploaded files and any per-site configuration -
+    and the `modules`, `themes` and `profiles` directories. The content itself is in the
+    database app.
+
+    **Trusted hosts**
+
+    Drupal refuses requests whose Host header it does not recognise once you configure
+    `trusted_host_patterns`. The template leaves it open and the reverse proxy in front is
+    the only way in; tighten it in `settings.php` when the site has its final address.
+  categories: [webapps/cms]
+  tags: [cms, open-source]
+  aliases: [wordpress-alternative, joomla-alternative, website, content-management]
+  icon: icons/drupal.svg
+  links:
+    website: https://www.drupal.org
+    documentation: https://www.drupal.org/docs/getting-started
+    source: https://git.drupalcode.org/project/drupal
+  license: GPL-2.0
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: drupal
+      username: drupal
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the site answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: hashSalt
+    title: Hash salt
+    description: >-
+      Drupal salts its one-time login links and session identifiers with this. Leave it
+      empty and one is generated; changing it later signs everybody out.
+    type: secret
+    generate: {length: 48}
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The site directory - settings, uploads - and the modules, themes and profiles you add.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: PHP and Apache. A site with many modules wants more.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "11"
+    release: "11.2.3"
+    default: true
+    image: drupal:11.2.3-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point ends in `exec "$@"`, so this replaces the command it
+      # would have run. Two things happen before Apache starts, both only once: the
+      # directories are created, and settings.php is put in place - after that it is
+      # Drupal's own file, which the installer and the interface write to.
+      #
+      # The configuration sync directory is created here and not by Drupal because the
+      # installer decides whether to ask for database credentials by checking that it
+      # exists (install.core.inc: config_verified && database_verified && hash_salt).
+      # Without it the credentials in settings.php are ignored and the form appears.
+      command: >-
+        bash -c 'install -d -m 0777 /opt/drupal/web/sites/default/files
+        /opt/drupal/web/sites/default/files/config/sync &&
+        if [ ! -f /opt/drupal/web/sites/default/settings.php ]; then
+        cp /etc/drupal/settings.php /opt/drupal/web/sites/default/settings.php &&
+        chmod 0666 /opt/drupal/web/sites/default/settings.php; fi &&
+        exec apache2-foreground'
+    storage:
+      mounts:
+        /opt/drupal/web/sites:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: sites}
+        /opt/drupal/web/modules:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: modules}
+        /opt/drupal/web/themes:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: themes}
+        /opt/drupal/web/profiles:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: profiles}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Answers the installer before there is a site and the site afterwards; a
+        # redirect to the installer counts, which is why redirects are followed.
+        command: curl -fsSL -o /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: drupal
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DRUPAL_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DRUPAL_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DRUPAL_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DRUPAL_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DRUPAL_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DRUPAL_HASH_SALT, v: "${secrets.DRUPAL_HASH_SALT}"}
+    secrets:
+      DRUPAL_HASH_SALT:
+        value: "${{ params.hashSalt }}"
+    configFiles:
+      settings.php:
+        # Copied into the site directory on a first start. It is PHP, so it reads the
+        # database credentials from the environment rather than having them written
+        # into a file on the volume.
+        content: |
+          <?php
+
+          $databases['default']['default'] = [
+            'driver' => 'pgsql',
+            'host' => getenv('DRUPAL_DB_HOST'),
+            'port' => getenv('DRUPAL_DB_PORT'),
+            'database' => getenv('DRUPAL_DB_NAME'),
+            'username' => getenv('DRUPAL_DB_USER'),
+            'password' => getenv('DRUPAL_DB_PASSWORD'),
+            'prefix' => '',
+            'namespace' => 'Drupal\\Core\\Database\\Driver\\pgsql',
+            'autoload' => 'core/modules/pgsql/src/Driver/Database/pgsql/',
+          ];
+
+          $settings['hash_salt'] = getenv('DRUPAL_HASH_SALT');
+          $settings['config_sync_directory'] = 'sites/default/files/config/sync';
+          $settings['file_private_path'] = 'sites/default/files/private';
+
+          // The reverse proxy in front terminates TLS and forwards the real address.
+          $settings['reverse_proxy'] = TRUE;
+          $settings['reverse_proxy_trusted_headers'] =
+            \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_FOR
+            | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_HOST
+            | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PORT
+            | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PROTO;
+
+          if (file_exists(__DIR__ . '/settings.local.php')) {
+            include __DIR__ . '/settings.local.php';
+          }
+        swarmRef:
+          file: {name: /etc/drupal/settings.php, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

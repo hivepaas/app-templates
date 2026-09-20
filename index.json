@@ -1308,6 +1308,50 @@
       }
     },
     {
+      "name": "drupal",
+      "file": {
+        "path": "templates/drupal.yaml",
+        "sha256": "e8ae7addf46561e0972dcd21df5faa094f91001e90c64bf8e0791fed68631d60"
+      },
+      "icon": {
+        "path": "icons/drupal.svg",
+        "sha256": "8cb675404cc89127fc1d21ad0b7e3834baa1f9b1a6b3766b3dce1fc1d93e6c1f"
+      },
+      "title": "Drupal",
+      "tagline": "A content framework for sites whose structure is the hard part",
+      "categories": [
+        "webapps/cms"
+      ],
+      "tags": [
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "wordpress-alternative",
+        "joomla-alternative",
+        "website",
+        "content-management"
+      ],
+      "license": "GPL-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "11",
+          "release": "11.2.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "duplicati",
       "file": {
         "path": "templates/duplicati.yaml",
@@ -2600,6 +2644,50 @@
         {
           "name": "2.568-slim",
           "release": "2.568.3 LTS, slim"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "joomla",
+      "file": {
+        "path": "templates/joomla.yaml",
+        "sha256": "4f2bb729e4ad4dca36d97f1bce824997063ff786467c9ef81d9ab9a213e3f402"
+      },
+      "icon": {
+        "path": "icons/joomla.svg",
+        "sha256": "ebd21926de361b5b916f79e5c3793faddbb29203305b04c837621ae67b1019d5"
+      },
+      "title": "Joomla",
+      "tagline": "A content management system that installs itself and waits for your pages",
+      "categories": [
+        "webapps/cms"
+      ],
+      "tags": [
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "wordpress-alternative",
+        "drupal-alternative",
+        "website",
+        "blog"
+      ],
+      "license": "GPL-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5",
+          "release": "5.3.3",
+          "default": true
         }
       ],
       "requires": {

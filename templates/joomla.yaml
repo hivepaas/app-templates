@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: joomla
+  title: Joomla
+  tagline: A content management system that installs itself and waits for your pages
+  description: |
+    Joomla builds websites: articles organised into categories, menus that decide what
+    appears where, templates that decide how it looks, and a few thousand extensions for
+    everything else. It sits between WordPress and Drupal - more structure than the first,
+    less ceremony than the second - and it has been maintained for twenty years.
+
+    **Nothing to install by hand**
+
+    Unusually for a PHP application, the image installs itself: the database this template
+    creates, the site name and the administrator below are all it needs, and the site is
+    ready the first time it starts. No setup page, and nobody else can claim the
+    administrator account before you do.
+
+    **Where to go first**
+
+    The public site is at the app's domain; the administration is at `/administrator` on the
+    same address, with the account from the parameters below.
+
+    **What the volume holds**
+
+    Joomla itself, and everything added to it afterwards: uploaded images, extensions,
+    templates and the configuration file the installer writes. It is the site, so it is
+    what a backup has to include along with the database.
+
+    **Sending mail**
+
+    Joomla sends registration and password-reset mail and has no server of its own. Point
+    it at one under *System - Global Configuration - Mail*, or set the SMTP parameters here
+    before the first start.
+  categories: [webapps/cms]
+  tags: [cms, open-source]
+  aliases: [wordpress-alternative, drupal-alternative, website, blog]
+  icon: icons/joomla.svg
+  links:
+    website: https://www.joomla.org
+    documentation: https://docs.joomla.org
+    source: https://github.com/joomla/joomla-cms
+  license: GPL-2.0
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: joomla
+      username: joomla
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the site answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: siteName
+    title: Site name
+    description: Shown in the browser tab and wherever the site names itself.
+    type: string
+    default: "My Joomla site"
+  - name: adminName
+    title: Administrator's name
+    description: The person's name, as articles will credit it.
+    type: string
+    default: "Administrator"
+  - name: adminUsername
+    title: Administrator's username
+    description: What is typed at /administrator.
+    type: string
+    default: admin
+  - name: adminEmail
+    title: Administrator's email
+    description: Where password resets and site mail go.
+    type: string
+    default: "admin@example.com"
+  - name: adminPassword
+    title: Administrator's password
+    description: Leave it empty and one is generated. Joomla wants at least twelve characters.
+    type: secret
+    generate: {length: 24}
+  - name: dataVolume
+    title: Data volume
+    description: The site itself - uploads, extensions, templates and its configuration.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: PHP and Apache. Extensions are what make it want more.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "5"
+    release: "5.3.3"
+    default: true
+    image: joomla:5.3.3-php8.3-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The site's own front page. The image has curl and no wget.
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 10s
+        # The first start unpacks Joomla into the volume and installs it.
+        startPeriod: 180s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: joomla
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: JOOMLA_DB_TYPE, v: mysqli}
+        - {k: JOOMLA_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: JOOMLA_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: JOOMLA_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: JOOMLA_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: JOOMLA_DB_PREFIX, v: "jml_"}
+        # Read once, by the installer that runs on the first start.
+        - {k: JOOMLA_SITE_NAME, v: "${{ params.siteName }}"}
+        - {k: JOOMLA_ADMIN_USER, v: "${{ params.adminName }}"}
+        - {k: JOOMLA_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: JOOMLA_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: JOOMLA_ADMIN_PASSWORD, v: "${secrets.JOOMLA_ADMIN_PASSWORD}"}
+    secrets:
+      JOOMLA_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
