@@ -1,0 +1,83 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: drawio
+  title: draw.io
+  tagline: The diagram editor, served from your own domain
+  description: |
+    draw.io - diagrams.net - draws flowcharts, network and architecture diagrams, UML, org
+    charts and floor plans, with shape libraries for AWS, Azure, GCP, Kubernetes and more.
+    Diagrams are saved as files you keep, and can be exported to PNG, SVG and PDF.
+
+    **This template sets up**
+
+    - the draw.io web app, served by Tomcat, with nothing to store
+    - a memory limit you choose
+
+    Diagrams live where each person saves them - their own device, or a storage service
+    they connect in the editor - so the app can be deleted and created again without losing
+    anything.
+  categories: [webapps/dev-tools, webapps/knowledge]
+  tags: [whiteboard, collaboration, open-source]
+  aliases: [diagrams.net, diagrams, flowchart, uml, visio alternative]
+  icon: icons/drawio.svg
+  links:
+    website: https://www.drawio.com
+    documentation: https://www.drawio.com/doc/
+    source: https://github.com/jgraph/docker-drawio
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+versions:
+  - name: "31.4"
+    release: "31.4.6"
+    default: true
+    image: jgraph/drawio:31.4.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: drawio
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Without it the JVM sizes its heap from the machine, not from the limit.
+        - {k: JAVA_OPTS, v: "-XX:MaxRAMPercentage=75.0"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

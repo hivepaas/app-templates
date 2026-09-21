@@ -1,0 +1,116 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: calibre-web
+  title: Calibre-Web
+  tagline: Browse, read and download a Calibre e-book library from the web
+  description: |
+    Calibre-Web serves a Calibre library to browsers and e-readers: covers, series and
+    authors to browse, a reader in the browser, downloads in the format a device wants,
+    an OPDS feed for reading apps, and sending to a Kindle by email. Each account can be
+    kept to the shelves it should see.
+
+    **This template sets up**
+
+    - Calibre-Web, on a volume for its own settings and accounts
+    - a second volume for the library itself
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `admin123` and change it straight away. Calibre-Web
+    then asks where the library is: enter `/books`.
+
+    **It needs a Calibre library**
+
+    Calibre-Web reads the `metadata.db` Calibre keeps beside the books - it does not make
+    one. Copy an existing library onto the books volume, or enable uploads in the admin
+    settings to start one from nothing.
+  categories: [webapps/documents]
+  tags: [documents, open-source]
+  aliases: [calibre, ebooks, epub, opds, kindle, library]
+  icon: icons/calibre-web.svg
+  links:
+    website: https://github.com/janeczku/calibre-web
+    documentation: https://github.com/janeczku/calibre-web/wiki
+    source: https://github.com/janeczku/calibre-web
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Settings volume
+    description: The volume Calibre-Web's settings, accounts and shelves are kept on.
+    type: volume
+  - name: booksVolume
+    title: Books volume
+    description: The volume the Calibre library - books and metadata.db - is on.
+    type: volume
+
+versions:
+  - name: "0.6"
+    release: "0.6.27"
+    default: true
+    image: lscr.io/linuxserver/calibre-web:0.6.27-ls402
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+        /books: {type: volume, source: "${{ params.booksVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The sign-in page, or the redirect to it.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8083/login
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: calibre-web
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 8083
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

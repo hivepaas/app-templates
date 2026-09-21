@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: hedgedoc
+  title: HedgeDoc
+  tagline: Write Markdown together, in real time, and share it as a page or slides
+  description: |
+    HedgeDoc is a collaborative Markdown editor: several people type in the same note at
+    once, with the rendered page beside it. Notes can hold diagrams, maths, code and
+    embedded media, and can be published as a read-only page or presented as slides. It
+    began as CodiMD.
+
+    **This template creates two apps**
+
+    - **HedgeDoc**, on a volume for uploaded images
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open it and register an account - email registration is on, and anyone who can reach
+    the page can register. Once your people have accounts, set `CMD_ALLOW_EMAIL_REGISTER`
+    to `false` in the app's environment and redeploy. Notes created without signing in are
+    off; turn `CMD_ALLOW_ANONYMOUS` on for a scratchpad anyone can use.
+
+    **The domain**
+
+    HedgeDoc builds its links from the domain you give it here and assumes HTTPS. Without
+    one, it works from inside the project but links it hands out will be relative.
+  categories: [webapps/knowledge]
+  tags: [notes, documents, collaboration, open-source]
+  aliases: [codimd, hackmd, markdown, collaborative editor, notes]
+  icon: icons/hedgedoc.svg
+  links:
+    website: https://hedgedoc.org
+    documentation: https://docs.hedgedoc.org
+    source: https://github.com/hedgedoc/hedgedoc
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, which its links are built from. Leave it empty to
+      add one later, in the app's routing settings - and in CMD_DOMAIN.
+    type: domain
+    optional: true
+  - name: sessionSecret
+    title: Session secret
+    description: Signs session cookies. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Upload volume
+    description: The volume images uploaded into notes are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: hedgedoc
+      username: hedgedoc
+
+versions:
+  - name: "1.12"
+    release: "1.12.0"
+    default: true
+    image: quay.io/hedgedoc/hedgedoc:1.12.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /hedgedoc/public/uploads: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: /_health says ready once the database is migrated.
+        command: cd /hedgedoc && node healthcheck.mjs
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: hedgedoc
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Separate fields rather than CMD_DB_URL: the database's name on the project
+        # network has an underscore, which a strict URL parser refuses in a host.
+        - {k: CMD_DB_DIALECT, v: postgres}
+        - {k: CMD_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: CMD_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: CMD_DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: CMD_DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: CMD_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: CMD_SESSION_SECRET, v: "${secrets.CMD_SESSION_SECRET}"}
+        - {k: CMD_DOMAIN, v: "${{ params.domain }}"}
+        # TLS ends at the reverse proxy, on the standard port.
+        - {k: CMD_PROTOCOL_USESSL, v: "true"}
+        - {k: CMD_URL_ADDPORT, v: "false"}
+        - {k: CMD_EMAIL, v: "true"}
+        - {k: CMD_ALLOW_EMAIL_REGISTER, v: "true"}
+        - {k: CMD_ALLOW_ANONYMOUS, v: "false"}
+    secrets:
+      CMD_SESSION_SECRET:
+        value: "${{ params.sessionSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

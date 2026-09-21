@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: apprise
+  title: Apprise API
+  tagline: One HTTP call that notifies Slack, Telegram, email, ntfy and a hundred more
+  description: |
+    Apprise sends a notification to any of more than a hundred services - chat apps, push
+    services, email, SMS, webhooks - described by a URL such as `tgram://token/chat` or
+    `slack://tokens`. The API puts that behind HTTP, so any app in the project can notify
+    people with a POST and never hold the credentials itself.
+
+    **This template sets up**
+
+    - the Apprise API with its configuration page, on a volume that keeps saved
+      configurations
+    - a memory limit you choose
+
+    **Using it**
+
+    Save the service URLs under a key, from the page at `/cfg/<key>` or with
+    `POST /add/<key>`; then any app here notifies them with
+
+    ```sh
+    curl -d '{"title":"Backup failed","body":"..."}' -H 'Content-Type: application/json' \
+      http://<the app's key>:8000/notify/<key>
+    ```
+
+    **It has no accounts**
+
+    Whoever reaches it can send in your name and read the saved URLs, which hold the
+    services' tokens. That is why it takes no domain: keep it inside the project.
+  categories: [webapps/communication]
+  tags: [notifications, open-source]
+  aliases: [notifications, alerts, push, webhook, notify]
+  icon: icons/apprise.svg
+  links:
+    website: https://github.com/caronc/apprise-api
+    documentation: https://github.com/caronc/apprise/wiki
+    source: https://github.com/caronc/apprise-api
+  license: BSD-2-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume saved configurations are kept on.
+    type: volume
+
+versions:
+  - name: "1.5"
+    release: "1.5.4"
+    default: true
+    image: caronc/apprise:1.5.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Other apps reach this one by its key, which has an underscore; Django refuses such
+      # a Host outright, ALLOWED_HOSTS or not, and answers 400. This rewrites the image's
+      # nginx so a Host with an underscore reaches Django as localhost, then starts it as
+      # the image would.
+      command: >-
+        sh -c 'sed -i
+        -e "s/^http {/http {\n    map \$http_host \$apprise_host { ~_ localhost; default \$http_host; }/"
+        -e "s/proxy_set_header Host \$http_host;/proxy_set_header Host \$apprise_host;/"
+        -e "s/proxy_set_header X-Forwarded-Host \$http_host;/proxy_set_header X-Forwarded-Host \$apprise_host;/"
+        /opt/apprise/webapp/etc/nginx.conf /opt/apprise/webapp/etc/nginx-strict.conf
+        && exec /opt/apprise/webapp/supervisord-startup'
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8000/status
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: apprise
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Keep each configuration as a file on the volume, readable and editable by hand.
+        - {k: APPRISE_STATEFUL_MODE, v: simple}
+        - {k: APPRISE_WORKER_COUNT, v: "1"}
+    routing:
+      port: 8000

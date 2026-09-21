@@ -1,0 +1,208 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: synapse
+  title: Matrix Synapse
+  tagline: Your own Matrix homeserver - chat that federates with everyone else's
+  description: |
+    Synapse is the reference homeserver for Matrix, the open protocol for chat: rooms,
+    direct messages, end-to-end encryption, voice and video calls, and bridges to other
+    networks. Accounts on your server talk to accounts on any other Matrix server, the way
+    email does.
+
+    **This template creates two apps**
+
+    - **Synapse**, on a volume for its signing key and uploaded media
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **The server name is forever**
+
+    It is the part after the colon in every user ID - `@alice:example.com` - and it cannot
+    be changed once people have accounts or other servers have seen it. This template
+    expects the app to be reachable at that same name over HTTPS: give the app the server
+    name as its domain. Synapse then serves the `/.well-known` answers other servers look
+    for, so federation works on port 443 without anything more.
+
+    **After the first deployment**
+
+    Registration is closed. Create the first account from the app's console, as an
+    administrator:
+
+    ```sh
+    register_new_matrix_user -c /config/secrets.yaml -a http://localhost:8008
+    ```
+
+    Then sign in with any Matrix client - Element is in this store - at the domain.
+
+    **The database locale**
+
+    Synapse wants its database sorted in C collation and refuses anything else unless told.
+    The PostgreSQL made alongside runs on Alpine, whose musl libc sorts by code point - the
+    property Synapse is after - so the check is switched off with `allow_unsafe_locale`.
+  categories: [webapps/communication]
+  tags: [chat, team-chat, open-source]
+  aliases: [matrix, element server, homeserver, federation, slack alternative]
+  icon: icons/synapse.svg
+  links:
+    website: https://element-hq.github.io/synapse/
+    documentation: https://element-hq.github.io/synapse/latest/
+    source: https://github.com/element-hq/synapse
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: serverName
+    title: Server name
+    description: >-
+      The domain in every user ID, and the address the app answers at - matrix.example.com.
+      It cannot be changed later.
+    type: string
+    default: matrix.example.com
+    pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the server name above. Leave it empty to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: registrationSecret
+    title: Registration shared secret
+    description: >-
+      What register_new_matrix_user proves itself with when it creates accounts. Leave empty
+      to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: macaroonSecret
+    title: Macaroon secret
+    description: Signs access tokens. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: formSecret
+    title: Form secret
+    description: Signs the forms Synapse serves itself. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: Joining large federated rooms is what uses memory; a server that does needs more.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the signing key and uploaded media are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: synapse
+      username: synapse
+
+versions:
+  - name: "1.161"
+    release: "1.161.0"
+    default: true
+    image: matrixdotorg/synapse:v1.161.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # /start.py runs Synapse with these, which is its default --generate-missing-and-run:
+      # the signing key named in the configuration is made on the first start.
+      command: run --config-path /config/homeserver.yaml --config-path /config/secrets.yaml
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8008/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: synapse
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # psycopg2 goes through libpq, which reads the connection from these; the
+        # database block in homeserver.yaml names no server of its own.
+        - {k: PGHOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: PGPORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: PGDATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: PGUSER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PGPASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      # The secrets live in a configuration file of their own, loaded after the main one,
+      # so they stay encrypted rather than sitting in a plain config object.
+      SYNAPSE_SECRETS:
+        value: |
+          registration_shared_secret: "${{ params.registrationSecret }}"
+          macaroon_secret_key: "${{ params.macaroonSecret }}"
+          form_secret: "${{ params.formSecret }}"
+        swarmRef:
+          # Synapse runs as 991 once /start.py drops root.
+          file: {name: /config/secrets.yaml, uid: "991", gid: "991", mode: 400}
+    configFiles:
+      homeserver.yaml:
+        content: |
+          server_name: "${{ params.serverName }}"
+          public_baseurl: "https://${{ params.serverName }}/"
+          # Answer /.well-known/matrix/server so other servers federate over 443,
+          # through the reverse proxy, instead of looking for port 8448.
+          serve_server_wellknown: true
+
+          pid_file: /data/homeserver.pid
+          signing_key_path: /data/signing.key
+          media_store_path: /data/media_store
+
+          listeners:
+            - port: 8008
+              type: http
+              tls: false
+              bind_addresses: ["0.0.0.0"]
+              # TLS ends at the reverse proxy, which says who the client was.
+              x_forwarded: true
+              resources:
+                - names: [client, federation]
+                  compress: false
+
+          database:
+            name: psycopg2
+            # See the description: C collation in all but name on Alpine.
+            allow_unsafe_locale: true
+            args:
+              cp_min: 5
+              cp_max: 10
+
+          enable_registration: false
+          report_stats: false
+          trusted_key_servers:
+            - server_name: matrix.org
+          suppress_key_server_warning: true
+        swarmRef:
+          file: {name: /config/homeserver.yaml, mode: 444}
+    routing:
+      port: 8008
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

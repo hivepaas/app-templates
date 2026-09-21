@@ -29,6 +29,9 @@ metadata:
     or NFS without `root_squash`. A bind mount that presents every file as root-owned - Docker
     Desktop on macOS does - lets MongoDB start once and fails every start after that.
 
+    **Kernel.** MongoDB 8 refuses to start on Linux 6.19 and newer, saying the kernel has a
+    known incompatibility. On a node that new - current Docker Desktop is one - choose 7.0.
+
     MongoDB is published under the Server Side Public License.
   categories: [databases/nosql]
   tags: [document, json]
@@ -75,6 +78,12 @@ versions:
     release: "8.0.32"
     default: true
     image: mongo:8.0.32-noble
+  # Every MongoDB 8 refuses to start on a Linux kernel from 6.19 on (SERVER-121912),
+  # which is what current Docker Desktop and the newest distributions run; 7.0 starts
+  # there, and is supported until August 2027.
+  - name: "7.0"
+    release: "7.0.43"
+    image: mongo:7.0.43-jammy
 
 app:
   deployment:

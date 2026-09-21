@@ -1,0 +1,129 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: zipline
+  title: Zipline
+  tagline: Share screenshots, files and short links from your own domain
+  description: |
+    Zipline takes uploads - screenshots from ShareX or Flameshot, files dragged into the
+    page, text pastes - and gives each a short link on your domain, with embeds that look
+    right in chat apps. It shortens URLs too, and can expire, password-protect or limit the
+    views of what it serves.
+
+    **This template creates two apps**
+
+    - **Zipline**, on a volume for the uploaded files
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open it: the first page creates the administrator account. Then download a
+    configuration for your screenshot tool from your user settings.
+
+    **The domain is the product**
+
+    Every link it hands out is on the address people open it at, so give it its short
+    domain before sharing anything.
+  categories: [webapps/documents, storage/files]
+  tags: [file-transfer, open-source]
+  aliases: [sharex, screenshots, file sharing, url shortener, paste]
+  icon: icons/zipline.svg
+  links:
+    website: https://zipline.diced.sh
+    documentation: https://zipline.diced.sh/docs/get-started
+    source: https://github.com/diced/zipline
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, and the one its links are on. Leave it empty to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: coreSecret
+    title: Secret
+    description: Signs sessions. Leave empty to generate one; at least 32 characters.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Upload volume
+    description: The volume uploaded files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: zipline
+      username: zipline
+
+versions:
+  - name: "4.4"
+    release: "4.4.2"
+    default: true
+    image: ghcr.io/diced/zipline:4.4.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /zipline/uploads: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/api/healthcheck
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: zipline
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: CORE_SECRET, v: "${secrets.CORE_SECRET}"}
+        - {k: CORE_HOSTNAME, v: 0.0.0.0}
+        - {k: CORE_PORT, v: "3000"}
+        # TLS ends at the reverse proxy: believe what it forwards, and hand out https links.
+        - {k: CORE_TRUST_PROXY, v: "true"}
+        - {k: CORE_RETURN_HTTPS_URLS, v: "true"}
+        # Separate fields rather than DATABASE_URL: the database's name on the project
+        # network has an underscore, which a strict URL parser refuses in a host.
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DATASOURCE_TYPE, v: local}
+        - {k: DATASOURCE_LOCAL_DIRECTORY, v: /zipline/uploads}
+    secrets:
+      CORE_SECRET:
+        value: "${{ params.coreSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

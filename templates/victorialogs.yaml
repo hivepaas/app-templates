@@ -1,0 +1,104 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: victorialogs
+  title: VictoriaLogs
+  tagline: A log database that stores a lot in little space and queries it fast
+  description: |
+    VictoriaLogs stores logs from anything that ships them - Vector, Fluent Bit, Promtail,
+    the OpenTelemetry Collector, syslog - and searches them with LogsQL, from its own web
+    interface or from Grafana. It compresses hard and needs no schema, so every field of a
+    structured log is searchable without setting anything up.
+
+    **This template sets up**
+
+    - VictoriaLogs, on a volume for its data
+    - a retention period, after which old days are dropped
+    - a cap on disk use, past which the oldest days are dropped early
+    - a memory limit you choose
+
+    **Sending logs**
+
+    Other apps in the project send to `http://<the app's key>:9428`: `/insert/jsonline` for
+    JSON lines, `/insert/loki/api/v1/push` for anything that speaks Loki, and
+    `/insert/opentelemetry/v1/logs` for OTLP. The web interface is at `/select/vmui`.
+
+    **It has no accounts**
+
+    Anything that reaches it can write and read, which is why it takes no domain here. To
+    use the web interface from outside, add a domain together with basic authentication
+    in the app's routing settings.
+
+    **No health check**
+
+    The image is one static binary with nothing else in it, so there is nothing to run a
+    check with.
+  categories: [observability/monitoring]
+  tags: [monitoring, search, open-source]
+  aliases: [logs, log management, loki alternative, elk alternative, logsql]
+  icon: icons/victorialogs.svg
+  links:
+    website: https://victoriametrics.com/products/victorialogs/
+    documentation: https://docs.victoriametrics.com/victorialogs/
+    source: https://github.com/VictoriaMetrics/VictoriaLogs
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: retention
+    title: Retention
+    description: How long logs are kept - 7d, 4w, 1y.
+    type: string
+    default: 30d
+    pattern: '^[1-9][0-9]*[dwy]$'
+  - name: maxDiskUsage
+    title: Disk cap
+    description: >-
+      The most it may keep on the volume; past it the oldest days are dropped, whatever the
+      retention says. Leave some of the volume free.
+    type: string
+    default: 10GiB
+    pattern: '^[1-9][0-9]*(MiB|GiB|TiB)$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the logs are kept on.
+    type: volume
+
+versions:
+  - name: "1.52"
+    release: "1.52.0"
+    default: true
+    image: victoriametrics/victoria-logs:v1.52.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: >-
+        -storageDataPath=/victoria-logs-data
+        -retentionPeriod=${{ params.retention }}
+        -retention.maxDiskSpaceUsageBytes=${{ params.maxDiskUsage }}
+    storage:
+      mounts:
+        /victoria-logs-data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: one static binary, no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: victorialogs
+      version: "${{ version.name }}"
+    routing:
+      port: 9428

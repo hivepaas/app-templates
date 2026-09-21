@@ -1,0 +1,95 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: homebox
+  title: Homebox
+  tagline: An inventory of what you own, where it is, and when its warranty runs out
+  description: |
+    Homebox keeps track of things: what you have, which room and which box it is in,
+    receipts, manuals and photos attached, serial numbers, and warranty and maintenance
+    dates. Print QR labels for the boxes and scan one to see what is inside.
+
+    **This template sets up**
+
+    - Homebox with its SQLite database, on one volume with the attachments
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open it and register: the first account creates your group. Registration stays open for
+    anyone who can reach the page, so set `HBOX_OPTIONS_ALLOW_REGISTRATION` to `false` in the
+    app's environment and redeploy once everyone has an account - more people can still
+    join a group through an invitation link.
+  categories: [webapps/documents]
+  tags: [documents, open-source]
+  aliases: [inventory, home inventory, assets, warranty, qr labels]
+  icon: icons/homebox.svg
+  links:
+    website: https://homebox.software
+    documentation: https://homebox.software/en/
+    source: https://github.com/sysadminsmedia/homebox
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and the attached photos and documents are kept on.
+    type: volume
+
+versions:
+  - name: "0.21"
+    release: "0.21.0"
+    default: true
+    image: ghcr.io/sysadminsmedia/homebox:0.21.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:7745/api/v1/status
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: homebox
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: HBOX_OPTIONS_ALLOW_REGISTRATION, v: "true"}
+        # Anonymous usage statistics sent to the project; off unless you turn it on.
+        - {k: HBOX_OPTIONS_ALLOW_ANALYTICS, v: "false"}
+    routing:
+      port: 7745
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,115 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: element-web
+  title: Element
+  tagline: The Matrix chat client in the browser, pointed at your homeserver
+  description: |
+    Element is the most complete Matrix client: rooms and spaces, threads, end-to-end
+    encryption with cross-signing, voice and video calls, and widgets. This is its web
+    version, served from your own domain and set up to sign in to your homeserver by
+    default.
+
+    **This template sets up**
+
+    - Element Web, served by nginx, with nothing to store
+    - your homeserver as the default, and the sign-in page skipping the choice of server
+    - a memory limit you choose
+
+    **Pairing it with Synapse**
+
+    Create Synapse from this store first, give it its domain, then create this with that
+    domain's HTTPS address as the homeserver. Element runs in the browser, so the address
+    has to be one the browser can reach - not the app's key inside the project.
+  categories: [webapps/communication]
+  tags: [chat, team-chat, open-source]
+  aliases: [matrix client, riot, element web, chat]
+  icon: icons/element-web.svg
+  links:
+    website: https://element.io
+    documentation: https://github.com/element-hq/element-web/blob/develop/docs/config.md
+    source: https://github.com/element-hq/element-web
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Element answers at - chat.example.com. Leave it empty to add one later, in
+      the app's routing settings.
+    type: domain
+    optional: true
+  - name: homeserverUrl
+    title: Homeserver address
+    description: The HTTPS address of your Matrix homeserver - https://matrix.example.com.
+    type: string
+    default: https://matrix.example.com
+    pattern: '^https?://[^\s/?#]+$'
+  - name: brand
+    title: Name
+    description: What the browser tab and the sign-in page call it.
+    type: string
+    default: Element
+    pattern: '^[^"\\\n]{1,40}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "1.12"
+    release: "1.12.28"
+    default: true
+    image: vectorim/element-web:v1.12.28
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8080/config.json
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: element-web
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The image exposes 8080 but listens on this, which defaults to 80 - a port its
+        # unprivileged nginx user is not always allowed to bind.
+        - {k: ELEMENT_WEB_PORT, v: "8080"}
+    configFiles:
+      config.json:
+        content: |
+          {
+            "default_server_config": {
+              "m.homeserver": {"base_url": "${{ params.homeserverUrl }}"}
+            },
+            "disable_custom_urls": true,
+            "disable_guests": true,
+            "brand": "${{ params.brand }}",
+            "show_labs_settings": false,
+            "default_theme": "light"
+          }
+        swarmRef:
+          file: {name: /app/config.json, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

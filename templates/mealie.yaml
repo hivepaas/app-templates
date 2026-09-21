@@ -1,0 +1,116 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mealie
+  title: Mealie
+  tagline: A recipe manager and meal planner that imports recipes from any URL
+  description: |
+    Mealie keeps a household's recipes: paste the address of a recipe page and it pulls in
+    the ingredients, steps and photo without the life story above them. It plans meals for
+    the week, turns the plan into a shopping list, scales servings, and shares recipes
+    between households.
+
+    **This template sets up**
+
+    - Mealie with its SQLite database, on one volume with the recipe images
+    - sign-up closed, so accounts are made by the administrator
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Sign in as `changeme@example.com` with the password `MyPassword` and change both straight
+    away - it is the account the first start creates, and it is the same on every Mealie in
+    the world. Then invite the rest of the household from the admin settings.
+
+    **The public address**
+
+    Invitation links and shared recipes are built from it. Set it to the HTTPS address of
+    the domain you give the app.
+  categories: [webapps/knowledge]
+  tags: [open-source]
+  aliases: [recipes, meal planner, cooking, shopping list, tandoor alternative]
+  icon: icons/mealie.svg
+  links:
+    website: https://mealie.io
+    documentation: https://docs.mealie.io
+    source: https://github.com/mealie-recipes/mealie
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://recipes.example.com.
+      Invitation links and shared recipes are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:9000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: Decides which day a meal plan falls on. An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database, recipe images and backups are kept on.
+    type: volume
+
+versions:
+  - name: "3.27"
+    release: "3.27.0"
+    default: true
+    image: ghcr.io/mealie-recipes/mealie:v3.27.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check, against its API.
+        command: /app/healthcheck.sh
+        interval: 30s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mealie
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: BASE_URL, v: "${{ params.appUrl }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: ALLOW_SIGNUP, v: "false"}
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

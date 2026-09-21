@@ -639,6 +639,44 @@
       }
     },
     {
+      "name": "apprise",
+      "file": {
+        "path": "templates/apprise.yaml",
+        "sha256": "12f850707f78cc7276d0cbcff424cd7e261dbb32ef81cdf7d9765d30ac69bf65"
+      },
+      "icon": {
+        "path": "icons/apprise.svg",
+        "sha256": "3f2ad8030ec6e7edc7a651284c901e492ce8f9865b646b1949e6fb352896adda"
+      },
+      "title": "Apprise API",
+      "tagline": "One HTTP call that notifies Slack, Telegram, email, ntfy and a hundred more",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "notifications",
+        "alerts",
+        "push",
+        "webhook",
+        "notify"
+      ],
+      "license": "BSD-2-Clause",
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "appsmith",
       "file": {
         "path": "templates/appsmith.yaml",
@@ -1019,6 +1057,45 @@
         {
           "name": "2.6",
           "release": "2.6.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "calibre-web",
+      "file": {
+        "path": "templates/calibre-web.yaml",
+        "sha256": "10eccb8afaece608a8c6abdc888ec91d8c10f0b0df16b08e96e72fcc81e6c6eb"
+      },
+      "icon": {
+        "path": "icons/calibre-web.svg",
+        "sha256": "abb7110cdfdafd43013beaa3a1327b9f2b619c3d8f674182c7f6624cfabe5a45"
+      },
+      "title": "Calibre-Web",
+      "tagline": "Browse, read and download a Calibre e-book library from the web",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "calibre",
+        "ebooks",
+        "epub",
+        "opds",
+        "kindle",
+        "library"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.6",
+          "release": "0.6.27",
           "default": true
         }
       ],
@@ -1546,6 +1623,46 @@
       }
     },
     {
+      "name": "drawio",
+      "file": {
+        "path": "templates/drawio.yaml",
+        "sha256": "25f1303c6d8c77777e5c4c2f21bb60e48d21c8816872d6a11d1977e40ec59557"
+      },
+      "icon": {
+        "path": "icons/drawio.svg",
+        "sha256": "fdf547c1573b445dcfbdc1ccd15129ec702802bdcfb3f3063a2008c38e8d986a"
+      },
+      "title": "draw.io",
+      "tagline": "The diagram editor, served from your own domain",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "whiteboard",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "diagrams.net",
+        "diagrams",
+        "flowchart",
+        "uml",
+        "visio alternative"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "31.4",
+          "release": "31.4.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "drupal",
       "file": {
         "path": "templates/drupal.yaml",
@@ -1619,6 +1736,44 @@
         {
           "name": "2.4",
           "release": "2.4.0.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "element-web",
+      "file": {
+        "path": "templates/element-web.yaml",
+        "sha256": "d54e3c1a6a7d898e483f52b0ada113d12c27b4cbe4feae76f5a7aef9232b0414"
+      },
+      "icon": {
+        "path": "icons/element-web.svg",
+        "sha256": "73b3e423bcf437886a946d869f41e482fb4869e11bbae43a8d32661e3409819e"
+      },
+      "title": "Element",
+      "tagline": "The Matrix chat client in the browser, pointed at your homeserver",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "chat",
+        "team-chat",
+        "open-source"
+      ],
+      "aliases": [
+        "matrix client",
+        "riot",
+        "element web",
+        "chat"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.12",
+          "release": "1.12.28",
           "default": true
         }
       ],
@@ -2711,6 +2866,91 @@
         {
           "name": "4.4",
           "release": "4.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "hedgedoc",
+      "file": {
+        "path": "templates/hedgedoc.yaml",
+        "sha256": "796e5026c0306fad03e1a9e38e744b0bccc6be75525d157cf438ba25dd37b728"
+      },
+      "icon": {
+        "path": "icons/hedgedoc.svg",
+        "sha256": "988217d1ad7966e28f5d5c71c12eab9264222c404bc53c42d31774eab1f817d7"
+      },
+      "title": "HedgeDoc",
+      "tagline": "Write Markdown together, in real time, and share it as a page or slides",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "codimd",
+        "hackmd",
+        "markdown",
+        "collaborative editor",
+        "notes"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.12",
+          "release": "1.12.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "homebox",
+      "file": {
+        "path": "templates/homebox.yaml",
+        "sha256": "946f6e8d9d84b5cf66eb6bd64cfe07b0c2ab2bad567dc5a1e55abf26386ed861"
+      },
+      "icon": {
+        "path": "icons/homebox.svg",
+        "sha256": "75b1e02ee0ab240777b8cea516228925d419558895bfd1e36f53cb75c41f7d06"
+      },
+      "title": "Homebox",
+      "tagline": "An inventory of what you own, where it is, and when its warranty runs out",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "inventory",
+        "home inventory",
+        "assets",
+        "warranty",
+        "qr labels"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.21",
+          "release": "0.21.0",
           "default": true
         }
       ],
@@ -3990,6 +4230,43 @@
       }
     },
     {
+      "name": "mealie",
+      "file": {
+        "path": "templates/mealie.yaml",
+        "sha256": "69900645338524391439cda568bd35bea0495b94c7cbb68ac2d95bd2cc10017c"
+      },
+      "icon": {
+        "path": "icons/mealie.svg",
+        "sha256": "24245fb444f3b8385511ea2e14d8cb1f58a456f4c9ae05de2888fb616fd237c7"
+      },
+      "title": "Mealie",
+      "tagline": "A recipe manager and meal planner that imports recipes from any URL",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "recipes",
+        "meal planner",
+        "cooking",
+        "shopping list",
+        "tandoor alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.27",
+          "release": "3.27.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "meilisearch",
       "file": {
         "path": "templates/meilisearch.yaml",
@@ -4281,7 +4558,7 @@
       "name": "mongodb",
       "file": {
         "path": "templates/mongodb.yaml",
-        "sha256": "61aa666f4b99592442a630efdd5dafc0ae72e6ca5f7087382bfc518045c5bf0b"
+        "sha256": "09da3665f66e2f1fee2d8b1b9072b42a026147f7bfe34920d07db3a8639ee5cf"
       },
       "icon": {
         "path": "icons/mongodb.svg",
@@ -4305,6 +4582,10 @@
           "name": "8.0",
           "release": "8.0.32",
           "default": true
+        },
+        {
+          "name": "7.0",
+          "release": "7.0.43"
         }
       ],
       "requires": {
@@ -6788,6 +7069,52 @@
       }
     },
     {
+      "name": "synapse",
+      "file": {
+        "path": "templates/synapse.yaml",
+        "sha256": "299af25fd5ac6de0464fbd9f9418281548f7a6db0d1cb219e88063c1f0f6d0ab"
+      },
+      "icon": {
+        "path": "icons/synapse.svg",
+        "sha256": "9b5e71338d3200c2c58bb44c81ed5416d1424788265578c7e58179797a71dd91"
+      },
+      "title": "Matrix Synapse",
+      "tagline": "Your own Matrix homeserver - chat that federates with everyone else's",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "chat",
+        "team-chat",
+        "open-source"
+      ],
+      "aliases": [
+        "matrix",
+        "element server",
+        "homeserver",
+        "federation",
+        "slack alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.161",
+          "release": "1.161.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "tandoor",
       "file": {
         "path": "templates/tandoor.yaml",
@@ -7419,6 +7746,45 @@
       }
     },
     {
+      "name": "victorialogs",
+      "file": {
+        "path": "templates/victorialogs.yaml",
+        "sha256": "825fa34cf20250f962608e5a95125f8190b8adce38651cdf733dbd377eeebcf6"
+      },
+      "icon": {
+        "path": "icons/victorialogs.svg",
+        "sha256": "824c9cd72b3a148288111d11b6daf0bf230300efcc55d0ebac5168708fb783ad"
+      },
+      "title": "VictoriaLogs",
+      "tagline": "A log database that stores a lot in little space and queries it fast",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "search",
+        "open-source"
+      ],
+      "aliases": [
+        "logs",
+        "log management",
+        "loki alternative",
+        "elk alternative",
+        "logsql"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.52",
+          "release": "1.52.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "victoriametrics",
       "file": {
         "path": "templates/victoriametrics.yaml",
@@ -7702,6 +8068,52 @@
         {
           "name": "7.1",
           "release": "7.1.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "zipline",
+      "file": {
+        "path": "templates/zipline.yaml",
+        "sha256": "93cf41585e7cee98baf9a5fc36b6ef3311bfefdd04a693a656ef889f63749464"
+      },
+      "icon": {
+        "path": "icons/zipline.svg",
+        "sha256": "447969f910a12df82b10bbe209a401bd7a887cdc75f71fee703448ae6df6099d"
+      },
+      "title": "Zipline",
+      "tagline": "Share screenshots, files and short links from your own domain",
+      "categories": [
+        "webapps/documents",
+        "storage/files"
+      ],
+      "tags": [
+        "file-transfer",
+        "open-source"
+      ],
+      "aliases": [
+        "sharex",
+        "screenshots",
+        "file sharing",
+        "url shortener",
+        "paste"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.4",
+          "release": "4.4.2",
           "default": true
         }
       ],
