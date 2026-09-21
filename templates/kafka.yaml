@@ -1,0 +1,134 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kafka
+  title: Apache Kafka
+  tagline: The event streaming platform, as a single broker with no ZooKeeper
+  description: |
+    Apache Kafka keeps ordered, replayable streams of events - orders placed, rows changed,
+    clicks, sensor readings - and lets any number of consumers read them at their own pace.
+    This is the Apache project's own image, running in KRaft mode: one process is both the
+    broker and its own controller, so there is no ZooKeeper to run beside it.
+
+    **This template sets up**
+
+    - one broker that is also the controller, advertised under the app's own name
+    - internal topics sized for one broker, so consumer groups and transactions work
+    - a persistent volume for the log segments
+    - a Java heap that follows the memory limit you choose
+
+    **Connecting**
+
+    Other apps in the project use `<the app's key>:9092` as the bootstrap server, in
+    plaintext and without authentication. The broker tells clients to come back to that same
+    name, which only resolves inside the project, so there is no way in from outside - and
+    this template publishes nothing.
+
+    **One broker is one copy**
+
+    Topics created here have a replication factor of 1: the volume is the only copy of the
+    data, and while the broker restarts, producers wait. Redpanda, also in this repository,
+    speaks the same protocol if you want something lighter.
+
+    To look inside it, create Kafka UI from this store and point it at the broker.
+  categories: [databases/messaging]
+  tags: [messaging, open-source]
+  aliases: [apache kafka, event streaming, broker, queue, log, kraft]
+  icon: icons/kafka.svg
+  links:
+    website: https://kafka.apache.org
+    documentation: https://kafka.apache.org/documentation/
+    source: https://github.com/apache/kafka
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Half of it goes to the Java heap; the rest is left to the page cache, which is where
+      Kafka actually serves reads from.
+    type: size
+    default: 1GB
+    min: 768MB
+  - name: partitions
+    title: Default partitions
+    description: How many partitions a topic gets when it is created without saying.
+    type: int
+    default: 1
+    min: 1
+    max: 64
+  - name: retentionHours
+    title: Retention
+    description: How many hours a message is kept before it is deleted, unless a topic says otherwise.
+    type: int
+    default: 168
+    min: 1
+  - name: dataVolume
+    title: Data volume
+    description: The volume the log segments are kept on. This is where the messages live.
+    type: volume
+
+versions:
+  - name: "4.3"
+    release: "4.3.1"
+    default: true
+    image: apache/kafka:4.3.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/kafka/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The client tools start a second JVM, which would compete with the broker for
+        # the memory limit on every check, so this only asks whether the listener is
+        # open - it is not until the broker has joined its own quorum.
+        command: bash -c '</dev/tcp/127.0.0.1/9092'
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: kafka
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # The image writes server.properties from KAFKA_* when any are set, and from
+        # nothing else, so this is the whole configuration.
+        - {k: KAFKA_NODE_ID, v: "1"}
+        - {k: KAFKA_PROCESS_ROLES, v: "broker,controller"}
+        - {k: KAFKA_LISTENERS, v: "PLAINTEXT://:9092,CONTROLLER://:9093"}
+        # What clients are told to reconnect to: this app's own name, which the project
+        # network resolves - not the container address, which changes every deployment.
+        - {k: KAFKA_ADVERTISED_LISTENERS, v: "PLAINTEXT://${HIVEPAAS_HOST}:9092"}
+        - {k: KAFKA_CONTROLLER_LISTENER_NAMES, v: CONTROLLER}
+        - {k: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, v: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"}
+        - {k: KAFKA_CONTROLLER_QUORUM_VOTERS, v: "1@localhost:9093"}
+        - {k: KAFKA_LOG_DIRS, v: /var/lib/kafka/data}
+        # The internal topics default to three replicas, which one broker cannot hold:
+        # consumer groups and transactions would never become available.
+        - {k: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, v: "1"}
+        - {k: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, v: "1"}
+        - {k: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, v: "1"}
+        - {k: KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR, v: "1"}
+        - {k: KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR, v: "1"}
+        - {k: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS, v: "0"}
+        - {k: KAFKA_NUM_PARTITIONS, v: "${{ params.partitions }}"}
+        - {k: KAFKA_LOG_RETENTION_HOURS, v: "${{ params.retentionHours }}"}
+        # Unset, the start script fixes the heap at 1 GB whatever the limit is.
+        - {k: KAFKA_HEAP_OPTS, v: "-XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=25.0"}
+    routing:
+      port: 9092

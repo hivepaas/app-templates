@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pgadmin
+  title: pgAdmin
+  tagline: The PostgreSQL administration tool, in the browser
+  description: |
+    pgAdmin is the management tool PostgreSQL's own community builds: a query tool with
+    explain plans, a schema browser, backup and restore, roles and grants, and a dashboard
+    of what the server is doing right now.
+
+    **This template sets up**
+
+    - pgAdmin in server mode, with the account you give it as the first administrator
+    - a volume for its settings, the servers you register and saved queries
+    - a memory limit you choose
+
+    **Adding a database**
+
+    Register a server with the database app's key as the host, port 5432, and the username
+    and password under that app's Secrets. pgAdmin keeps the list per account, so each
+    person who signs in sets up their own.
+
+    **The account is only read once**
+
+    The email address and password below create the first administrator when the volume is
+    empty. Changing them afterwards does nothing; change the password inside pgAdmin, and
+    add other people under Users.
+
+    **Think before you give it a domain**
+
+    On a domain it is a console for every database it knows about, behind one password. Left
+    without one it is reachable only from inside the project - which, since the databases
+    are too, is usually enough.
+  categories: [webapps/dev-tools]
+  tags: [sql, open-source]
+  aliases: [pgadmin4, postgres admin, postgresql client, database-client]
+  icon: icons/pgadmin.svg
+  links:
+    website: https://www.pgadmin.org
+    documentation: https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html
+    source: https://github.com/pgadmin-org/pgadmin4
+  license: PostgreSQL
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leaving it empty keeps the console inside the
+      project, which is where the databases are.
+    type: domain
+    optional: true
+  - name: email
+    title: Administrator email
+    description: What you sign in with. pgAdmin wants a real-looking address, not a bare name.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: password
+    title: Administrator password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the accounts, registered servers and settings are kept on.
+    type: volume
+
+versions:
+  - name: "9.18"
+    release: "9.18.0"
+    default: true
+    image: dpage/pgadmin4:9.18.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/pgadmin: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /misc/ping answers PING without a session. The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:80/misc/ping
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: pgadmin
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PGADMIN_DEFAULT_EMAIL, v: "${{ params.email }}"}
+        - {k: PGADMIN_DEFAULT_PASSWORD, v: "${secrets.PGADMIN_DEFAULT_PASSWORD}"}
+        # The image otherwise starts a postfix of its own, for password reset mails that
+        # have nowhere to go from here.
+        - {k: PGADMIN_DISABLE_POSTFIX, v: "true"}
+    secrets:
+      PGADMIN_DEFAULT_PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

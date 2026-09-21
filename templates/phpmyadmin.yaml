@@ -1,0 +1,111 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: phpmyadmin
+  title: phpMyAdmin
+  tagline: The MySQL and MariaDB console most people already know
+  description: |
+    phpMyAdmin manages MySQL and MariaDB from the browser: tables and rows, indexes and
+    relations, users and privileges, a SQL console, and import and export in the formats
+    people hand each other.
+
+    **This template sets up**
+
+    - phpMyAdmin on its own, with nothing to store
+    - the database apps you name offered in a list on the sign-in page, and a field for
+      any other server
+    - an upload limit for imports, and a memory limit you choose
+
+    **Signing in**
+
+    phpMyAdmin has no accounts of its own: you sign in with a database's own credentials.
+    For an app in this project, the server is the database app's key, and the username and
+    password are that app's, under its Secrets.
+
+    **Think before you give it a domain**
+
+    On a domain it is a database console on the internet, and its only lock is the database
+    password behind it. Left without one it is reachable from inside the project - which,
+    since the databases are too, is usually where you want it. If you do publish it, put
+    basic authentication in front of it in the app's routing settings.
+  categories: [webapps/dev-tools]
+  tags: [sql, mysql-compatible, open-source]
+  aliases: [pma, mysql client, mariadb client, database-client, dbadmin]
+  icon: icons/phpmyadmin.svg
+  links:
+    website: https://www.phpmyadmin.net
+    documentation: https://docs.phpmyadmin.net
+    source: https://github.com/phpmyadmin/phpmyadmin
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leaving it empty keeps the console inside the
+      project, which is where the databases are.
+    type: domain
+    optional: true
+  - name: servers
+    title: Database servers
+    description: >-
+      The app keys of the databases to list on the sign-in page, separated by commas. Leave
+      it empty to type the server each time.
+    type: string
+    optional: true
+    maxLength: 500
+    pattern: '^[A-Za-z0-9._:-]+(,[A-Za-z0-9._:-]+)*$'
+  - name: uploadLimit
+    title: Upload limit
+    description: The largest file an import accepts, the way PHP writes it - 64M, 1G.
+    type: string
+    default: 64M
+    pattern: '^[1-9][0-9]{0,5}[KMG]$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "5.2"
+    release: "5.2.3"
+    default: true
+    image: phpmyadmin:5.2.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: phpmyadmin
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # A list of servers when some are named, and a free field for any other either way.
+        - {k: PMA_HOSTS, v: "${{ params.servers }}"}
+        - {k: PMA_ARBITRARY, v: "1"}
+        - {k: UPLOAD_LIMIT, v: "${{ params.uploadLimit }}"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

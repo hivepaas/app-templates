@@ -59,3 +59,6 @@ tags:
   - {id: voice, title: Voice Chat}
   - {id: file-transfer, title: File Transfer}
   - {id: cloudflare, title: Cloudflare}
+  - {id: containers, title: Containers}
+  - {id: error-tracking, title: Error Tracking}
+  - {id: geospatial, title: Geospatial}

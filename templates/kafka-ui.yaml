@@ -1,0 +1,127 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kafka-ui
+  title: Kafka UI
+  tagline: Browse topics, messages and consumer groups of a Kafka cluster
+  description: |
+    Kafka UI - the kafbat project - is a web console for Kafka and anything that speaks its
+    protocol, Redpanda included: topics and their partitions, messages you can search and
+    produce, consumer groups and how far behind they are, brokers and their configuration.
+
+    **This template sets up**
+
+    - Kafka UI, connected to the Kafka or Redpanda app you pick
+    - a sign-in form with one account, whose password is generated unless you give one
+    - a memory limit you choose
+
+    Nothing is stored: the cluster comes from the app's settings, so the app can be deleted
+    and created again without losing anything.
+
+    **More than one cluster**
+
+    To watch a second cluster - here or anywhere else it can reach - add
+    `KAFKA_CLUSTERS_1_NAME` and `KAFKA_CLUSTERS_1_BOOTSTRAPSERVERS` (`host:9092`) to the app's
+    environment and redeploy.
+
+    **Think before you give it a domain**
+
+    Whoever signs in can read every message and produce new ones. Left without a domain it
+    is reachable only from inside the project.
+  categories: [webapps/dev-tools, databases/messaging]
+  tags: [messaging, dashboards, open-source]
+  aliases: [kafbat, kafka console, kafka admin, redpanda console]
+  icon: icons/kafka-ui.svg
+  links:
+    website: https://kafbat.io
+    documentation: https://ui.docs.kafbat.io
+    source: https://github.com/kafbat/kafka-ui
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to keep it inside the project, with
+      the brokers.
+    type: domain
+    optional: true
+  - name: kafkaApp
+    title: Kafka app
+    description: >-
+      The Kafka or Redpanda app in this environment to connect to. What is stored is its
+      key - the name it answers to on the project's network.
+    type: app
+  - name: clusterName
+    title: Cluster name
+    description: What the cluster is called in the interface.
+    type: string
+    default: kafka
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: username
+    title: Username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 384MB
+
+versions:
+  - name: "1.5"
+    release: "1.5.0"
+    default: true
+    image: kafbat/kafka-ui:v1.5.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The actuator answers without signing in, and says UP whether or not the cluster
+        # is reachable - that is shown inside, per cluster. The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/actuator/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kafka-ui
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: KAFKA_CLUSTERS_0_NAME, v: "${{ params.clusterName }}"}
+        - {k: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS, v: "${${{ params.kafkaApp }}.HIVEPAAS_HOST}:${${{ params.kafkaApp }}.HIVEPAAS_PORT}"}
+        - {k: AUTH_TYPE, v: LOGIN_FORM}
+        - {k: SPRING_SECURITY_USER_NAME, v: "${{ params.username }}"}
+        - {k: SPRING_SECURITY_USER_PASSWORD, v: "${secrets.SPRING_SECURITY_USER_PASSWORD}"}
+        # Without it the JVM sizes its heap from the machine, not from the limit.
+        - {k: JAVA_OPTS, v: "-XX:MaxRAMPercentage=75.0"}
+    secrets:
+      SPRING_SECURITY_USER_PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

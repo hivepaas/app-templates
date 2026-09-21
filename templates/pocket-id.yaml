@@ -1,0 +1,131 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pocket-id
+  title: Pocket ID
+  tagline: Sign in to your apps with passkeys, through one small OpenID provider
+  description: |
+    Pocket ID is an OpenID Connect provider with no passwords at all: people sign in with a
+    passkey - a fingerprint, a face, a security key - and every app that supports OIDC can
+    hand its sign-in to it. It is a single small binary, with users, groups and per-app
+    access, and none of the machinery a full identity server brings.
+
+    **This template sets up**
+
+    - Pocket ID, on a volume for its SQLite database and uploaded logos
+    - an encryption key for the secrets it stores, generated unless you give one
+    - a health check with its own `healthcheck` command
+    - a memory limit you choose
+
+    **It needs a domain, and HTTPS**
+
+    Browsers only create passkeys for a secure origin, and a passkey belongs to the domain it
+    was made on. Give it its domain when you create it, set the public address to match, and
+    keep it: moving to another domain later means everyone registers their passkeys again.
+
+    **After the first deployment**
+
+    Open `/setup` on the domain and create the first administrator by registering a passkey.
+    Until someone does, whoever opens that page first becomes the administrator. Then add
+    each app under OIDC Clients; the issuer to give them is the public address itself.
+
+    **Backups are the volume**
+
+    Users, their passkeys and the registered apps all live in the SQLite file on the volume,
+    encrypted where it matters with the key. Keep the key with the backup: without it the
+    stored secrets cannot be read.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [passkey, webauthn, oidc, oauth, openid, sso]
+  icon: icons/pocket-id.svg
+  links:
+    website: https://pocket-id.org
+    documentation: https://pocket-id.org/docs/
+    source: https://github.com/pocket-id/pocket-id
+  license: BSD-2-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://id.example.com. It is the
+      OIDC issuer and the origin passkeys are made for, so it has to be the HTTPS address of
+      the domain below.
+    type: string
+    default: http://${HIVEPAAS_HOST}:1411
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      What the secrets Pocket ID stores are encrypted with. Leave empty to generate one.
+      Changing it later makes them unreadable.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and uploaded images are kept on.
+    type: volume
+
+versions:
+  - name: "2.5"
+    release: "2.5.0"
+    default: true
+    image: ghcr.io/pocket-id/pocket-id:v2.5.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: /app/pocket-id healthcheck
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: pocket-id
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_URL, v: "${{ params.appUrl }}"}
+        - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        # TLS ends at the reverse proxy; this makes it believe the address the proxy
+        # forwards, which is what sign-in logs and rate limits are keyed on.
+        - {k: TRUST_PROXY, v: "true"}
+    secrets:
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+    routing:
+      port: 1411
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

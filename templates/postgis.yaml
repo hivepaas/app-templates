@@ -1,0 +1,137 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: postgis
+  title: PostgreSQL + PostGIS
+  tagline: PostgreSQL that understands points, lines, areas and distances on Earth
+  description: |
+    The PostGIS project's own image: PostgreSQL with the PostGIS extensions built in. It adds
+    geometry and geography column types, spatial indexes and hundreds of functions - distance,
+    containment, intersection, reprojection - so "everything within 5 km of here" is one query
+    against data you already keep.
+
+    ```sql
+    CREATE TABLE places (id bigserial PRIMARY KEY, name text, geom geography(Point, 4326));
+    CREATE INDEX ON places USING gist (geom);
+    SELECT name FROM places
+    WHERE ST_DWithin(geom, ST_MakePoint(105.85, 21.03)::geography, 5000);
+    ```
+
+    **This template sets up**
+
+    - a database, a user and a generated password
+    - `postgis`, `postgis_topology`, `fuzzystrmatch` and `postgis_tiger_geocoder` already
+      enabled in that database, on its first start
+    - a persistent data volume
+    - a health check with `pg_isready`
+    - a memory limit you choose
+
+    Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (5432),
+    `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD` and `HIVEPAAS_DATABASE_NAME`.
+
+    **Choosing a version**
+
+    The version is the PostGIS release; the variant is the PostgreSQL major it is built on.
+    The major is the one you cannot change later without a dump and restore - pick it first.
+
+    **Only for x86-64 servers**
+
+    The PostGIS project publishes this image for amd64 alone, so it will not start on an
+    ARM node.
+  categories: [databases/sql]
+  tags: [sql, relational, geospatial, open-source]
+  aliases: [gis, spatial, postgresql-postgis, geography, maps]
+  icon: icons/postgis.svg
+  links:
+    website: https://postgis.net
+    documentation: https://postgis.net/documentation/
+    source: https://github.com/postgis/docker-postgis
+  license: GPL-2.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+variants:
+  - name: pg18
+    title: PostgreSQL 18
+    default: true
+  - name: pg17
+    title: PostgreSQL 17
+
+versions:
+  - name: "3.6"
+    release: "3.6.4"
+    default: true
+    # The project publishes only moving tags - 18-3.6 follows every patch of both - so
+    # each is pinned to the digest it had when this release was added.
+    images:
+      pg18: postgis/postgis:18-3.6-alpine@sha256:ffcf0c4b904e41b9779f8098007fb5a9484025319c18c70cf8e1bcebb742b9b7
+      pg17: postgis/postgis:17-3.6-alpine@sha256:a8ffa9afeea4ad6eada171fa2afdb57cd3eb90f92ce20156aa2cb8411d70e0cd
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # One mount for every major. PostgreSQL 18 keeps its data under
+        # /var/lib/postgresql and the majors before it under /var/lib/postgresql/data;
+        # PGDATA below puts every variant in the same place inside this volume, so the
+        # variant a person picks does not change where their data lives.
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: PGDATA, v: /var/lib/postgresql/hpdata}
+    routing:
+      port: 5432

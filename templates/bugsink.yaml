@@ -1,0 +1,150 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: bugsink
+  title: Bugsink
+  tagline: Error tracking that takes the Sentry SDKs, in one small app
+  description: |
+    Bugsink collects the errors your applications throw - stack traces, local variables,
+    breadcrumbs, the release they came from - groups them into issues and tells you when a
+    new one appears. It accepts events from the Sentry SDKs you may already have in your
+    code, so switching is a matter of changing the DSN.
+
+    **This template creates two apps**
+
+    - **Bugsink**, which keeps nothing of its own
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in with the administrator email and password you gave it, create a team and a
+    project, and copy the project's DSN into your application's Sentry SDK.
+
+    **It needs a domain**
+
+    Your applications send their errors to the DSN, which is built from the public address.
+    Give the app a domain and set the address to its HTTPS form - sign-in only works over
+    HTTPS, because the session cookie is marked secure.
+
+    **Backups are the database**
+
+    Every event, issue and account lives in PostgreSQL, so the database app is what there is
+    to back up. Old events are removed on their own once a project reaches its retention
+    limit, which you set per project.
+  categories: [observability/monitoring, webapps/dev-tools]
+  tags: [monitoring, error-tracking, open-source]
+  aliases: [sentry, errors, exceptions, crash reporting, glitchtip, apm]
+  icon: icons/bugsink.svg
+  links:
+    website: https://www.bugsink.com
+    documentation: https://www.bugsink.com/docs/
+    source: https://github.com/bugsink/bugsink
+  license: PolyForm-Shield-1.0.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address it is reached at, scheme and all - https://errors.example.com. The DSNs
+      it hands out and the links in its emails are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The first account, created on the first start. It is also what you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@:\s]+@[^@:\s]+\.[^@:\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Signs sessions and password reset links. Leave empty to generate one; it has to be at
+      least 50 characters.
+    type: secret
+    minLength: 50
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: bugsink
+      username: bugsink
+
+versions:
+  - name: "2.6"
+    release: "2.6.0"
+    default: true
+    image: bugsink/bugsink:2.6.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: it has neither curl nor wget, and /health/ready answers
+        # once the migrations have run and the server is up.
+        command: >-
+          python -c 'import requests;
+          requests.get("http://127.0.0.1:8000/health/ready", timeout=4).raise_for_status()'
+        interval: 20s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: bugsink
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: BASE_URL, v: "${{ params.appUrl }}"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        # email:password, read once, while there are no users yet.
+        - {k: CREATE_SUPERUSER, v: "${{ params.adminEmail }}:${secrets.ADMIN_PASSWORD}"}
+        - {k: DATABASE_URL, v: "postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        # TLS ends at the reverse proxy, which forwards the scheme and the client's
+        # address in X-Forwarded-Proto and X-Real-IP.
+        - {k: BEHIND_HTTPS_PROXY, v: "true"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

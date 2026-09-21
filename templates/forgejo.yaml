@@ -1,0 +1,115 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: forgejo
+  title: Forgejo
+  tagline: A community-run Git forge, light enough to self-host anywhere
+  description: |
+    Forgejo hosts Git repositories with pull requests, issues, releases, wikis, a package
+    registry and Actions runners that read the workflow syntax you already know. It began
+    as a fork of Gitea and is governed by a non-profit, in the open, by the people who use
+    it.
+
+    **This template creates two apps**
+
+    - **Forgejo**, on a volume for the repositories, attachments and its configuration
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the app and finish the short installation page. The database fields are already
+    filled in from the app it was created with; set the address people will use under "Server
+    and Third-Party Service Settings", then create the administrator account at the bottom of
+    the page. The first account is an administrator whether or not you create it there, so do
+    not leave the page for someone else to find.
+
+    **Git over SSH is not part of this**
+
+    Only the HTTP port is published, so clone and push over HTTPS with a token or password.
+    Forgejo's SSH server listens inside the container on port 22 and nothing routes to it,
+    which also means the SSH keys people add are unused for now.
+  categories: [webapps/dev-tools]
+  tags: [git, open-source]
+  aliases: [git, forge, gitea, codeberg]
+  icon: icons/forgejo.svg
+  links:
+    website: https://forgejo.org
+    documentation: https://forgejo.org/docs/latest/
+    source: https://codeberg.org/forgejo/forgejo
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the repositories and configuration are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: forgejo
+      username: forgejo
+
+versions:
+  - name: "16.0"
+    release: "16.0.5"
+    default: true
+    image: codeberg.org/forgejo/forgejo:16.0.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: forgejo
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # FORGEJO__section__KEY writes app.ini before the server starts, which is what
+        # fills in the installation page.
+        - {k: FORGEJO__database__DB_TYPE, v: postgres}
+        - {k: FORGEJO__database__HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: FORGEJO__database__NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: FORGEJO__database__USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: FORGEJO__database__PASSWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

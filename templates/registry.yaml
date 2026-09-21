@@ -1,0 +1,117 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: registry
+  title: Docker Registry
+  tagline: A private place to push container images and pull them back
+  description: |
+    The Docker registry - the CNCF Distribution project that Docker Hub itself grew from -
+    stores container images and serves them to anything that speaks the registry API:
+    `docker push`, `docker pull`, CI jobs, and the nodes of this cluster when they deploy.
+
+    **This template sets up**
+
+    - the registry, on a volume that holds every layer pushed to it
+    - deletion turned on, so images can be removed through the API and their space
+      reclaimed with garbage collection
+    - a health check on the registry's own storage check
+    - a memory limit you choose
+
+    **It has no accounts of its own**
+
+    Anything that can reach it can push and pull. That is why this template gives it no
+    domain: other apps in the project reach it by the app's name on port 5000, and nothing
+    outside does. Before you add a domain, turn on basic authentication in the app's
+    routing settings - `docker login` works with it - and add both in the same change, so
+    there is never a moment when the registry is on the internet without a lock.
+
+    **Pulling from the cluster's own nodes**
+
+    Docker only talks to a registry over HTTPS, so the nodes pull from the domain, with the
+    certificate HivePaaS issues for it, and not from the app's internal name. Sign the
+    nodes in to it with the basic authentication account.
+
+    **Deleting does not free space by itself**
+
+    Deleting a tag removes the reference. The layers stay on the volume until garbage
+    collection runs, which is `registry garbage-collect /etc/distribution/config.yml` in
+    the app's console - best while nothing is pushing.
+  categories: [webapps/dev-tools, storage/object-storage]
+  tags: [containers, open-source]
+  aliases: [docker registry, container registry, distribution, oci, images]
+  icon: icons/registry.svg
+  links:
+    website: https://distribution.github.io/distribution/
+    documentation: https://distribution.github.io/distribution/about/configuration/
+    source: https://github.com/distribution/distribution
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: httpSecret
+    title: HTTP secret
+    description: >-
+      Signs the state of uploads in progress. Leave empty to generate one; without it the
+      registry makes up a new one at every start, which breaks uploads that span a restart.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the image layers and manifests are kept on.
+    type: volume
+
+versions:
+  - name: "3.1"
+    release: "3.1.1"
+    default: true
+    image: registry:3.1.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/registry: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The debug server's health endpoint runs the storage driver check the image's
+        # configuration turns on, so a volume that cannot be written fails it. The image
+        # has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:5001/debug/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: registry
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # REGISTRY_<section>_<key> overrides the image's /etc/distribution/config.yml.
+        - {k: REGISTRY_STORAGE_DELETE_ENABLED, v: "true"}
+        - {k: REGISTRY_HTTP_SECRET, v: "${secrets.REGISTRY_HTTP_SECRET}"}
+        # The image ships with debug logging, which writes a line per blob request.
+        - {k: REGISTRY_LOG_LEVEL, v: info}
+    secrets:
+      REGISTRY_HTTP_SECRET:
+        value: "${{ params.httpSecret }}"
+    routing:
+      port: 5000
+      exposePublicly: true

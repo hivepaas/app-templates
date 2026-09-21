@@ -359,6 +359,18 @@
     {
       "id": "cloudflare",
       "title": "Cloudflare"
+    },
+    {
+      "id": "containers",
+      "title": "Containers"
+    },
+    {
+      "id": "error-tracking",
+      "title": "Error Tracking"
+    },
+    {
+      "id": "geospatial",
+      "title": "Geospatial"
     }
   ],
   "templates": [
@@ -819,6 +831,100 @@
         {
           "name": "0.20",
           "release": "0.20.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "bookstack",
+      "file": {
+        "path": "templates/bookstack.yaml",
+        "sha256": "78d341984106cd902e7dfc1afc8e2dba01c75f466ef8b6f8d2114025ea07f1cd"
+      },
+      "icon": {
+        "path": "icons/bookstack.svg",
+        "sha256": "f2b209654fa2e37e9b94e7b2747d715dcac25d886110756686686a685efa19bf"
+      },
+      "title": "BookStack",
+      "tagline": "A wiki organised like a library - shelves, books, chapters and pages",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "wiki",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "wiki",
+        "documentation",
+        "knowledge base",
+        "confluence"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "26.05",
+          "release": "26.05.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "bugsink",
+      "file": {
+        "path": "templates/bugsink.yaml",
+        "sha256": "cf1713dfcc8add69a7bf62de95ee71b76b25ab86d5339dfc2a7c289953572623"
+      },
+      "icon": {
+        "path": "icons/bugsink.svg",
+        "sha256": "f671f6fcec29d98f3da1efc888eeb14198a69dcbb7652469c394db3e151ec033"
+      },
+      "title": "Bugsink",
+      "tagline": "Error tracking that takes the Sentry SDKs, in one small app",
+      "categories": [
+        "observability/monitoring",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "monitoring",
+        "error-tracking",
+        "open-source"
+      ],
+      "aliases": [
+        "sentry",
+        "errors",
+        "exceptions",
+        "crash reporting",
+        "glitchtip",
+        "apm"
+      ],
+      "license": "PolyForm-Shield-1.0.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.0",
           "default": true
         }
       ],
@@ -1604,6 +1710,50 @@
         {
           "name": "3.1",
           "release": "3.1.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "forgejo",
+      "file": {
+        "path": "templates/forgejo.yaml",
+        "sha256": "88ae9d70541d7df8176e26e21470bbe2748e387e58f6e7c2a171e422b81d801e"
+      },
+      "icon": {
+        "path": "icons/forgejo.svg",
+        "sha256": "b2ba4206b6344a4116b9a7eb86f822942940fec0fa83327114d77fb7a98775b8"
+      },
+      "title": "Forgejo",
+      "tagline": "A community-run Git forge, light enough to self-host anywhere",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "git",
+        "forge",
+        "gitea",
+        "codeberg"
+      ],
+      "license": "GPL-3.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "16.0",
+          "release": "16.0.5",
           "default": true
         }
       ],
@@ -2687,6 +2837,84 @@
         {
           "name": "5",
           "release": "5.3.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kafka",
+      "file": {
+        "path": "templates/kafka.yaml",
+        "sha256": "d3b3b5f27aa892b553e04f1d60ed595c5f8eda05da67dde392ebbafdde30dfc0"
+      },
+      "icon": {
+        "path": "icons/kafka.svg",
+        "sha256": "e64804c91c53daee5ab4c83f466b90b3daca2e219d91deab06e68ccae06d7d3d"
+      },
+      "title": "Apache Kafka",
+      "tagline": "The event streaming platform, as a single broker with no ZooKeeper",
+      "categories": [
+        "databases/messaging"
+      ],
+      "tags": [
+        "messaging",
+        "open-source"
+      ],
+      "aliases": [
+        "apache kafka",
+        "event streaming",
+        "broker",
+        "queue",
+        "log",
+        "kraft"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "4.3",
+          "release": "4.3.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kafka-ui",
+      "file": {
+        "path": "templates/kafka-ui.yaml",
+        "sha256": "c80d80445b6e0d72297b73f9fb6ebbcac8f12929ac8cd7c54099f0846f31b71b"
+      },
+      "icon": {
+        "path": "icons/kafka-ui.svg",
+        "sha256": "94ee0e2c26dcb4fb0117494bb0a630e9b8d2ea4d98a31d0c42cf4ca6a0aa053c"
+      },
+      "title": "Kafka UI",
+      "tagline": "Browse topics, messages and consumer groups of a Kafka cluster",
+      "categories": [
+        "webapps/dev-tools",
+        "databases/messaging"
+      ],
+      "tags": [
+        "messaging",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "kafbat",
+        "kafka console",
+        "kafka admin",
+        "redpanda console"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.0",
           "default": true
         }
       ],
@@ -4715,6 +4943,43 @@
       }
     },
     {
+      "name": "pgadmin",
+      "file": {
+        "path": "templates/pgadmin.yaml",
+        "sha256": "38305515cef12139027de636fb7395bfdddc96a9a9ac11873c2f95e63cb3a6df"
+      },
+      "icon": {
+        "path": "icons/pgadmin.svg",
+        "sha256": "a38651cc0fa6cfbb4275d7dd2da09050aa68b983e96502c705c126c6af3cbc9e"
+      },
+      "title": "pgAdmin",
+      "tagline": "The PostgreSQL administration tool, in the browser",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "pgadmin4",
+        "postgres admin",
+        "postgresql client",
+        "database-client"
+      ],
+      "license": "PostgreSQL",
+      "versions": [
+        {
+          "name": "9.18",
+          "release": "9.18.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "pgbouncer",
       "file": {
         "path": "templates/pgbouncer.yaml",
@@ -4846,6 +5111,45 @@
         {
           "name": "260919",
           "release": "260919",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "phpmyadmin",
+      "file": {
+        "path": "templates/phpmyadmin.yaml",
+        "sha256": "b9e47dbe5a02f4a3c855d99e191f14941c61eee23a9a4220eab8d48ecf083c7b"
+      },
+      "icon": {
+        "path": "icons/phpmyadmin.svg",
+        "sha256": "9e6a32e029687d314c71bb6ab88800b1c6594ccd485a88d16dc93ef3736449c3"
+      },
+      "title": "phpMyAdmin",
+      "tagline": "The MySQL and MariaDB console most people already know",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "mysql-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "pma",
+        "mysql client",
+        "mariadb client",
+        "database-client",
+        "dbadmin"
+      ],
+      "license": "GPL-2.0-only",
+      "versions": [
+        {
+          "name": "5.2",
+          "release": "5.2.3",
           "default": true
         }
       ],
@@ -5027,6 +5331,46 @@
       }
     },
     {
+      "name": "pocket-id",
+      "file": {
+        "path": "templates/pocket-id.yaml",
+        "sha256": "4106d92142282345426d5932097790ec4702a1fd86dcbd6237e6fe467137be25"
+      },
+      "icon": {
+        "path": "icons/pocket-id.svg",
+        "sha256": "a16bcc34cc855c12572c34335496ee35c57c0b3795f59d728077cbd6aabd5570"
+      },
+      "title": "Pocket ID",
+      "tagline": "Sign in to your apps with passkeys, through one small OpenID provider",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "passkey",
+        "webauthn",
+        "oidc",
+        "oauth",
+        "openid",
+        "sso"
+      ],
+      "license": "BSD-2-Clause",
+      "versions": [
+        {
+          "name": "2.5",
+          "release": "2.5.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "pocketbase",
       "file": {
         "path": "templates/pocketbase.yaml",
@@ -5059,6 +5403,59 @@
           "name": "0.30",
           "release": "0.30.0",
           "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "postgis",
+      "file": {
+        "path": "templates/postgis.yaml",
+        "sha256": "b89c827bc8c11c34e04fb3f55deab8b773a4ebf2d34d89104afa4fcb9e5d72f9"
+      },
+      "icon": {
+        "path": "icons/postgis.svg",
+        "sha256": "d7f206d80419524a9eabaacff2db55a5ffb07912313fcbc57f417572ae43c046"
+      },
+      "title": "PostgreSQL + PostGIS",
+      "tagline": "PostgreSQL that understands points, lines, areas and distances on Earth",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "geospatial",
+        "open-source"
+      ],
+      "aliases": [
+        "gis",
+        "spatial",
+        "postgresql-postgis",
+        "geography",
+        "maps"
+      ],
+      "license": "GPL-2.0-or-later",
+      "variants": [
+        {
+          "name": "pg18",
+          "default": true
+        },
+        {
+          "name": "pg17"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.6",
+          "release": "3.6.4",
+          "default": true,
+          "variants": [
+            "pg18",
+            "pg17"
+          ]
         }
       ],
       "requires": {
@@ -5581,6 +5978,45 @@
         {
           "name": "26.2",
           "release": "26.2.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "registry",
+      "file": {
+        "path": "templates/registry.yaml",
+        "sha256": "f190fca26374d7d4a82155547139281c57a11449ab9633cab98b64eb2d168f12"
+      },
+      "icon": {
+        "path": "icons/registry.svg",
+        "sha256": "f2bde1f3be530b8b69c8e18f9d74e8783b1527c374cfb26c9df9d1ba4b0af2cb"
+      },
+      "title": "Docker Registry",
+      "tagline": "A private place to push container images and pull them back",
+      "categories": [
+        "webapps/dev-tools",
+        "storage/object-storage"
+      ],
+      "tags": [
+        "containers",
+        "open-source"
+      ],
+      "aliases": [
+        "docker registry",
+        "container registry",
+        "distribution",
+        "oci",
+        "images"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.1",
           "default": true
         }
       ],
