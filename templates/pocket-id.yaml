@@ -55,7 +55,9 @@ parameters:
       OIDC issuer and the origin passkeys are made for, so it has to be the HTTPS address of
       the domain below.
     type: string
-    default: http://${HIVEPAAS_HOST}:1411
+    # Not the app's own name: from 2.x on, Pocket ID refuses to start when the host is not
+    # a valid domain, and an app key's underscore makes it one.
+    default: https://id.example.com
     # A scheme and a host, and nothing after them.
     pattern: '^https?://[^\s/?#]+$'
   - name: domain
@@ -84,10 +86,10 @@ parameters:
     type: volume
 
 versions:
-  - name: "2.5"
-    release: "2.5.0"
+  - name: "2.16"
+    release: "2.16.0"
     default: true
-    image: ghcr.io/pocket-id/pocket-id:v2.5.0
+    image: ghcr.io/pocket-id/pocket-id:v2.16.0
 
 app:
   deployment:

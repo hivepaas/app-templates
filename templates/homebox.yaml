@@ -41,6 +41,14 @@ parameters:
       routing settings.
     type: domain
     optional: true
+  - name: apiKeyPepper
+    title: API key pepper
+    description: >-
+      Hashes the API keys people create. Leave empty to generate one; changing it later
+      invalidates every key already issued.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
   - name: memoryLimit
     title: Memory limit
     type: size
@@ -52,10 +60,10 @@ parameters:
     type: volume
 
 versions:
-  - name: "0.21"
-    release: "0.21.0"
+  - name: "0.26"
+    release: "0.26.2"
     default: true
-    image: ghcr.io/sysadminsmedia/homebox:0.21.0
+    image: ghcr.io/sysadminsmedia/homebox:0.26.2
 
 app:
   deployment:
@@ -88,6 +96,11 @@ app:
         - {k: HBOX_OPTIONS_ALLOW_REGISTRATION, v: "true"}
         # Anonymous usage statistics sent to the project; off unless you turn it on.
         - {k: HBOX_OPTIONS_ALLOW_ANALYTICS, v: "false"}
+        # Required from 0.26: without it the server refuses to start.
+        - {k: HBOX_AUTH_API_KEY_PEPPER, v: "${secrets.HBOX_AUTH_API_KEY_PEPPER}"}
+    secrets:
+      HBOX_AUTH_API_KEY_PEPPER:
+        value: "${{ params.apiKeyPepper }}"
     routing:
       port: 7745
       exposePublicly: true

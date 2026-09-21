@@ -71,10 +71,10 @@ dependencies:
       username: zipline
 
 versions:
-  - name: "4.4"
-    release: "4.4.2"
+  - name: "4.7"
+    release: "4.7.0"
     default: true
-    image: ghcr.io/diced/zipline:4.4.2
+    image: ghcr.io/diced/zipline:4.7.0
 
 app:
   deployment:

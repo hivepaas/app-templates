@@ -2188,7 +2188,7 @@
       "name": "formbricks",
       "file": {
         "path": "templates/formbricks.yaml",
-        "sha256": "a83fbbe499930e2924fc41140d7b0037d2b8044eed69d0388907bc9c6df1b8f8"
+        "sha256": "e4abedb70d0baf4c484fd7e5a05b08eb8f40de7fe1b5f65c8f0ce23fd6786f52"
       },
       "icon": {
         "path": "icons/formbricks.svg",
@@ -2215,12 +2215,17 @@
           "name": "db",
           "title": "Database",
           "template": "pgvector"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
         }
       ],
       "versions": [
         {
-          "name": "3.16",
-          "release": "3.16.1",
+          "name": "4.9",
+          "release": "4.9.7",
           "default": true
         }
       ],
@@ -3063,7 +3068,7 @@
       "name": "homebox",
       "file": {
         "path": "templates/homebox.yaml",
-        "sha256": "946f6e8d9d84b5cf66eb6bd64cfe07b0c2ab2bad567dc5a1e55abf26386ed861"
+        "sha256": "f76c0f899cc1167859de3a08a132910f74ed0747964dbc02e3f995c7a4965d13"
       },
       "icon": {
         "path": "icons/homebox.svg",
@@ -3088,8 +3093,8 @@
       "license": "AGPL-3.0-only",
       "versions": [
         {
-          "name": "0.21",
-          "release": "0.21.0",
+          "name": "0.26",
+          "release": "0.26.2",
           "default": true
         }
       ],
@@ -6423,7 +6428,7 @@
       "name": "pocket-id",
       "file": {
         "path": "templates/pocket-id.yaml",
-        "sha256": "4106d92142282345426d5932097790ec4702a1fd86dcbd6237e6fe467137be25"
+        "sha256": "5793f4b56e5948a1a63b0f1a36a44ad032f014c70fb3c367109478761cd6d5b9"
       },
       "icon": {
         "path": "icons/pocket-id.svg",
@@ -6450,8 +6455,8 @@
       "license": "BSD-2-Clause",
       "versions": [
         {
-          "name": "2.5",
-          "release": "2.5.0",
+          "name": "2.16",
+          "release": "2.16.0",
           "default": true
         }
       ],
@@ -8839,7 +8844,7 @@
       "name": "zipline",
       "file": {
         "path": "templates/zipline.yaml",
-        "sha256": "93cf41585e7cee98baf9a5fc36b6ef3311bfefdd04a693a656ef889f63749464"
+        "sha256": "0c6033b1266a69e0cc3f33ecfde4f24daaf93884d914a9a676a1db397b4bfb12"
       },
       "icon": {
         "path": "icons/zipline.svg",
@@ -8872,8 +8877,8 @@
       ],
       "versions": [
         {
-          "name": "4.4",
-          "release": "4.4.2",
+          "name": "4.7",
+          "release": "4.7.0",
           "default": true
         }
       ],

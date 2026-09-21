@@ -11,16 +11,25 @@ metadata:
     NPS and CSAT templates, hidden fields, integrations with Slack, Notion and Google Sheets,
     and the responses stay in your database.
 
-    **This template creates two apps**
+    **This template creates three apps**
 
-    - **Formbricks**, on a volume for files respondents upload
+    - **Formbricks**, which keeps nothing of its own
     - **a PostgreSQL database with pgvector** for it, named after the app with `-db` added
+    - **a Redis** for sessions and rate limits, with `-cache` added
 
     **After the first deployment**
 
     Open it and create the first account; it becomes the owner of the first organization.
     Email verification and password reset are off, since no mail server is configured -
     add SMTP settings to the app's environment to turn them on.
+
+    **File uploads need S3**
+
+    Formbricks stores uploaded files - logos, and answers to file-upload questions - in S3
+    and nowhere else. Surveys work without it; to allow uploads, add `S3_ENDPOINT_URL`,
+    `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET_NAME`, `S3_REGION` and
+    `S3_FORCE_PATH_STYLE=1` to the app's environment - the Garage template in this store
+    provides all of them.
 
     **The public address has to be right**
 
@@ -81,10 +90,6 @@ parameters:
     type: size
     default: 1GB
     min: 512MB
-  - name: dataVolume
-    title: Upload volume
-    description: The volume files uploaded by respondents are kept on.
-    type: volume
 
 dependencies:
   - name: db
@@ -94,26 +99,30 @@ dependencies:
     params:
       dbName: formbricks
       username: formbricks
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
 
 versions:
-  - name: "3.16"
-    release: "3.16.1"
+  # 5.0 and later refuse to start without a Cube.js server and the Formbricks Hub, two
+  # more services this template cannot create alongside; 4.9 is the last line without.
+  - name: "4.9"
+    release: "4.9.7"
     default: true
-    image: ghcr.io/formbricks/formbricks:v3.16.1
+    image: ghcr.io/formbricks/formbricks:4.9.7
 
 app:
   deployment:
     source:
       activeMethod: image
       imageSource: {image: "${{ image }}"}
-    storage:
-      mounts:
-        /home/nextjs/apps/web/uploads: {type: volume, source: "${{ params.dataVolume }}"}
     container:
       healthcheck:
         enabled: true
         mode: CMD-SHELL
-        command: curl -fsS -o /dev/null http://127.0.0.1:3000/health
+        # The image has wget and, from 4.x, no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/health
         interval: 20s
         timeout: 10s
         # Every start runs the database migrations before the server comes up.
@@ -140,6 +149,11 @@ app:
             postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
             deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
             deps.db.ref.HIVEPAAS_DATABASE_NAME }}?schema=public
+        # Redis has no user name to set: it authenticates as its built-in `default` user.
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
         # No mail server is configured, and both of these send mail.
         - {k: EMAIL_VERIFICATION_DISABLED, v: "1"}
         - {k: PASSWORD_RESET_DISABLED, v: "1"}
