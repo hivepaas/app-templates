@@ -6746,6 +6746,62 @@
       }
     },
     {
+      "name": "openclaw",
+      "file": {
+        "path": "templates/openclaw.yaml",
+        "sha256": "2798d7e1fe55bbe870728ea0bbef5018e92ff132d0075f7e0d09b0d884a73d30"
+      },
+      "icon": {
+        "path": "icons/openclaw.svg",
+        "sha256": "f99f39e65dab17562abfa2b88561dc6d76c7fe21510ee68e4edcbdb3caa919dc"
+      },
+      "title": "OpenClaw",
+      "tagline": "A personal AI agent that answers on your own messaging accounts",
+      "categories": [
+        "webapps/ai",
+        "webapps/automation"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "automation",
+        "chat",
+        "open-source"
+      ],
+      "aliases": [
+        "ai agent",
+        "assistant",
+        "whatsapp bot",
+        "telegram bot",
+        "clawdbot",
+        "moltbot"
+      ],
+      "license": "MIT",
+      "variants": [
+        {
+          "name": "standard",
+          "default": true
+        },
+        {
+          "name": "browser"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.5",
+          "default": true,
+          "variants": [
+            "standard",
+            "browser"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "opencloud",
       "file": {
         "path": "templates/opencloud.yaml",

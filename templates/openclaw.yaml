@@ -1,0 +1,186 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: openclaw
+  title: OpenClaw
+  tagline: A personal AI agent that answers on your own messaging accounts
+  description: |
+    OpenClaw is an agent you talk to where you already talk: WhatsApp, Telegram, Discord,
+    Signal, e-mail, or its own web interface. It runs the model you point it at - Anthropic,
+    OpenAI, a local Ollama - and it does things rather than only answering: runs commands,
+    reads and writes files in its workspace, browses, remembers, and keeps working on a
+    schedule. This runs its gateway, which is the part that holds the accounts, the memory
+    and the workspace.
+
+    **This template sets up**
+
+    - the gateway, on a volume for its configuration, memory and workspace
+    - the Control UI at the app's address, behind a token
+    - a model provider key, if you give one
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Two steps, both in the app's console, because the address it is served at has to be
+    allowed before a browser may talk to it:
+
+    ```sh
+    openclaw config set gateway.controlUi.allowedOrigins '["https://claw.example.com"]'
+    ```
+
+    Then open the address and paste the gateway token into Settings. From there, pick a
+    model, and pair the channels you want:
+
+    ```sh
+    openclaw channels login                                   # WhatsApp, by QR code
+    openclaw channels add --channel telegram --token "<token>"
+    ```
+
+    **What it can do is what it can reach**
+
+    The agent runs commands inside this app, so it reaches the project network and whatever
+    the node routes to. Anyone who gets the token gets the agent, and the agent has your
+    messaging accounts - treat the token as the key to all of it, and keep the address
+    behind HTTPS.
+
+    **It needs a model**
+
+    Without a provider key or a local model it has nothing to think with. The keys below go
+    in as environment variables; a local Ollama in this project works too, set in the
+    Control UI.
+
+    **Memory and disk**
+
+    The image is large - several gigabytes - and the agent keeps its memory, sessions and
+    workspace on the volume. Two gigabytes of memory is a comfortable floor.
+  categories: [webapps/ai, webapps/automation]
+  tags: [ai, llm, automation, chat, open-source]
+  aliases: [ai agent, assistant, whatsapp bot, telegram bot, clawdbot, moltbot]
+  icon: icons/openclaw.svg
+  links:
+    website: https://openclaw.ai
+    documentation: https://docs.openclaw.ai
+    source: https://github.com/openclaw/openclaw
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. The Control UI is served here - and the same
+      address has to be added to the gateway's allowed origins after the first start, which
+      the description shows how to do.
+    type: domain
+    optional: true
+  - name: gatewayToken
+    title: Gateway token
+    description: >-
+      What the Control UI and every client sign in with. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 40}
+  - name: anthropicApiKey
+    title: Anthropic API key
+    description: For Claude models. Leave empty if you use another provider.
+    type: secret
+    optional: true
+  - name: openaiApiKey
+    title: OpenAI API key
+    description: For GPT models. Leave empty if you use another provider.
+    type: secret
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: What the agent takes "tomorrow morning" to mean - Europe/Berlin, Asia/Ho_Chi_Minh.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: Node, the plugins and whatever the agent runs share it.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the configuration, the paired accounts, the memory and the workspace are
+      kept on.
+    type: volume
+
+variants:
+  - name: standard
+    title: Standard
+    description: The gateway and its bundled plugins
+    default: true
+  - name: browser
+    title: With a browser
+    description: >-
+      Also carries Chromium, for the browser the agent drives itself. A much larger image.
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.5"
+    default: true
+    images:
+      standard: openclaw/openclaw:2026.9.5
+      browser: openclaw/openclaw:2026.9.5-browser
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The gateway refuses to start without a configuration file, which normally comes
+      # from running onboarding by hand first. This starts it empty instead, to be
+      # configured in the Control UI.
+      command: node openclaw.mjs gateway --allow-unconfigured --bind lan --port 18789
+    storage:
+      mounts:
+        /home/node/.openclaw: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: node dist/docker-healthcheck.js
+        interval: 30s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: openclaw
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Where it keeps everything, which is the volume above rather than the home
+        # directory the image would pick on its own.
+        - {k: OPENCLAW_STATE_DIR, v: /home/node/.openclaw}
+        - {k: OPENCLAW_CONFIG_DIR, v: /home/node/.openclaw}
+        - {k: OPENCLAW_CONFIG_PATH, v: /home/node/.openclaw/openclaw.json}
+        - {k: OPENCLAW_WORKSPACE_DIR, v: /home/node/.openclaw/workspace}
+        - {k: OPENCLAW_GATEWAY_PORT, v: "18789"}
+        - {k: OPENCLAW_GATEWAY_TOKEN, v: "${secrets.GATEWAY_TOKEN}"}
+        - {k: ANTHROPIC_API_KEY, v: "${secrets.ANTHROPIC_API_KEY}"}
+        - {k: OPENAI_API_KEY, v: "${secrets.OPENAI_API_KEY}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    secrets:
+      GATEWAY_TOKEN:
+        value: "${{ params.gatewayToken }}"
+      ANTHROPIC_API_KEY:
+        value: "${{ params.anthropicApiKey }}"
+      OPENAI_API_KEY:
+        value: "${{ params.openaiApiKey }}"
+    routing:
+      port: 18789
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
