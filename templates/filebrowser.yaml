@@ -22,11 +22,11 @@ metadata:
     in the app's logs: *User 'admin' initialized with randomly generated password*. Sign in
     with it and change it under Settings.
 
-    **Sharing a volume with another app**
+    **Its files are its own**
 
-    The files volume can be one another app uses too - a media library, a site's uploads -
-    to manage its files from here. File Browser runs as user 1000, so it can only change
-    what that user may write.
+    HivePaaS gives every app its own folder on a volume, so picking a volume another app
+    uses does not show that app's files here - File Browser sees only what is uploaded to
+    it. It is a place to keep and share files, not a window into other apps.
   categories: [webapps/documents, storage/files]
   tags: [files, file-transfer, open-source]
   aliases: [file manager, web file manager, upload, share files]

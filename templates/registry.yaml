@@ -21,16 +21,18 @@ metadata:
     **It has no accounts of its own**
 
     Anything that can reach it can push and pull. That is why this template gives it no
-    domain: other apps in the project reach it by the app's name on port 5000, and nothing
-    outside does. Before you add a domain, turn on basic authentication in the app's
+    domain to begin with. Before you add one, turn on basic authentication in the app's
     routing settings - `docker login` works with it - and add both in the same change, so
     there is never a moment when the registry is on the internet without a lock.
 
-    **Pulling from the cluster's own nodes**
+    **Use it through the domain**
 
-    Docker only talks to a registry over HTTPS, so the nodes pull from the domain, with the
-    certificate HivePaaS issues for it, and not from the app's internal name. Sign the
-    nodes in to it with the basic authentication account.
+    An image name cannot carry the app's key as its registry: the key has an underscore,
+    and image references refuse one in a host name. Docker also only talks to a registry
+    over HTTPS. Both point the same way - push and pull as `<the domain>/<repository>`,
+    with the certificate HivePaaS issues for it, from your machine, from CI and from the
+    cluster's own nodes alike. The Docker Registry UI in this store can browse it from
+    inside the project without a domain.
 
     **Deleting does not free space by itself**
 
