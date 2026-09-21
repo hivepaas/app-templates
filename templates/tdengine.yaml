@@ -1,0 +1,98 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: tdengine
+  title: TDengine
+  tagline: A time-series database built for devices, with a table per device
+  description: |
+    TDengine stores what sensors and meters produce: one table per device, grouped into
+    super tables, which is what makes its writes cheap and its queries over thousands of
+    devices fast. It speaks SQL with time-series extensions - windows, interpolation,
+    downsampling - and keeps data far smaller than a general-purpose database would.
+
+    **This template sets up**
+
+    - TDengine, on a volume for the data and its write-ahead log
+    - the REST API on port 6041, which is what applications and Grafana use
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps in the project use `http://<the app's key>:6041/rest/sql` with HTTP basic
+    authentication, or the native client on port 6030. Grafana has a TDengine data source.
+    The MQTT broker and Node-RED in this store are the usual things in front of it.
+
+    **Change the password first**
+
+    It starts with the account `root` and the password `taosdata`, the same on every
+    installation. Open the app's console and change it:
+
+    ```sh
+    taos -s "ALTER USER root PASS 'something else';"
+    ```
+
+    **It is one node**
+
+    Replication needs more of them, so the volume is the only copy of the data.
+  categories: [databases/time-series]
+  tags: [time-series, sql, iot, open-source]
+  aliases: [iot database, influxdb alternative, sensors, telemetry]
+  icon: icons/tdengine.svg
+  links:
+    website: https://tdengine.com
+    documentation: https://docs.tdengine.com
+    source: https://github.com/taosdata/TDengine
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the data and the write-ahead log are kept on.
+    type: volume
+
+versions:
+  - name: "3.3"
+    release: "3.3.6.13"
+    default: true
+    image: tdengine/tdengine:3.3.6.13
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/taos: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The client the image carries, asking the server something only it can answer.
+        command: taos -s 'SHOW DATABASES;' >/dev/null
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: tdengine
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # The name the server knows itself by, which is also what clients are told to
+        # reconnect to: the app's own name on the project network.
+        - {k: TAOS_FQDN, v: "${HIVEPAAS_HOST}"}
+    routing:
+      port: 6041

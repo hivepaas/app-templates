@@ -1,0 +1,272 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: opencloud
+  title: OpenCloud
+  tagline: File sync and share with spaces, in a single binary
+  description: |
+    OpenCloud stores files in spaces rather than one home folder each: a space per project
+    or team, with its own members and quota. It syncs with the desktop and phone clients,
+    shares by link or by person, keeps versions and a trash bin, and opens documents in
+    Collabora or ONLYOFFICE when you connect one. It is a single Go binary with its own
+    identity provider, so there is no database and no LDAP to run beside it.
+
+    **This template sets up**
+
+    - OpenCloud, on a volume for the files and its search index
+    - its identity provider, with an administrator account
+    - every secret it needs, generated and kept as one configuration secret
+    - a memory limit you choose
+
+    **It needs a domain**
+
+    The address is written into the links it hands out and into what the desktop and phone
+    clients are told to come back to, and its sign-in flow is OpenID Connect, which
+    browsers only run over HTTPS. Give it its domain when you create it.
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password below. Then make spaces, invite people, and point
+    the clients at the same address.
+
+    **Backups are the volume**
+
+    Files, versions, the trash bin and the accounts are all on it. The configuration secret
+    holds the keys that make what is on the volume readable - keep it with the backup.
+  categories: [webapps/documents, storage/files]
+  tags: [files, collaboration, open-source]
+  aliases: [owncloud, ocis, nextcloud alternative, file sync, share]
+  icon: icons/opencloud.svg
+  links:
+    website: https://opencloud.eu
+    documentation: https://docs.opencloud.eu
+    source: https://github.com/opencloud-eu/opencloud
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people and clients reach it at, scheme and all - https://cloud.example.com.
+    type: string
+    default: https://cloud.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Administrator password
+    description: What `admin` signs in with. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: jwtSecret
+    title: Token secret
+    description: Signs the tokens its services pass between themselves. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: machineAuthApiKey
+    title: Machine key
+    description: What its services authenticate to each other with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: systemUserApiKey
+    title: System user key
+    description: The key of the account its background work runs as. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: transferSecret
+    title: Transfer secret
+    description: Signs the one-time addresses uploads and downloads go to. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: urlSigningSecret
+    title: Link secret
+    description: Signs public share links. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: servicePassword
+    title: Service password
+    description: >-
+      What its directory, identity provider and storage services sign in to each other
+      with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: Search indexing and thumbnails are what use it; 2 GB is a comfortable floor.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the files, versions, accounts and search index are kept on.
+    type: volume
+
+versions:
+  - name: "7.2"
+    release: "7.2.4"
+    default: true
+    image: opencloudeu/opencloud:7.2.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/opencloud: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:9200/status.php
+        interval: 20s
+        timeout: 10s
+        # It starts about thirty services of its own before the proxy answers.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: opencloud
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: OC_URL, v: "${{ params.appUrl }}"}
+        - {k: PROXY_HTTP_ADDR, v: "0.0.0.0:9200"}
+        # TLS ends at the reverse proxy, so everything inside talks plain HTTP.
+        - {k: OC_INSECURE, v: "true"}
+        - {k: PROXY_TLS, v: "false"}
+        - {k: OC_LOG_LEVEL, v: warn}
+    secrets:
+      # `opencloud init` writes this file on a normal installation. The image runs the
+      # server directly, with nothing that could run init first, so the template writes
+      # the same file - with its own generated secrets - and mounts it here.
+      OPENCLOUD_CONFIG:
+        value: |
+          token_manager:
+            jwt_secret: "${{ params.jwtSecret }}"
+          machine_auth_api_key: "${{ params.machineAuthApiKey }}"
+          system_user_api_key: "${{ params.systemUserApiKey }}"
+          transfer_secret: "${{ params.transferSecret }}"
+          url_signing_secret: "${{ params.urlSigningSecret }}"
+
+          # Identifiers rather than secrets: they only have to be the same everywhere in
+          # this file and stay the same for the life of the installation.
+          system_user_id: 9b37e665-3dfa-4d4a-a69c-c21df6042af8
+          admin_user_id: 5c48bb3e-c7d0-4968-ab01-c718922f666b
+
+          graph:
+            application:
+              id: d2c63c73-1421-4c0d-b912-8c5b78640e6c
+            events: {tls_insecure: true}
+            spaces: {insecure: true}
+            identity:
+              ldap:
+                bind_password: "${{ params.servicePassword }}"
+            service_account: &service_account
+              service_account_id: 2cc07ac9-1a49-49e2-826a-c7a1ba533700
+              service_account_secret: "${{ params.machineAuthApiKey }}"
+          idp:
+            ldap:
+              bind_password: "${{ params.servicePassword }}"
+          idm:
+            service_user_passwords:
+              admin_password: "${{ params.adminPassword }}"
+              idm_password: "${{ params.servicePassword }}"
+              reva_password: "${{ params.servicePassword }}"
+              idp_password: "${{ params.servicePassword }}"
+          collaboration:
+            wopi:
+              secret: "${{ params.transferSecret }}"
+            app: {insecure: true}
+          proxy:
+            oidc: {insecure: true}
+            insecure_backends: true
+            service_account: *service_account
+          frontend:
+            app_handler: {insecure: true}
+            archiver: {insecure: true}
+            ocdav: {insecure: true}
+            service_account: *service_account
+          auth_basic:
+            auth_providers:
+              ldap:
+                bind_password: "${{ params.servicePassword }}"
+          auth_bearer:
+            auth_providers:
+              oidc: {insecure: true}
+          users:
+            drivers:
+              ldap:
+                bind_password: "${{ params.servicePassword }}"
+          groups:
+            drivers:
+              ldap:
+                bind_password: "${{ params.servicePassword }}"
+          ocm:
+            service_account: *service_account
+          thumbnails:
+            thumbnail:
+              transfer_secret: "${{ params.transferSecret }}"
+              webdav_allow_insecure: true
+              cs3_allow_insecure: true
+          search:
+            events: {tls_insecure: true}
+            service_account: *service_account
+          audit:
+            events: {tls_insecure: true}
+          settings:
+            service_account_ids:
+              - 2cc07ac9-1a49-49e2-826a-c7a1ba533700
+          sharing:
+            events: {tls_insecure: true}
+            service_account: *service_account
+          storage_users:
+            events: {tls_insecure: true}
+            mount_id: 8753b575-e0e5-443b-a8fb-2b948bf99418
+            service_account: *service_account
+          notifications:
+            notifications:
+              events: {tls_insecure: true}
+            service_account: *service_account
+          nats:
+            nats: {tls_skip_verify_client_cert: true}
+          gateway:
+            storage_registry:
+              storage_users_mount_id: 8753b575-e0e5-443b-a8fb-2b948bf99418
+          userlog:
+            service_account: *service_account
+          auth_service:
+            service_account: *service_account
+          clientlog:
+            service_account: *service_account
+          activitylog:
+            service_account: *service_account
+        swarmRef:
+          # OpenCloud runs as 1000 and reads this at every start.
+          file: {name: /etc/opencloud/opencloud.yaml, uid: "1000", gid: "1000", mode: 444}
+    routing:
+      port: 9200
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

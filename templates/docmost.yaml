@@ -82,6 +82,10 @@ dependencies:
     title: Cache
     template: redis
     version: "8.10"
+    params:
+      # It holds the job queue, so evicting a key would lose work rather than a cached
+      # value: Redis refuses writes when it is full instead.
+      evictionPolicy: noeviction
 
 versions:
   - name: "0.96"

@@ -1,0 +1,108 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: luanti
+  title: Luanti Server
+  tagline: A voxel game server - the engine formerly known as Minetest
+  description: |
+    Luanti is an open source voxel game engine: a server hosts a world, and players join it
+    with the free client on desktop, Android or iOS. What the world is made of is up to the
+    game you install - Minetest Game, MineClone, VoxeLibre and hundreds of mods - all in
+    Lua, all changeable.
+
+    **This template sets up**
+
+    - the server, on a volume for the world, its configuration and the mods
+    - the game port published on the node over UDP, which is what the protocol uses
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    A world is created on the first start. Players join at the node's address and the game
+    port; no domain is set up through HivePaaS, since Luanti does not speak HTTP. Settings
+    live in `minetest.conf` on the volume - `server_name`, `server_description`, and
+    `default_privs` for what new players may do.
+
+    **Games and mods**
+
+    Put them under `games/` and `mods/` on the volume - the app's console, or File Browser
+    with this volume mounted, is the way to get them there - and name the game in
+    `minetest.conf`.
+  categories: [games/servers]
+  tags: [game-server, open-source]
+  aliases: [minetest, voxel, minecraft alternative, game server]
+  icon: icons/luanti.svg
+  links:
+    website: https://www.luanti.org
+    documentation: https://docs.luanti.org
+    source: https://github.com/luanti-org/luanti
+  license: LGPL-2.1-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: gamePort
+    title: Game port
+    description: The port on the node players connect to, over UDP.
+    type: int
+    default: 30000
+    min: 1
+    max: 65535
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: A large world with many players wants a gigabyte or more.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the world, configuration, games and mods are kept on.
+    type: volume
+
+versions:
+  - name: "5.17"
+    release: "5.17.0"
+    default: true
+    image: lscr.io/linuxserver/luanti:5.17.0-ls46
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config/.minetest: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: 30000, published: "${{ params.gamePort }}", protocol: udp, publishMode: host}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        # The server speaks its own protocol over UDP and nothing else: there is no
+        # request that proves it is serving.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: luanti
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}

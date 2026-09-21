@@ -1,0 +1,179 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: misskey
+  title: Misskey
+  tagline: A Fediverse server with reactions, drive and timelines of its own
+  description: |
+    Misskey is an ActivityPub server that goes further than a microblog: custom emoji
+    reactions on every post, a file drive, channels, antennas that collect posts by rule,
+    pages and plugins. Accounts on it follow and are followed across Mastodon, GoToSocial
+    and the rest of the Fediverse.
+
+    **This template creates three apps**
+
+    - **Misskey**, on a volume for the files people upload
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+    - **a Redis** for its queues and timelines, with `-cache` added
+
+    **The address is forever**
+
+    It is the part after the second @ in every account, and other servers remember it. Set
+    the public address to the HTTPS address of the domain you give the app, and never
+    change it.
+
+    **After the first deployment**
+
+    Open it and create the first account, which becomes the administrator. Then close
+    registration under Control Panel, Moderation, unless anyone may join.
+
+    **Memory**
+
+    Misskey is Node and PostgreSQL together; give the app itself a gigabyte to start with,
+    and more once the timelines it federates grow.
+  categories: [webapps/social]
+  tags: [chat, open-source]
+  aliases: [fediverse, activitypub, mastodon alternative, microblog, social]
+  icon: icons/misskey.svg
+  links:
+    website: https://misskey-hub.net
+    documentation: https://misskey-hub.net/en/docs/
+    source: https://github.com/misskey-dev/misskey
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://social.example.com. It is
+      written into every post this server federates and cannot be changed later.
+    type: string
+    default: https://social.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Drive volume
+    description: The volume the files people upload are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: misskey
+      username: misskey
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the job queue, so evicting a key would lose work rather than a cached
+      # value: Redis refuses writes when it is full instead.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.0"
+    default: true
+    image: misskey/misskey:2026.9.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Misskey is configured by one file and reads nothing about the database from the
+      # environment, so the file is written from the environment at every start - where
+      # the addresses and passwords of the two apps below actually arrive.
+      command: sh -c "node /etc/misskey/write-config.js && exec pnpm run migrateandstart"
+    storage:
+      mounts:
+        /misskey/files: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image's entry point is tini, which has to be process 1 to reap what the
+      # worker processes leave behind.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # What the image's own check does, with the port already known.
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/healthz
+        interval: 20s
+        timeout: 10s
+        # Every start runs the database migrations before the server listens.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: misskey
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MK_URL, v: "${{ params.appUrl }}"}
+        - {k: MK_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: MK_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: MK_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: MK_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: MK_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: MK_REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: MK_REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: MK_REDIS_PASS, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+    configFiles:
+      write-config.js:
+        # Run before the server, by the command above. It writes JSON, which Misskey's
+        # YAML parser reads as YAML - and which quotes a password of any shape correctly,
+        # something a shell here-document would not.
+        content: |
+          const fs = require('fs');
+          const env = process.env;
+
+          fs.mkdirSync('/misskey/.config', {recursive: true});
+          fs.writeFileSync('/misskey/.config/default.yml', JSON.stringify({
+            url: env.MK_URL,
+            port: 3000,
+            db: {
+              host: env.MK_DB_HOST,
+              port: Number(env.MK_DB_PORT),
+              db: env.MK_DB_NAME,
+              user: env.MK_DB_USER,
+              pass: env.MK_DB_PASS,
+            },
+            redis: {
+              host: env.MK_REDIS_HOST,
+              port: Number(env.MK_REDIS_PORT),
+              pass: env.MK_REDIS_PASS,
+            },
+            // The shape of the ids Misskey gives its objects. It cannot be changed once
+            // anything exists.
+            id: 'aidx',
+            // TLS ends at the reverse proxy, which forwards the client's address.
+            proxyRemoteFiles: true,
+          }, null, 2));
+        swarmRef:
+          file: {name: /etc/misskey/write-config.js, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

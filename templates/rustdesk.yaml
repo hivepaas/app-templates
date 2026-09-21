@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rustdesk
+  title: RustDesk Server
+  tagline: Your own rendezvous and relay server for RustDesk remote desktop
+  description: |
+    RustDesk is remote desktop software; this is the server half of it. Point your clients
+    at it and their connections are brokered - and relayed when a direct connection cannot
+    be made - by your own machine instead of the public servers, which is what makes remote
+    support private and, on a local network, fast.
+
+    **This template sets up**
+
+    - both halves in one app: the rendezvous server and the relay
+    - their ports published on the node, which is where clients connect
+    - a volume for the key pair the clients trust
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    The first start generates a key pair. Read the public key from the app's console:
+
+    ```sh
+    cat /data/id_ed25519.pub
+    ```
+
+    In each client, under Settings, Network, set the ID server to the node's address and
+    paste that key. Leave the relay field empty unless the relay is somewhere else.
+
+    **The ports have to be reachable**
+
+    Clients use 21115, 21116 and 21117 on the node - TCP, and 21116 over UDP as well. They
+    are published as they are, because the client expects those numbers and the server
+    tells peers about them.
+
+    **The browser client is not covered**
+
+    It needs 21118 and 21119 as well, and an app may publish five ports at most. The
+    desktop and phone clients do not use them.
+
+    **Nothing here speaks HTTP**
+
+    So there is no domain. The web console and the API of the paid edition are not part of
+    this.
+  categories: [webapps/networking]
+  tags: [networking, open-source]
+  aliases: [remote desktop, teamviewer alternative, vnc, remote support, hbbs]
+  icon: icons/rustdesk.svg
+  links:
+    website: https://rustdesk.com
+    documentation: https://rustdesk.com/docs/en/self-host/
+    source: https://github.com/rustdesk/rustdesk-server
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: relayHost
+    title: Relay address
+    description: >-
+      The address clients are told to reach the relay at - the node's own address or name.
+      It has to be one clients can resolve.
+    type: string
+    default: relay.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$'
+  - name: encryptedOnly
+    title: Encrypted connections only
+    description: Refuse clients that do not use the key pair.
+    type: select
+    default: "1"
+    options:
+      - {value: "1", title: "On"}
+      - {value: "0", title: "Off"}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the key pair and the list of known peers are kept on.
+    type: volume
+
+versions:
+  - name: "1.1"
+    release: "1.1.16"
+    default: true
+    image: rustdesk/rustdesk-server-s6:1.1.16
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # The numbers the client expects, and what the server tells peers to use.
+          - {target: 21115, published: 21115, protocol: tcp, publishMode: host}
+          - {target: 21116, published: 21116, protocol: tcp, publishMode: host}
+          - {target: 21116, published: 21116, protocol: udp, publishMode: host}
+          - {target: 21117, published: 21117, protocol: tcp, publishMode: host}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: both services still supervised.
+        command: /usr/bin/healthcheck.sh
+        interval: 30s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: rustdesk
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: RELAY, v: "${{ params.relayHost }}"}
+        - {k: ENCRYPTED_ONLY, v: "${{ params.encryptedOnly }}"}

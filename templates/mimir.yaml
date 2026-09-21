@@ -1,0 +1,110 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mimir
+  title: Grafana Mimir
+  tagline: Long-term storage for Prometheus metrics, with the same query API
+  description: |
+    Mimir keeps Prometheus metrics for years instead of weeks: Prometheus remote-writes to
+    it, Grafana queries it with PromQL exactly as it queries Prometheus, and the data is
+    compacted and downsampled behind the scenes. This runs it monolithically - every
+    component in one process - which is the shape that suits one node.
+
+    **This template sets up**
+
+    - Mimir with all of its components in one process, on a volume
+    - multi-tenancy off, so nothing has to send a tenant header
+    - a memory limit you choose
+
+    **Sending metrics to it**
+
+    In Prometheus, add a remote write to `http://<the app's key>:8080/api/v1/push`. In
+    Grafana, add a Prometheus data source pointing at
+    `http://<the app's key>:8080/prometheus`.
+
+    **Blocks on a volume, not object storage**
+
+    Mimir is built to keep its blocks in S3 and says so in its logs at every start. A
+    volume works and is what this template uses; for a large or long-lived installation,
+    point it at the Garage app in this store instead, with the `-common.storage.*` flags.
+
+    **It has no accounts, and no health check**
+
+    Anything that reaches it can read and write metrics, which is why it takes no domain
+    here. The image carries the one binary and no shell, so there is nothing to run a check
+    with; `/ready` is what a check would ask for.
+  categories: [databases/time-series, observability/monitoring]
+  tags: [metrics, monitoring, time-series, open-source]
+  aliases: [prometheus long term, thanos alternative, promql, remote write]
+  icon: icons/mimir.svg
+  links:
+    website: https://grafana.com/oss/mimir/
+    documentation: https://grafana.com/docs/mimir/latest/
+    source: https://github.com/grafana/mimir
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: retention
+    title: Retention
+    description: How long metrics are kept before compaction deletes them.
+    type: select
+    default: 90d
+    options:
+      - {value: 30d, title: 30 days}
+      - {value: 90d, title: 90 days}
+      - {value: 1y, title: A year}
+      - {value: 0s, title: Keep everything}
+  - name: memoryLimit
+    title: Memory limit
+    description: Ingestion keeps the last hours of every series in memory; 2 GB is a floor.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the blocks, the ruler's rules and the compactor's work are kept on.
+    type: volume
+
+versions:
+  - name: "3.2"
+    release: "3.2.1"
+    default: true
+    image: grafana/mimir:3.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # -target=all is the monolithic mode; the replication factors are 1 because there
+      # is one of everything, and multitenancy off means no X-Scope-OrgID header.
+      command: >-
+        -target=all
+        -server.http-listen-port=8080
+        -auth.multitenancy-enabled=false
+        -common.storage.backend=filesystem
+        -common.storage.filesystem.dir=/data
+        -blocks-storage.filesystem.dir=/data/blocks
+        -compactor.data-dir=/data/compactor
+        -ingester.ring.replication-factor=1
+        -store-gateway.sharding-ring.replication-factor=1
+        -compactor.blocks-retention-period=${{ params.retention }}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: one static binary, no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mimir
+      version: "${{ version.name }}"
+    routing:
+      port: 8080

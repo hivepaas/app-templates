@@ -1621,7 +1621,7 @@
       "name": "docmost",
       "file": {
         "path": "templates/docmost.yaml",
-        "sha256": "9d1a12a3de243148d7e5586667eb288259e2ce84e20c9514fbdce9113f628878"
+        "sha256": "f509171134d7a2e1bd64546cdb61a77b24b2620ada544e500b2c93cf180041ec"
       },
       "icon": {
         "path": "icons/docmost.svg",
@@ -3679,6 +3679,56 @@
       }
     },
     {
+      "name": "infisical",
+      "file": {
+        "path": "templates/infisical.yaml",
+        "sha256": "fbebf8f2c95df72e9d066fdb406b555ab72619ebc68c7b1ceac4b83dc4adf3ae"
+      },
+      "icon": {
+        "path": "icons/infisical.svg",
+        "sha256": "a3096130ecfe313be6b2471165cb93aeb87d31a58fdd117345e22304a369e9e6"
+      },
+      "title": "Infisical",
+      "tagline": "Store your applications' secrets in one place and hand them out per environment",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "secrets",
+        "identity",
+        "open-source"
+      ],
+      "aliases": [
+        "secrets manager",
+        "vault alternative",
+        "env vars",
+        "api keys"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.165",
+          "release": "0.165.14",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "influxdb",
       "file": {
         "path": "templates/influxdb.yaml",
@@ -4405,6 +4455,53 @@
       }
     },
     {
+      "name": "langflow",
+      "file": {
+        "path": "templates/langflow.yaml",
+        "sha256": "ff20619c4391c6d89151d75ef927f6404c9c3be1719f02b48f11ff2e10bba86c"
+      },
+      "icon": {
+        "path": "icons/langflow.svg",
+        "sha256": "c89e98666f410c3c2b021651b8028e6a17499ba96dadc1061b75ac7142abe330"
+      },
+      "title": "Langflow",
+      "tagline": "Build LLM flows and agents by dragging components onto a canvas",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "langchain",
+        "flowise alternative",
+        "agents",
+        "rag",
+        "ai workflows"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.12",
+          "release": "1.12.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "leantime",
       "file": {
         "path": "templates/leantime.yaml",
@@ -4792,6 +4889,43 @@
         {
           "name": "3.7",
           "release": "3.7.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "luanti",
+      "file": {
+        "path": "templates/luanti.yaml",
+        "sha256": "2c52151ef71010f5cf3bc7e89f5e740b8d5e854e631c9bdf121a36b255d3e2ed"
+      },
+      "icon": {
+        "path": "icons/luanti.svg",
+        "sha256": "86a1cb9b906145ebac6b87789c7788016fc788dc511a30f692c484800f659b81"
+      },
+      "title": "Luanti Server",
+      "tagline": "A voxel game server - the engine formerly known as Minetest",
+      "categories": [
+        "games/servers"
+      ],
+      "tags": [
+        "game-server",
+        "open-source"
+      ],
+      "aliases": [
+        "minetest",
+        "voxel",
+        "minecraft alternative",
+        "game server"
+      ],
+      "license": "LGPL-2.1-or-later",
+      "versions": [
+        {
+          "name": "5.17",
+          "release": "5.17.0",
           "default": true
         }
       ],
@@ -5332,6 +5466,46 @@
       }
     },
     {
+      "name": "mimir",
+      "file": {
+        "path": "templates/mimir.yaml",
+        "sha256": "e50ad462160c671458ac89821c2769d8f9c459f55fc810db583c8a4e931902cf"
+      },
+      "icon": {
+        "path": "icons/mimir.svg",
+        "sha256": "fd70ea7298d67665cae32bdf1721fa7bd0b6b79b6f7cd8da1e3f77c97bbcdcc9"
+      },
+      "title": "Grafana Mimir",
+      "tagline": "Long-term storage for Prometheus metrics, with the same query API",
+      "categories": [
+        "databases/time-series",
+        "observability/monitoring"
+      ],
+      "tags": [
+        "metrics",
+        "monitoring",
+        "time-series",
+        "open-source"
+      ],
+      "aliases": [
+        "prometheus long term",
+        "thanos alternative",
+        "promql",
+        "remote write"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.2",
+          "release": "3.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "minecraft",
       "file": {
         "path": "templates/minecraft.yaml",
@@ -5407,6 +5581,56 @@
         {
           "name": "2.3",
           "release": "2.3.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "misskey",
+      "file": {
+        "path": "templates/misskey.yaml",
+        "sha256": "3bde7043ec754d7dd799abfc3072bdee1f6be82c6ea1e15d17cdf9fbba0e52e8"
+      },
+      "icon": {
+        "path": "icons/misskey.svg",
+        "sha256": "3d87134c85e682e4354e620e27a67cf4d2c33cf56cc5be72908462b0a0a79918"
+      },
+      "title": "Misskey",
+      "tagline": "A Fediverse server with reactions, drive and timelines of its own",
+      "categories": [
+        "webapps/social"
+      ],
+      "tags": [
+        "chat",
+        "open-source"
+      ],
+      "aliases": [
+        "fediverse",
+        "activitypub",
+        "mastodon alternative",
+        "microblog",
+        "social"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.0",
           "default": true
         }
       ],
@@ -6270,6 +6494,46 @@
       }
     },
     {
+      "name": "opencloud",
+      "file": {
+        "path": "templates/opencloud.yaml",
+        "sha256": "3e1efad6daf4ebb155b0197cbac935bf9e504855910b272b0eef793f702f2d72"
+      },
+      "icon": {
+        "path": "icons/opencloud.svg",
+        "sha256": "e5626182679fd7f4015aaaba1f16275b6ea37fa8c38895c1ca62752b493d0520"
+      },
+      "title": "OpenCloud",
+      "tagline": "File sync and share with spaces, in a single binary",
+      "categories": [
+        "webapps/documents",
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "owncloud",
+        "ocis",
+        "nextcloud alternative",
+        "file sync",
+        "share"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "7.2",
+          "release": "7.2.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "openproject",
       "file": {
         "path": "templates/openproject.yaml",
@@ -6402,7 +6666,7 @@
       "name": "outline",
       "file": {
         "path": "templates/outline.yaml",
-        "sha256": "d4b19cb634b264f4207cbe4094f23db964d6b10b6632ec5f216aeff79f35c626"
+        "sha256": "600d31dc29cc7a2529313dfa1cd3d5804166d26f934ab722b247201ba2174f46"
       },
       "icon": {
         "path": "icons/outline.svg",
@@ -6443,6 +6707,43 @@
         {
           "name": "1.10",
           "release": "1.10.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "owncast",
+      "file": {
+        "path": "templates/owncast.yaml",
+        "sha256": "2899c3f13d1d84bc7532f3cfcf6c432baf42e62f0456d7bfe63357c4dfd7d268"
+      },
+      "icon": {
+        "path": "icons/owncast.svg",
+        "sha256": "cc2b2da91538784140f301ac787990d21e5134045014cdbab50affefeda3e9f0"
+      },
+      "title": "Owncast",
+      "tagline": "Your own live streaming server, with a chat beside the video",
+      "categories": [
+        "webapps/media",
+        "webapps/social"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "live streaming",
+        "rtmp",
+        "twitch alternative",
+        "stream"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.3",
+          "release": "0.3.0",
           "default": true
         }
       ],
@@ -7562,6 +7863,47 @@
       }
     },
     {
+      "name": "quickwit",
+      "file": {
+        "path": "templates/quickwit.yaml",
+        "sha256": "3eb11601c9963739bf434ba9b505a67406a37024b491b652a134337fabef95b6"
+      },
+      "icon": {
+        "path": "icons/quickwit.svg",
+        "sha256": "c56271f6d08ac253a4747698dad27d9be6619537a78dfbe232072c97982f9fa3"
+      },
+      "title": "Quickwit",
+      "tagline": "Search engine for logs and traces, built for cheap storage",
+      "categories": [
+        "databases/search",
+        "observability/monitoring"
+      ],
+      "tags": [
+        "search",
+        "full-text",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "logs",
+        "log search",
+        "elasticsearch alternative",
+        "traces",
+        "otel"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.9",
+          "release": "0.9.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "rabbitmq",
       "file": {
         "path": "templates/rabbitmq.yaml",
@@ -8020,6 +8362,44 @@
         {
           "name": "1.6",
           "release": "1.6.19",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "rustdesk",
+      "file": {
+        "path": "templates/rustdesk.yaml",
+        "sha256": "c66f2d85054bce85069cd2bb85dd4f4299e3bc68b3134485c1d4e7e1b9c5f508"
+      },
+      "icon": {
+        "path": "icons/rustdesk.svg",
+        "sha256": "42cb0b550912526bfea5a3cd9b94004d1a7425ffc07bf0f1fde3cfd0bf8128cf"
+      },
+      "title": "RustDesk Server",
+      "tagline": "Your own rendezvous and relay server for RustDesk remote desktop",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "remote desktop",
+        "teamviewer alternative",
+        "vnc",
+        "remote support",
+        "hbbs"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.1",
+          "release": "1.1.16",
           "default": true
         }
       ],
@@ -8755,6 +9135,45 @@
         {
           "name": "2.6",
           "release": "2.6.15",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "tdengine",
+      "file": {
+        "path": "templates/tdengine.yaml",
+        "sha256": "ba90348fa539e4e40be6fefb37ea05629115559267605ebb53deebe24d975fe2"
+      },
+      "icon": {
+        "path": "icons/tdengine.svg",
+        "sha256": "7ce553189ce1e83e6726338ed9ce979ab2710771cc973bb84b15ddbb058632ce"
+      },
+      "title": "TDengine",
+      "tagline": "A time-series database built for devices, with a table per device",
+      "categories": [
+        "databases/time-series"
+      ],
+      "tags": [
+        "time-series",
+        "sql",
+        "iot",
+        "open-source"
+      ],
+      "aliases": [
+        "iot database",
+        "influxdb alternative",
+        "sensors",
+        "telemetry"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.3",
+          "release": "3.3.6.13",
           "default": true
         }
       ],

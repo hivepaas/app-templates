@@ -1,0 +1,114 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: owncast
+  title: Owncast
+  tagline: Your own live streaming server, with a chat beside the video
+  description: |
+    Owncast is live streaming without a platform: point OBS or any RTMP encoder at it, and
+    it serves the stream to viewers on your own page, with chat, emoji, follower
+    notifications over ActivityPub and a schedule. No account for the audience, no
+    recommendations, no rules but yours.
+
+    **This template sets up**
+
+    - Owncast, on a volume for its settings, chat history and the video it is serving
+    - the RTMP port published on the node, which is where the encoder sends the stream
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    The administrator page is at `/admin`, with the user `admin` and the password
+    `abc123` - change it there first, under Configuration, then set the stream key your
+    encoder will use.
+
+    **Streaming to it**
+
+    The encoder sends to `rtmp://<the node's address>:<the RTMP port>/live` with that stream
+    key. Viewers open the app's domain.
+
+    **It transcodes on the processor**
+
+    Owncast re-encodes what it receives unless the encoder sends exactly what it wants.
+    Video is heavy work: give it two cores' worth of room, or set the encoder to match the
+    output quality and let Owncast pass it through.
+  categories: [webapps/media, webapps/social]
+  tags: [open-source]
+  aliases: [live streaming, rtmp, twitch alternative, stream]
+  icon: icons/owncast.svg
+  links:
+    website: https://owncast.online
+    documentation: https://owncast.online/docs/
+    source: https://github.com/owncast/owncast
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address viewers open. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: rtmpPort
+    title: RTMP port
+    description: The port on the node the encoder sends the stream to.
+    type: int
+    default: 1935
+    min: 1
+    max: 65535
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the settings, chat history and served video are kept on.
+    type: volume
+
+versions:
+  - name: "0.3"
+    release: "0.3.0"
+    default: true
+    image: owncast/owncast:0.3.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # RTMP is not HTTP, so it goes to the node rather than through the reverse proxy.
+          - {target: 1935, published: "${{ params.rtmpPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl. /api/status answers without signing in.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/api/status
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: owncast
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,144 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: langflow
+  title: Langflow
+  tagline: Build LLM flows and agents by dragging components onto a canvas
+  description: |
+    Langflow builds retrieval, agent and chat pipelines visually: drag prompts, models,
+    vector stores, loaders and tools onto a canvas, wire them together, and try the result
+    in a playground beside it. Every flow is also an API endpoint, so what you built is
+    what your application calls.
+
+    **This template creates two apps**
+
+    - **Langflow**, on a volume for uploaded files and the components you add
+    - **a PostgreSQL database** for it, named after the app with `-db` added, holding the
+      flows
+
+    **After the first deployment**
+
+    Sign in with the administrator name and password you gave it. Then connect the models
+    you run here - Ollama and LiteLLM are in this store - or paste a provider's key into a
+    component.
+
+    **Memory**
+
+    Langflow loads every component it uses into the process; a gigabyte is a floor rather
+    than a comfortable amount, and flows that embed documents want more.
+  categories: [webapps/ai]
+  tags: [ai, llm, low-code, open-source]
+  aliases: [langchain, flowise alternative, agents, rag, ai workflows]
+  icon: icons/langflow.svg
+  links:
+    website: https://www.langflow.org
+    documentation: https://docs.langflow.org
+    source: https://github.com/langflow-ai/langflow
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._@-]{1,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Encrypts the provider keys saved in flows. Leave empty to generate one; changing it
+      makes them unreadable.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files and added components are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: langflow
+      username: langflow
+
+versions:
+  - name: "1.12"
+    release: "1.12.2"
+    default: true
+    image: langflowai/langflow:1.12.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/langflow: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:7860/health
+        interval: 20s
+        timeout: 10s
+        # The first start creates its tables and loads every bundled component.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: langflow
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LANGFLOW_HOST, v: 0.0.0.0}
+        - {k: LANGFLOW_PORT, v: "7860"}
+        - {k: LANGFLOW_CONFIG_DIR, v: /app/langflow}
+        - k: LANGFLOW_DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        # Without these anyone who opens the page is signed in as an administrator.
+        - {k: LANGFLOW_AUTO_LOGIN, v: "false"}
+        - {k: LANGFLOW_SUPERUSER, v: "${{ params.adminUsername }}"}
+        - {k: LANGFLOW_SUPERUSER_PASSWORD, v: "${secrets.LANGFLOW_SUPERUSER_PASSWORD}"}
+        - {k: LANGFLOW_SECRET_KEY, v: "${secrets.LANGFLOW_SECRET_KEY}"}
+    secrets:
+      LANGFLOW_SUPERUSER_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      LANGFLOW_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 7860
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

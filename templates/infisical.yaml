@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: infisical
+  title: Infisical
+  tagline: Store your applications' secrets in one place and hand them out per environment
+  description: |
+    Infisical keeps the secrets your applications need - API keys, database passwords,
+    certificates - with a value per environment, versions and a trail of who changed what.
+    Applications fetch them through its CLI, SDKs, a Kubernetes operator or agents, so
+    nothing has to live in a `.env` file on a laptop.
+
+    **This template creates three apps**
+
+    - **Infisical**, which keeps nothing of its own
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+    - **a Redis** for its queues and caches, with `-cache` added
+
+    **After the first deployment**
+
+    Open it and create the first account, which becomes the administrator of the
+    installation. Then make a project, add your secrets, and give each application a
+    machine identity to read them with.
+
+    **Keep the encryption key**
+
+    Every secret is encrypted with it. Losing it means losing the secrets; changing it makes
+    them unreadable. It is under this app's Secrets - back it up somewhere else, which is
+    not this Infisical.
+  categories: [webapps/security]
+  tags: [secrets, identity, open-source]
+  aliases: [secrets manager, vault alternative, env vars, api keys]
+  icon: icons/infisical.svg
+  links:
+    website: https://infisical.com
+    documentation: https://infisical.com/docs/self-hosting/overview
+    source: https://github.com/Infisical/infisical
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people and machines reach it at, scheme and all -
+      https://secrets.example.com. Links in invitations are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8080
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      What every stored secret is encrypted with - exactly 32 hexadecimal characters. Leave
+      empty to generate one.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32, charset: hex}
+  - name: authSecret
+    title: Session secret
+    description: Signs sessions and tokens. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: infisical
+      username: infisical
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the job queue, so evicting a key would lose work rather than a cached
+      # value: Redis refuses writes when it is full instead.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "0.165"
+    release: "0.165.14"
+    default: true
+    image: infisical/infisical:v0.165.14
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8080/api/status
+        interval: 20s
+        timeout: 10s
+        # Every start runs the database migrations before the server listens.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: infisical
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SITE_URL, v: "${{ params.appUrl }}"}
+        - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        - {k: AUTH_SECRET, v: "${secrets.AUTH_SECRET}"}
+        - k: DB_CONNECTION_URI
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        # Redis has no user name to set: it authenticates as its built-in `default` user.
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
+        - {k: TELEMETRY_ENABLED, v: "false"}
+    secrets:
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      AUTH_SECRET:
+        value: "${{ params.authSecret }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
