@@ -4393,6 +4393,51 @@
       }
     },
     {
+      "name": "onetimesecret",
+      "file": {
+        "path": "templates/onetimesecret.yaml",
+        "sha256": "f58994cda4da3c3cdf932f7b611ca7b522b022e82dc8f410edce2f1b49fa1301"
+      },
+      "icon": {
+        "path": "icons/onetimesecret.svg",
+        "sha256": "14b7422f2b34d2eb25d8202ac8f5df5fc0e9a8665d8480bbbc04c79d0c11ac1d"
+      },
+      "title": "Onetime Secret",
+      "tagline": "A link that shows a password once and then destroys it",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "passwords",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "password-sharing",
+        "secret",
+        "privatebin-alternative",
+        "share-secret"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Secret store",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.26",
+          "release": "0.26.12",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "open-webui",
       "file": {
         "path": "templates/open-webui.yaml",
@@ -5789,6 +5834,45 @@
         {
           "name": "0.13",
           "release": "0.13.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "stirling-pdf",
+      "file": {
+        "path": "templates/stirling-pdf.yaml",
+        "sha256": "58c5b69c525343a5fdc77810c335dea5c4ae14b1d5eacdda1824805cb098ace8"
+      },
+      "icon": {
+        "path": "icons/stirling-pdf.svg",
+        "sha256": "cf8642802d252acc25df1926f5bc44f9ac407c7b14d5cf93cf0cc06365037207"
+      },
+      "title": "Stirling PDF",
+      "tagline": "Every PDF tool you would otherwise upload a document to a website for",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "pdf",
+        "ocr",
+        "ilovepdf",
+        "smallpdf",
+        "pdf-tools"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.4",
+          "release": "1.4.0",
           "default": true
         }
       ],

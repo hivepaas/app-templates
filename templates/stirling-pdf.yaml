@@ -1,0 +1,168 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: stirling-pdf
+  title: Stirling PDF
+  tagline: Every PDF tool you would otherwise upload a document to a website for
+  description: |
+    Split, merge, rotate, compress, sign, watermark, redact, convert to and from Office
+    formats and images, OCR a scan into searchable text, fill and flatten forms, compare two
+    documents - about fifty operations, in a browser, on a machine you control. The point is
+    not that the tools are unusual; it is that the document never leaves your server.
+
+    **Sign-in is on**
+
+    The account below is created the first time it starts, and the whole application is
+    behind it. Turn it off only if this app is on a network where everyone is already
+    trusted: without it, anybody who can open the address can read anything anyone is
+    working on.
+
+    **Nothing is kept unless you keep it**
+
+    Files are processed and thrown away - there is no library and no history. The volume
+    holds the settings, the account database and anything custom you add; the documents
+    themselves pass through.
+
+    **The image is large**
+
+    Nearly 3GB, because it carries LibreOffice for the Office conversions, Tesseract for OCR,
+    Ghostscript and a Java runtime. The first deployment takes a while to pull, and the
+    application needs a minute or two before it answers.
+
+    **OCR languages**
+
+    English is installed. Add more with the **OCR languages** parameter - `deu,fra,vie` -
+    and they are fetched at start; each is a few megabytes.
+
+    **Where it fits with the rest**
+
+    The other document apps here do different jobs: Gotenberg converts a document to a PDF
+    from an API and has no interface, Tika extracts text and metadata for indexing, and
+    Paperless-ngx is an archive with OCR and search. This one is the workbench a person sits
+    at.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source]
+  aliases: [pdf, ocr, ilovepdf, smallpdf, pdf-tools]
+  icon: icons/stirling-pdf.svg
+  links:
+    website: https://www.stirlingpdf.com
+    documentation: https://docs.stirlingpdf.com
+    source: https://github.com/Stirling-Tools/Stirling-PDF
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address it answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: enableLogin
+    title: Require sign-in
+    description: >-
+      On is right for anything reachable from outside. Off makes every tool public to
+      whoever can open the address.
+    type: bool
+    default: true
+  - name: adminUsername
+    title: Admin username
+    description: The account created at first start.
+    type: string
+    default: admin
+  - name: adminPassword
+    title: Admin password
+    description: Leave it empty and one is generated.
+    type: secret
+    generate: {length: 24}
+  - name: ocrLanguages
+    title: OCR languages
+    description: >-
+      Extra Tesseract language packs to install at start, comma separated - deu,fra,vie.
+      English is already there.
+    type: string
+    optional: true
+  - name: dataVolume
+    title: Data volume
+    description: Settings, the account database, and any custom files you add.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      A Java application with LibreOffice beside it. Large documents and OCR are what make
+      it want more.
+    type: size
+    default: 2GB
+    min: 1GB
+
+versions:
+  - name: "1.4"
+    release: "1.4.0"
+    default: true
+    image: ghcr.io/stirling-tools/stirling-pdf:1.4.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # Settings and the account database.
+        /configs:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: configs}
+        # Custom fonts, branding and anything else added by hand.
+        /customFiles:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: custom}
+        # Saved pipelines - a sequence of operations run over a set of files.
+        /pipeline:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: pipeline}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Redirects are followed so the check works whether sign-in is on - where the
+        # root redirects to the login page - or off. The image has curl.
+        command: curl -fsSL -o /dev/null http://127.0.0.1:8080/
+        interval: 30s
+        timeout: 15s
+        # It unpacks a Java application and starts LibreOffice beside it; a minute and
+        # a half is normal, more on the first start.
+        startPeriod: 240s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: stirling-pdf
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Without this the image does not fetch the half of itself that does
+        # authentication, and the settings below are ignored.
+        - {k: DOCKER_ENABLE_SECURITY, v: "true"}
+        - {k: SECURITY_ENABLELOGIN, v: "${{ params.enableLogin }}"}
+        - {k: SECURITY_INITIALLOGIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: SECURITY_INITIALLOGIN_PASSWORD, v: "${secrets.STIRLING_ADMIN_PASSWORD}"}
+        - {k: TESSERACT_LANGS, v: "${{ params.ocrLanguages }}"}
+        # It phones home with usage statistics unless told not to.
+        - {k: SYSTEM_ENABLEANALYTICS, v: "false"}
+    secrets:
+      STIRLING_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
