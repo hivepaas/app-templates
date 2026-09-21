@@ -22,11 +22,14 @@ metadata:
     in the app's logs: *User 'admin' initialized with randomly generated password*. Sign in
     with it and change it under Settings.
 
-    **Its files are its own**
+    **Managing another app's files**
 
-    HivePaaS gives every app its own folder on a volume, so picking a volume another app
-    uses does not show that app's files here - File Browser sees only what is uploaded to
-    it. To manage another app's files, create File Browser for an app, also in this store.
+    To work on the files of another app in the project - a site's uploads, a media library -
+    add a mount under this app's Configuration, Persistent Storage: pick the volume that app
+    keeps them on, choose it under "Data of", mount it below `/srv` - `/srv/site`, say - and
+    turn on "Allow writing" if File Browser should change them. Redeploy, and they appear
+    beside its own files. Leave databases alone: changing a running database's files
+    corrupts it.
   categories: [webapps/documents, storage/files]
   tags: [files, file-transfer, open-source]
   aliases: [file manager, web file manager, upload, share files]

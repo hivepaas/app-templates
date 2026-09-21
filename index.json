@@ -865,7 +865,7 @@
       "name": "backrest",
       "file": {
         "path": "templates/backrest.yaml",
-        "sha256": "6dd3995d494f7ec6596d66d307e4f988a40c205c6f154f9ad64f1413f791bdb2"
+        "sha256": "4d99907d147c3b0d16d077f61a6e5db6bf870b7a4291e8809a8aeb16f445ae2e"
       },
       "icon": {
         "path": "icons/backrest.svg",
@@ -884,43 +884,6 @@
         "restic",
         "restic ui",
         "backups",
-        "snapshots",
-        "restore"
-      ],
-      "license": "GPL-3.0-only",
-      "versions": [
-        {
-          "name": "1.14",
-          "release": "1.14.1",
-          "default": true
-        }
-      ],
-      "requires": {
-        "versionCode": "v000001"
-      }
-    },
-    {
-      "name": "backrest-app",
-      "file": {
-        "path": "templates/backrest-app.yaml",
-        "sha256": "ea6de574492a27a6ad1efee496e96e842b41475d4a8216fe699ca80b6565e9ac"
-      },
-      "icon": {
-        "path": "icons/backrest.svg",
-        "sha256": "67a269a1fc0ed4c75c6c6f5780b3ec3d5813cea8fa2203e5e499eae6335a6863"
-      },
-      "title": "Backrest for an app",
-      "tagline": "Back up another app's files with restic, on a schedule, and browse the snapshots",
-      "categories": [
-        "storage/backup"
-      ],
-      "tags": [
-        "backup",
-        "open-source"
-      ],
-      "aliases": [
-        "restic",
-        "backup app",
         "snapshots",
         "restore"
       ],
@@ -2127,7 +2090,7 @@
       "name": "filebrowser",
       "file": {
         "path": "templates/filebrowser.yaml",
-        "sha256": "1d1685d9312c2a2942ed104e6d8ba902bbb306105fb1307251eadd0ae81cda96"
+        "sha256": "206e36a80a080f8fb2ad4a3f8097514e091443c94a3d4084777e7e02e6a2ee08"
       },
       "icon": {
         "path": "icons/filebrowser.svg",
@@ -2149,45 +2112,6 @@
         "web file manager",
         "upload",
         "share files"
-      ],
-      "license": "Apache-2.0",
-      "versions": [
-        {
-          "name": "2.63",
-          "release": "2.63.23",
-          "default": true
-        }
-      ],
-      "requires": {
-        "versionCode": "v000001"
-      }
-    },
-    {
-      "name": "filebrowser-app",
-      "file": {
-        "path": "templates/filebrowser-app.yaml",
-        "sha256": "2de09cb0edac721951f42601cd990b24b1b08cc82eb72c35f3448d86fdbc7f21"
-      },
-      "icon": {
-        "path": "icons/filebrowser.svg",
-        "sha256": "6e378aa902a448e614b030109be657abdc4a13004072c42c228da1bddc82efb3"
-      },
-      "title": "File Browser for an app",
-      "tagline": "Browse, upload and edit the files of another app in this project",
-      "categories": [
-        "webapps/documents",
-        "storage/files"
-      ],
-      "tags": [
-        "files",
-        "file-transfer",
-        "open-source"
-      ],
-      "aliases": [
-        "file manager",
-        "edit app files",
-        "uploads",
-        "sftp alternative"
       ],
       "license": "Apache-2.0",
       "versions": [

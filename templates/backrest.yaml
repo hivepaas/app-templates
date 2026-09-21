@@ -22,12 +22,14 @@ metadata:
     Then add a repository - the Restic REST Server template in this store makes one, at
     `rest:http://<user>:<password>@<its app key>:8000/<name>` - and a plan.
 
-    **What it can back up**
+    **Backing up another app**
 
-    Backrest backs up paths inside its own container, and HivePaaS gives every app its own
-    folder on a volume: mounting another app's volume here shows this app's folder on it,
-    not the other app's data. So it backs up what is on its own volume. To back up another
-    app's files, create Backrest for an app, also in this store.
+    Backrest backs up paths inside its own container. To protect another app's files, add a
+    mount under this app's Configuration, Persistent Storage: pick the volume that app keeps
+    them on, choose it under "Data of", mount it at a path such as `/source/site`, and leave
+    "Allow writing" off - a backup has no reason to change what it protects. Redeploy, then
+    point a plan at that path. Copy files this way, not a running database's data
+    directory; back databases up with their own dump tools.
 
     **Keep the repository password**
 
