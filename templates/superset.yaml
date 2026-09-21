@@ -1,0 +1,175 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: superset
+  title: Apache Superset
+  tagline: Explore data and build dashboards on top of any SQL database
+  description: |
+    Apache Superset is a business intelligence platform: connect it to your databases,
+    explore them in a SQL editor or with a no-code chart builder, and assemble charts into
+    dashboards with filters and drill-downs. It has dozens of chart types, row-level
+    security, caching and an API.
+
+    **This template creates two apps**
+
+    - **Superset**, which keeps nothing of its own
+    - **a PostgreSQL database** for its metadata - users, dashboards, saved queries - named
+      after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in with the administrator name and password you gave it. Every start upgrades the
+    metadata database and refreshes the built-in roles before the server comes up, so a
+    start takes a minute or two. Then add your databases under Settings, Database
+    Connections - the app key of a database in this project is its host.
+
+    **The image**
+
+    This uses Superset's `-dev` image, which carries the PostgreSQL and MySQL drivers. The
+    plain image carries none, so it could not reach its own metadata database, let alone
+    yours.
+  categories: [webapps/business]
+  tags: [business-intelligence, dashboards, analytics, open-source]
+  aliases: [bi, dashboards, tableau alternative, looker alternative, data exploration]
+  icon: icons/superset.svg
+  links:
+    website: https://superset.apache.org
+    documentation: https://superset.apache.org/docs/intro
+    source: https://github.com/apache/superset
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      Used once, when the first start creates the account. Leave empty to generate one; it
+      is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Signs sessions and encrypts the database passwords Superset stores. Leave empty to
+      generate one; changing it makes those passwords unreadable.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: superset
+      username: superset
+
+versions:
+  - name: "6.1"
+    release: "6.1.0"
+    default: true
+    image: apache/superset:6.1.0-dev
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image only runs the server; its compose file runs these in a second
+      # container first. Creating the administrator fails harmlessly once it exists.
+      command: >-
+        bash -c 'superset db upgrade
+        && (superset fab create-admin --username "$ADMIN_USERNAME" --firstname Admin
+        --lastname User --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD" || true)
+        && superset init
+        && exec /app/docker/entrypoints/run-server.sh'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8088/health
+        interval: 30s
+        timeout: 10s
+        # Every start migrates and re-initialises before the server listens.
+        startPeriod: 300s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: superset
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SUPERSET_SECRET_KEY, v: "${secrets.SUPERSET_SECRET_KEY}"}
+        - {k: ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SUPERSET_PORT, v: "8088"}
+    secrets:
+      SUPERSET_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      superset_config.py:
+        content: |
+          import os
+
+          from sqlalchemy.engine import URL
+
+          SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
+
+          # Built from parts rather than a string, so nothing in the password or the host
+          # has to be escaped.
+          SQLALCHEMY_DATABASE_URI = URL.create(
+              "postgresql+psycopg2",
+              username=os.environ["DATABASE_USER"],
+              password=os.environ["DATABASE_PASSWORD"],
+              host=os.environ["DATABASE_HOST"],
+              port=int(os.environ["DATABASE_PORT"]),
+              database=os.environ["DATABASE_DB"],
+          ).render_as_string(hide_password=False)
+
+          # TLS ends at the reverse proxy; believe the scheme and host it forwards.
+          ENABLE_PROXY_FIX = True
+        swarmRef:
+          file: {name: /app/pythonpath/superset_config.py, mode: 444}
+    routing:
+      port: 8088
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

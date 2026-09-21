@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: karakeep
+  title: Karakeep
+  tagline: Bookmark everything - links, notes and images - and find it again
+  description: |
+    Karakeep, formerly Hoarder, is a bookmark manager that keeps what you save: it fetches
+    each link's title, image and text, archives the page, and indexes all of it for full-text
+    search. Notes and images go in the same place. Lists, tags, browser extensions and phone
+    apps are included, and it can tag things automatically with an AI model you connect.
+
+    **This template creates two apps**
+
+    - **Karakeep**, on a volume for its database and archived assets
+    - **a Meilisearch index** for full-text search, named after the app with `-search`
+      added
+
+    **After the first deployment**
+
+    Open it and sign up: the first account is the administrator. Then turn off sign-ups
+    by setting `DISABLE_SIGNUPS` to `true` in the app's environment, unless the page is only
+    reachable by people who should have accounts.
+
+    **No headless browser**
+
+    Karakeep fetches pages without a browser here, which is enough for most sites.
+    Screenshots and pages that only render with JavaScript need a Chrome it can reach at
+    `BROWSER_WEB_URL`, which this template does not create. AI tagging needs
+    `OPENAI_API_KEY`, or `OLLAMA_BASE_URL` pointed at the Ollama app in this store.
+  categories: [webapps/knowledge]
+  tags: [notes, search, open-source]
+  aliases: [hoarder, bookmarks, read later, pocket alternative, raindrop alternative]
+  icon: icons/karakeep.svg
+  links:
+    website: https://karakeep.app
+    documentation: https://docs.karakeep.app
+    source: https://github.com/karakeep-app/karakeep
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://bookmarks.example.com.
+      Sign-in redirects are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:3000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: nextauthSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and archived pages and images are kept on.
+    type: volume
+
+dependencies:
+  - name: search
+    title: Search index
+    template: meilisearch
+    version: "1.53"
+
+versions:
+  - name: "0.33"
+    release: "0.33.2"
+    default: true
+    image: ghcr.io/karakeep-app/karakeep:0.33.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:3000/api/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: karakeep
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NEXTAUTH_URL, v: "${{ params.appUrl }}"}
+        - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
+        - {k: DATA_DIR, v: /data}
+        - {k: MEILI_ADDR, v: "http://${{ deps.search.ref.HIVEPAAS_HOST }}:${{ deps.search.ref.HIVEPAAS_PORT }}"}
+        - {k: MEILI_MASTER_KEY, v: "${{ deps.search.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      NEXTAUTH_SECRET:
+        value: "${{ params.nextauthSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

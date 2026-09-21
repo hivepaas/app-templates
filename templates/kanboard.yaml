@@ -1,0 +1,95 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kanboard
+  title: Kanboard
+  tagline: A minimal Kanban board that does one thing and stays out of the way
+  description: |
+    Kanboard is project management reduced to a Kanban board: columns, swimlanes, tasks
+    with subtasks, due dates, time tracking and automatic actions that move or assign tasks
+    for you. It is small, fast, and has plugins for what it leaves out.
+
+    **This template sets up**
+
+    - Kanboard with its SQLite database, on one volume with the attachments and plugins
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `admin` and change it straight away - it is the
+    account every Kanboard starts with.
+  categories: [webapps/project-management]
+  tags: [tasks, project-management, open-source]
+  aliases: [kanban, trello alternative, tasks, board]
+  icon: icons/kanboard.svg
+  links:
+    website: https://kanboard.org
+    documentation: https://docs.kanboard.org
+    source: https://github.com/kanboard/kanboard
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database, attachments and plugins are kept on.
+    type: volume
+
+versions:
+  - name: "1.2"
+    release: "1.2.54"
+    default: true
+    image: kanboard/kanboard:v1.2.54
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/app/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /var/www/app/plugins:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: plugins}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check, which opens the database.
+        command: curl -fsS -o /dev/null http://127.0.0.1/healthcheck.php
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kanboard
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,128 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: sonarqube
+  title: SonarQube
+  tagline: Static analysis that finds bugs, vulnerabilities and code smells on every commit
+  description: |
+    SonarQube analyses code in thirty-odd languages for bugs, security vulnerabilities,
+    duplications and maintainability issues, tracks coverage, and holds each branch and
+    pull request to a quality gate your CI can fail on. This is the Community Build.
+
+    **This template creates two apps**
+
+    - **SonarQube**, on a volume for its search index, plugins and logs
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `admin`; SonarQube makes you change it at once.
+    Then create a project and a token, and run the scanner from CI with
+    `-Dsonar.host.url=https://<the domain>`. Use the domain from inside the project too: its
+    Tomcat answers 400 to a Host with an underscore, which the app's key has.
+
+    **Memory, and the search index**
+
+    SonarQube runs a web server, a compute engine and an embedded Elasticsearch - three
+    JVMs. Give it 3 GB or more. Elasticsearch's own start-up checks want kernel settings
+    (`vm.max_map_count`) a container cannot change, so they are switched off here; on a
+    busy instance, raise `vm.max_map_count` to 524288 on the node.
+  categories: [webapps/dev-tools]
+  tags: [testing, open-source]
+  aliases: [sonar, code quality, static analysis, sast, code review]
+  icon: icons/sonarqube.svg
+  links:
+    website: https://www.sonarsource.com/products/sonarqube/
+    documentation: https://docs.sonarsource.com/sonarqube-community-build/
+    source: https://github.com/SonarSource/sonarqube
+  license: LGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 3GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the search index, installed plugins and logs are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: sonarqube
+      username: sonarqube
+
+versions:
+  - name: "26.9"
+    release: "26.9.0.129388"
+    default: true
+    image: sonarqube:26.9.0.129388-community
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /opt/sonarqube/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /opt/sonarqube/extensions:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: extensions}
+        /opt/sonarqube/logs:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: logs}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # UP once the database is migrated and the search index is ready.
+        command: curl -fsS http://127.0.0.1:9000/api/system/status | grep -q '"status":"UP"'
+        interval: 30s
+        timeout: 10s
+        startPeriod: 300s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: sonarqube
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # JDBC's own parser accepts the underscore in the database's host name.
+        - k: SONAR_JDBC_URL
+          v: >-
+            jdbc:postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT
+            }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: SONAR_JDBC_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: SONAR_JDBC_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # See the description: the checks want kernel settings a container cannot set.
+        - {k: SONAR_ES_BOOTSTRAP_CHECKS_DISABLE, v: "true"}
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

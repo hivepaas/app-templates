@@ -1,0 +1,110 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: registry-ui
+  title: Docker Registry UI
+  tagline: Browse and clean up the images in a private Docker registry
+  description: |
+    A web interface for a Docker registry: its repositories, their tags, each image's
+    size, layers, architecture and history, and the `docker pull` line to copy. Tags can be
+    deleted from it too.
+
+    **This template sets up**
+
+    - the interface, in front of the registry app you pick
+    - its own nginx forwarding API calls to the registry, so the browser only ever talks to
+      this app and the registry needs no CORS or domain of its own
+    - deleting enabled - the registry template in this store allows it
+    - a memory limit you choose
+
+    **Think before you give it a domain**
+
+    It sees and deletes whatever the registry holds, with no account of its own. Put basic
+    authentication in front of it in the app's routing settings in the same change as a
+    domain.
+
+    **Deleting does not free space by itself**
+
+    Deleting a tag removes the reference. The space comes back when garbage collection
+    runs in the registry app - see its description.
+  categories: [webapps/dev-tools]
+  tags: [containers, open-source]
+  aliases: [registry ui, docker registry browser, joxit, container images]
+  icon: icons/registry-ui.svg
+  links:
+    website: https://joxit.dev/docker-registry-ui/
+    documentation: https://github.com/Joxit/docker-registry-ui#configuration
+    source: https://github.com/Joxit/docker-registry-ui
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: registryApp
+    title: Registry
+    description: The Docker Registry app in this environment to show.
+    type: app
+    engine: registry
+  - name: title
+    title: Title
+    description: What the page calls the registry.
+    type: string
+    default: Docker Registry
+    pattern: '^[^"\\\n]{1,60}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "2.6"
+    release: "2.6.0"
+    default: true
+    image: joxit/docker-registry-ui:2.6.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: registry-ui
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The image's nginx forwards /v2 to this, so the registry stays inside the project.
+        - k: NGINX_PROXY_PASS_URL
+          v: "http://${${{ params.registryApp }}.HIVEPAAS_HOST}:${${{ params.registryApp }}.HIVEPAAS_PORT}"
+        - {k: SINGLE_REGISTRY, v: "true"}
+        - {k: REGISTRY_TITLE, v: "${{ params.title }}"}
+        - {k: DELETE_IMAGES, v: "true"}
+        - {k: SHOW_CONTENT_DIGEST, v: "true"}
+        - {k: SHOW_CATALOG_NB_TAGS, v: "true"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

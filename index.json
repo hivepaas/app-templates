@@ -847,7 +847,7 @@
       "name": "backrest",
       "file": {
         "path": "templates/backrest.yaml",
-        "sha256": "2cdbc6ec16432935c755e58535f346876995e7357c8308518557dc5fae93cab3"
+        "sha256": "670dfea841f3ea5b3f9fbcd129439384000bdef65e1666d939ab42cd2dc7249f"
       },
       "icon": {
         "path": "icons/backrest.svg",
@@ -1952,7 +1952,7 @@
       "name": "filebrowser",
       "file": {
         "path": "templates/filebrowser.yaml",
-        "sha256": "6595647510034fbc95332998cf18ea0e26910c330a63447fe5a8ffdad699e44a"
+        "sha256": "8d9c51a60a631dd906a5177671e4ecc7407adcfb314adeafd778db6ca5385f07"
       },
       "icon": {
         "path": "icons/filebrowser.svg",
@@ -3492,6 +3492,45 @@
       }
     },
     {
+      "name": "jupyter",
+      "file": {
+        "path": "templates/jupyter.yaml",
+        "sha256": "b31a469491aac938858e78aea27ae4764407f78bae7225512385681cf1f7461f"
+      },
+      "icon": {
+        "path": "icons/jupyter.svg",
+        "sha256": "3f183c120635601352bccf48f06a5bc621eff1dd55ce6effe19d9f69951bce85"
+      },
+      "title": "JupyterLab",
+      "tagline": "Notebooks for Python in the browser, with a terminal and a file browser",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "jupyter",
+        "notebook",
+        "ipython",
+        "python",
+        "data science"
+      ],
+      "license": "BSD-3-Clause",
+      "versions": [
+        {
+          "name": "3.13",
+          "release": "python-3.13.15",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "kafka",
       "file": {
         "path": "templates/kafka.yaml",
@@ -3562,6 +3601,90 @@
         {
           "name": "1.5",
           "release": "1.5.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kanboard",
+      "file": {
+        "path": "templates/kanboard.yaml",
+        "sha256": "36c2e00b8df7202ac03bd189efc979d0011eb60ba056b0c9d1c130d8c622ddf9"
+      },
+      "icon": {
+        "path": "icons/kanboard.svg",
+        "sha256": "732d35ab4d3335dd7389f782d8dca7d93096d39d9f24ad5160df928502ceba8d"
+      },
+      "title": "Kanboard",
+      "tagline": "A minimal Kanban board that does one thing and stays out of the way",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "tasks",
+        "project-management",
+        "open-source"
+      ],
+      "aliases": [
+        "kanban",
+        "trello alternative",
+        "tasks",
+        "board"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.2",
+          "release": "1.2.54",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "karakeep",
+      "file": {
+        "path": "templates/karakeep.yaml",
+        "sha256": "dfb56929610a58be948781c53fa982b71ab61dfb3e5886126190c31fb730750b"
+      },
+      "icon": {
+        "path": "icons/karakeep.svg",
+        "sha256": "13a8222c6f05cedfa0fc92a52459d4912567ed646e77f398f2d5c898d8dfd5af"
+      },
+      "title": "Karakeep",
+      "tagline": "Bookmark everything - links, notes and images - and find it again",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "search",
+        "open-source"
+      ],
+      "aliases": [
+        "hoarder",
+        "bookmarks",
+        "read later",
+        "pocket alternative",
+        "raindrop alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "search",
+          "title": "Search index",
+          "template": "meilisearch"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.33",
+          "release": "0.33.2",
           "default": true
         }
       ],
@@ -6104,6 +6227,46 @@
       }
     },
     {
+      "name": "pihole",
+      "file": {
+        "path": "templates/pihole.yaml",
+        "sha256": "e22900c0a20715070f6e2a10fcc82e036e5d834a85b2e458e6d0e2146c4e19ca"
+      },
+      "icon": {
+        "path": "icons/pihole.svg",
+        "sha256": "5eeaf0cd80c147b5a7f7217d59d74d49e5966833597dd075d42dd997db4eefd1"
+      },
+      "title": "Pi-hole",
+      "tagline": "The network-wide ad blocker, as a DNS server for every device",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "dns",
+        "networking",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "pihole",
+        "pi hole",
+        "ad blocker",
+        "dns filter",
+        "adguard alternative"
+      ],
+      "license": "EUPL-1.2",
+      "versions": [
+        {
+          "name": "2026.09",
+          "release": "2026.09.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "planka",
       "file": {
         "path": "templates/planka.yaml",
@@ -6894,6 +7057,51 @@
       }
     },
     {
+      "name": "redmine",
+      "file": {
+        "path": "templates/redmine.yaml",
+        "sha256": "f54eac00f93f17cfd9d6d40a5449dd849186814e05c671f2fd47bfd4560d6f8e"
+      },
+      "icon": {
+        "path": "icons/redmine.svg",
+        "sha256": "9d5e9a51fbf260ce618310924ef6303ee1870199296360821ee97390bc43110f"
+      },
+      "title": "Redmine",
+      "tagline": "The long-standing issue tracker and project manager, with wikis and time logs",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "tasks",
+        "project-management",
+        "open-source"
+      ],
+      "aliases": [
+        "issue tracker",
+        "bug tracker",
+        "jira alternative",
+        "project management"
+      ],
+      "license": "GPL-2.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.1",
+          "release": "6.1.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "redpanda",
       "file": {
         "path": "templates/redpanda.yaml",
@@ -6935,7 +7143,7 @@
       "name": "registry",
       "file": {
         "path": "templates/registry.yaml",
-        "sha256": "f190fca26374d7d4a82155547139281c57a11449ab9633cab98b64eb2d168f12"
+        "sha256": "2fb4dd7b2402fa079fd6a68a8c21b8ab44b8c882d98fc9b86b39c8138c7f294b"
       },
       "icon": {
         "path": "icons/registry.svg",
@@ -6963,6 +7171,43 @@
         {
           "name": "3.1",
           "release": "3.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "registry-ui",
+      "file": {
+        "path": "templates/registry-ui.yaml",
+        "sha256": "ca3d0364987269be40f229bbb017f7d856839c12246aab057a291e5b0d531139"
+      },
+      "icon": {
+        "path": "icons/registry-ui.svg",
+        "sha256": "e0d3e41e1359f3e41488b0815f1913b4af13c857b3bd61c5243e847322b3fc38"
+      },
+      "title": "Docker Registry UI",
+      "tagline": "Browse and clean up the images in a private Docker registry",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "containers",
+        "open-source"
+      ],
+      "aliases": [
+        "registry ui",
+        "docker registry browser",
+        "joxit",
+        "container images"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.0",
           "default": true
         }
       ],
@@ -7320,6 +7565,51 @@
       }
     },
     {
+      "name": "sonarqube",
+      "file": {
+        "path": "templates/sonarqube.yaml",
+        "sha256": "f060d153a06d36994bc9c804eb89ab600f60e76e42718a757bbe31d03d6638ae"
+      },
+      "icon": {
+        "path": "icons/sonarqube.svg",
+        "sha256": "5f113654dbfb33ec2fce7287bb2591a67613f0b7ebd0e4b85db9c6be2ce2918a"
+      },
+      "title": "SonarQube",
+      "tagline": "Static analysis that finds bugs, vulnerabilities and code smells on every commit",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "testing",
+        "open-source"
+      ],
+      "aliases": [
+        "sonar",
+        "code quality",
+        "static analysis",
+        "sast",
+        "code review"
+      ],
+      "license": "LGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "26.9",
+          "release": "26.9.0.129388",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "stalwart",
       "file": {
         "path": "templates/stalwart.yaml",
@@ -7391,6 +7681,53 @@
         {
           "name": "1.4",
           "release": "1.4.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "superset",
+      "file": {
+        "path": "templates/superset.yaml",
+        "sha256": "05ea7c383674d88b7915bf7cd06308c1eba302ca11984201c2db650afb59278e"
+      },
+      "icon": {
+        "path": "icons/superset.svg",
+        "sha256": "a62b6d9d048bab646914468256578b76dc9d17f9c6adc194e99fad74c77497e6"
+      },
+      "title": "Apache Superset",
+      "tagline": "Explore data and build dashboards on top of any SQL database",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "dashboards",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "bi",
+        "dashboards",
+        "tableau alternative",
+        "looker alternative",
+        "data exploration"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.1",
+          "release": "6.1.0",
           "default": true
         }
       ],

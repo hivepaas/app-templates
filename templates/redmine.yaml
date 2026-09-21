@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: redmine
+  title: Redmine
+  tagline: The long-standing issue tracker and project manager, with wikis and time logs
+  description: |
+    Redmine tracks issues across many projects, with custom fields and workflows per
+    tracker, Gantt charts and a calendar, time logging, per-project wikis and forums, and
+    fine-grained roles. It has been doing this since 2006 and has a plugin for nearly
+    everything.
+
+    **This template creates two apps**
+
+    - **Redmine**, on a volume for attached files
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `admin`; Redmine makes you change it at once. Then
+    load the default roles, trackers and statuses from Administration, which asks the first
+    time it is opened.
+  categories: [webapps/project-management]
+  tags: [tasks, project-management, open-source]
+  aliases: [issue tracker, bug tracker, jira alternative, project management]
+  icon: icons/redmine.svg
+  links:
+    website: https://www.redmine.org
+    documentation: https://www.redmine.org/guide
+    source: https://github.com/redmine/redmine
+  license: GPL-2.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: secretKeyBase
+    title: Secret key base
+    description: Signs sessions and cookies. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 64
+    generate: {length: 96, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 768MB
+    min: 384MB
+  - name: dataVolume
+    title: Files volume
+    description: The volume files attached to issues, wikis and documents are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: redmine
+      username: redmine
+
+versions:
+  - name: "6.1"
+    release: "6.1.4"
+    default: true
+    image: redmine:6.1.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /usr/src/redmine/files: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl. The sign-in page goes through Rails and the
+        # database.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/login
+        interval: 20s
+        timeout: 10s
+        # The first start creates the database from its migrations.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: redmine
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The entry point writes database.yml from these - fields, not a URL, which is what
+        # keeps the underscore in the database's host name from mattering to Rails.
+        - {k: REDMINE_DB_POSTGRES, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: REDMINE_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: REDMINE_DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: REDMINE_DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: REDMINE_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: REDMINE_SECRET_KEY_BASE, v: "${secrets.REDMINE_SECRET_KEY_BASE}"}
+    secrets:
+      REDMINE_SECRET_KEY_BASE:
+        value: "${{ params.secretKeyBase }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

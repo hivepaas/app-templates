@@ -1,0 +1,113 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jupyter
+  title: JupyterLab
+  tagline: Notebooks for Python in the browser, with a terminal and a file browser
+  description: |
+    JupyterLab is the notebook environment of data work: code, output, charts and prose in
+    one document, run a cell at a time. It has a file browser, a text editor, consoles and a
+    terminal beside the notebooks. This is the Jupyter project's minimal image - Python and
+    the notebook stack, ready for `pip install` and `mamba install`.
+
+    **This template sets up**
+
+    - JupyterLab for one person, behind a token
+    - a volume for the notebooks, mounted at `work` in the file browser
+    - a memory limit you choose
+
+    **Signing in**
+
+    Open the address with `?token=<the token>` once, or paste the token into the sign-in
+    page - it is under the app's Secrets. Anyone with the token can run code in the
+    container, so treat it as a password.
+
+    **What survives a redeployment**
+
+    Only the `work` folder is on the volume. Packages installed with pip or mamba live in
+    the container and are gone after a redeployment; keep a `requirements.txt` in `work`
+    and install from it.
+  categories: [webapps/dev-tools, webapps/ai]
+  tags: [ai, open-source]
+  aliases: [jupyter, notebook, ipython, python, data science]
+  icon: icons/jupyter.svg
+  links:
+    website: https://jupyter.org
+    documentation: https://jupyter-docker-stacks.readthedocs.io
+    source: https://github.com/jupyter/docker-stacks
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: token
+    title: Token
+    description: What you sign in with. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 24
+    generate: {length: 48, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: Everything the notebooks load into memory counts against this.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Notebook volume
+    description: The volume the notebooks and files in `work` are kept on.
+    type: volume
+
+versions:
+  - name: "3.13"
+    release: "python-3.13.15"
+    default: true
+    image: quay.io/jupyter/minimal-notebook:python-3.13.15
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/jovyan/work: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image's entry point is tini, which has to be process 1 to reap the kernels
+      # the server starts.
+      init: false
+      healthcheck:
+        enabled: true
+        # The image's own check, against the running server's API.
+        mode: CMD
+        command: /etc/jupyter/docker_healthcheck.py
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jupyter
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: JUPYTER_TOKEN, v: "${secrets.JUPYTER_TOKEN}"}
+    secrets:
+      JUPYTER_TOKEN:
+        value: "${{ params.token }}"
+    routing:
+      port: 8888
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

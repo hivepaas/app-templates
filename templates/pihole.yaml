@@ -1,0 +1,149 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pihole
+  title: Pi-hole
+  tagline: The network-wide ad blocker, as a DNS server for every device
+  description: |
+    Pi-hole answers DNS for your network and refuses to resolve the domains ads, trackers
+    and malware come from, so every device behind it is covered - televisions and phone
+    apps included - without installing anything on them. Its dashboard shows every query,
+    which clients ask for what, and what was blocked.
+
+    **This template sets up**
+
+    - Pi-hole, on a volume for its configuration, block lists and query database
+    - DNS published on the node over UDP and TCP, on the port you choose
+    - the web interface through the reverse proxy, at `/admin`
+    - a memory limit you choose
+
+    **Signing in**
+
+    The web interface has one password, the one below - generated unless you give one, and
+    kept under the app's Secrets.
+
+    **Pointing devices at it**
+
+    Set the DNS server of your router or your devices to the node's address. The port is
+    published on the node itself rather than through the ingress mesh, so the query log sees
+    which device asked. Only one app on a node can hold port 53 - AdGuard Home, also in this
+    store, is the other choice for the same job.
+
+    **No DHCP**
+
+    Pi-hole can also hand out addresses, but that needs the host network and capabilities
+    this template does not ask for. Leave DHCP to your router.
+  categories: [webapps/networking]
+  tags: [dns, networking, privacy, open-source]
+  aliases: [pihole, pi hole, ad blocker, dns filter, adguard alternative]
+  icon: icons/pihole.svg
+  links:
+    website: https://pi-hole.net
+    documentation: https://docs.pi-hole.net
+    source: https://github.com/pi-hole/docker-pi-hole
+  license: EUPL-1.2
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web interface answers at. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: password
+    title: Web interface password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 8
+    generate: {length: 20}
+  - name: dnsPort
+    title: DNS port
+    description: >-
+      The port on the node, published over UDP and TCP. The server itself always listens on
+      53 inside the project; this is only what the outside connects to. 53 is what clients
+      use without being told otherwise.
+    type: int
+    default: 53
+    min: 1
+    max: 65535
+  - name: upstreams
+    title: Upstream servers
+    description: Where queries that are not blocked are sent, separated by semicolons.
+    type: string
+    default: 1.1.1.1;1.0.0.1
+    pattern: '^[0-9A-Fa-f:.#]+(;[0-9A-Fa-f:.#]+)*$'
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration, block lists and query history are kept on.
+    type: volume
+
+versions:
+  - name: "2026.09"
+    release: "2026.09.0"
+    default: true
+    image: pihole/pihole:2026.09.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /etc/pihole: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # Published on the node rather than through the ingress mesh: a resolver
+          # wants to see which client asked, and the mesh would rewrite that address.
+          - {target: 53, published: "${{ params.dnsPort }}", protocol: udp, publishMode: host}
+          - {target: 53, published: "${{ params.dnsPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: its resolver answering for its own name.
+        command: dig -p 53 +short +norecurse +retry=0 @127.0.0.1 pi.hole
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: pihole
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: FTLCONF_webserver_api_password, v: "${secrets.FTLCONF_webserver_api_password}"}
+        # Answer queries from anywhere: they arrive from the node's address, not from a
+        # subnet the container knows as local.
+        - {k: FTLCONF_dns_listeningMode, v: ALL}
+        - {k: FTLCONF_dns_upstreams, v: "${{ params.upstreams }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    secrets:
+      FTLCONF_webserver_api_password:
+        value: "${{ params.password }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
