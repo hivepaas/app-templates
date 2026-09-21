@@ -1,0 +1,158 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: formbricks
+  title: Formbricks
+  tagline: Surveys and forms you host yourself - link, website and in-app
+  description: |
+    Formbricks builds surveys and forms: standalone links, pop-ups on your website, and
+    questions shown inside your own product at the right moment. It has logic and branching,
+    NPS and CSAT templates, hidden fields, integrations with Slack, Notion and Google Sheets,
+    and the responses stay in your database.
+
+    **This template creates two apps**
+
+    - **Formbricks**, on a volume for files respondents upload
+    - **a PostgreSQL database with pgvector** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open it and create the first account; it becomes the owner of the first organization.
+    Email verification and password reset are off, since no mail server is configured -
+    add SMTP settings to the app's environment to turn them on.
+
+    **The public address has to be right**
+
+    Survey links, the website snippet and sign-in are all built from it. Set it to the HTTPS
+    address of the domain you give the app.
+  categories: [webapps/business]
+  tags: [open-source]
+  aliases: [surveys, forms, typeform alternative, feedback, nps]
+  icon: icons/formbricks.svg
+  links:
+    website: https://formbricks.com
+    documentation: https://formbricks.com/docs/self-hosting/overview
+    source: https://github.com/formbricks/formbricks
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://forms.example.com. Survey
+      links and sign-in are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:3000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: nextauthSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      Encrypts stored integration tokens - exactly 64 hexadecimal characters. Leave empty
+      to generate one.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: cronSecret
+    title: Cron secret
+    description: Authorises the scheduled jobs the app runs on itself. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Upload volume
+    description: The volume files uploaded by respondents are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: pgvector
+    version: "0.8"
+    params:
+      dbName: formbricks
+      username: formbricks
+
+versions:
+  - name: "3.16"
+    release: "3.16.1"
+    default: true
+    image: ghcr.io/formbricks/formbricks:v3.16.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/nextjs/apps/web/uploads: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/health
+        interval: 20s
+        timeout: 10s
+        # Every start runs the database migrations before the server comes up.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: formbricks
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: WEBAPP_URL, v: "${{ params.appUrl }}"}
+        - {k: NEXTAUTH_URL, v: "${{ params.appUrl }}"}
+        - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
+        - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        - {k: CRON_SECRET, v: "${secrets.CRON_SECRET}"}
+        # Prisma reads the URL's host without objecting to the underscore in it.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?schema=public
+        # No mail server is configured, and both of these send mail.
+        - {k: EMAIL_VERIFICATION_DISABLED, v: "1"}
+        - {k: PASSWORD_RESET_DISABLED, v: "1"}
+        - {k: TELEMETRY_DISABLED, v: "1"}
+    secrets:
+      NEXTAUTH_SECRET:
+        value: "${{ params.nextauthSecret }}"
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      CRON_SECRET:
+        value: "${{ params.cronSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

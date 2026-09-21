@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kutt
+  title: Kutt
+  tagline: A URL shortener with your own domain, custom slugs and click stats
+  description: |
+    Kutt shortens links on your own domain: custom slugs, expiry, password protection,
+    per-link statistics on visits, referrers, browsers and countries, and an API for
+    creating links from scripts.
+
+    **This template sets up**
+
+    - Kutt with its SQLite database, on a volume
+    - registration closed and anonymous links off, so only accounts you make can shorten
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open it: the first page creates the administrator account. Other accounts are then
+    created from the admin page.
+
+    **The short domain**
+
+    Every link it hands out is on the short domain you set here. Give the app the same
+    domain, and set this to it, before sharing anything.
+  categories: [webapps/dev-tools]
+  tags: [open-source]
+  aliases: [url shortener, short links, bitly alternative, link shortener]
+  icon: icons/kutt.svg
+  links:
+    website: https://kutt.it
+    documentation: https://github.com/thedevs-network/kutt#configuration
+    source: https://github.com/thedevs-network/kutt
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: shortDomain
+    title: Short domain
+    description: >-
+      The host the short links are on - s.example.com. The default only works from inside
+      the project.
+    type: string
+    default: ${HIVEPAAS_HOST}:3000
+    pattern: '^[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - normally the short domain above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: jwtSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the SQLite database is kept on.
+    type: volume
+
+versions:
+  - name: "3.2"
+    release: "3.2.6"
+    default: true
+    image: kutt/kutt:v3.2.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/kutt: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/api/v2/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kutt
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DEFAULT_DOMAIN, v: "${{ params.shortDomain }}"}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: DB_FILENAME, v: /var/lib/kutt/data.sqlite}
+        # TLS ends at the reverse proxy; believe the client address it forwards.
+        - {k: TRUST_PROXY, v: "true"}
+        - {k: DISALLOW_REGISTRATION, v: "true"}
+        - {k: DISALLOW_ANONYMOUS_LINKS, v: "true"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

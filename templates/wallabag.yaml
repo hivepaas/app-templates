@@ -1,0 +1,126 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wallabag
+  title: wallabag
+  tagline: A read-it-later app that keeps the article, without the rest of the page
+  description: |
+    wallabag saves web articles to read later, stripped of ads and clutter: tag them,
+    annotate them, search their full text, and read them in the browser, on its phone apps
+    or on an e-reader. It imports from Pocket, Instapaper and Pinboard.
+
+    **This template sets up**
+
+    - wallabag with its SQLite database, on one volume with the saved images
+    - public registration closed
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Sign in as `wallabag` with the password `wallabag`, and change both straight away - it
+    is the account the first start creates, and it is the same on every wallabag in the
+    world. More accounts are made from the internal settings.
+
+    **The public address has to be right**
+
+    wallabag builds its links and the API endpoints the phone apps use from it. Set it to
+    the HTTPS address of the domain you give the app.
+  categories: [webapps/knowledge]
+  tags: [notes, open-source]
+  aliases: [read later, pocket alternative, instapaper alternative, articles]
+  icon: icons/wallabag.svg
+  links:
+    website: https://wallabag.org
+    documentation: https://doc.wallabag.org
+    source: https://github.com/wallabag/wallabag
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://read.example.com. Links and the
+      API address the apps use are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: secret
+    title: Application secret
+    description: Signs sessions and CSRF tokens. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and the images of saved articles are kept on.
+    type: volume
+
+versions:
+  - name: "2.6"
+    release: "2.6.14"
+    default: true
+    image: wallabag/wallabag:2.6.14
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/wallabag/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        /var/www/wallabag/web/assets/images:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: images}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: curl -fsS -o /dev/null --user-agent healthcheck http://127.0.0.1/api/info
+        interval: 30s
+        timeout: 10s
+        # The first start creates the database, and every start runs composer.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: wallabag
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SYMFONY__ENV__DOMAIN_NAME, v: "${{ params.appUrl }}"}
+        - {k: SYMFONY__ENV__SECRET, v: "${secrets.SYMFONY__ENV__SECRET}"}
+        - {k: SYMFONY__ENV__FOSUSER_REGISTRATION, v: "false"}
+    secrets:
+      SYMFONY__ENV__SECRET:
+        value: "${{ params.secret }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

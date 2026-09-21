@@ -1,0 +1,149 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: snipe-it
+  title: Snipe-IT
+  tagline: IT asset management - who has which laptop, license and cable
+  description: |
+    Snipe-IT tracks the things an organisation owns: hardware with its serial numbers and
+    warranty, software licenses and their seats, accessories and consumables, and who each
+    is checked out to. People accept what they are given with a signature, and every change
+    lands in an audit log.
+
+    **This template creates two apps**
+
+    - **Snipe-IT**, on a volume for uploads, backups and its keys
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the app: the setup wizard checks the configuration, creates the tables and asks for
+    the first administrator. It warns when the public address below does not match the one
+    you opened it at - fix that before anything else.
+
+    **Keep the application key**
+
+    It encrypts custom fields marked as encrypted and the sessions. Back it up with the
+    database; changing it makes those fields unreadable.
+  categories: [webapps/business]
+  tags: [open-source]
+  aliases: [asset management, inventory, itam, licenses, hardware]
+  icon: icons/snipe-it.svg
+  links:
+    website: https://snipeitapp.com
+    documentation: https://snipe-it.readme.io/docs
+    source: https://github.com/grokability/snipe-it
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://assets.example.com. Links,
+      labels and emails are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: appKey
+    title: Application key
+    description: >-
+      Encrypts sessions and encrypted fields - exactly 32 characters. Leave empty to
+      generate one.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploads, backups and the OAuth keys are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: snipeit
+      username: snipeit
+
+versions:
+  - name: "8.7"
+    release: "8.7.2"
+    default: true
+    image: snipe/snipe-it:v8.7.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/snipeit: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1/health
+        interval: 20s
+        timeout: 10s
+        # The first start runs the migrations that create the database.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: snipe-it
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_URL, v: "${{ params.appUrl }}"}
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        - {k: APP_ENV, v: production}
+        - {k: APP_DEBUG, v: "false"}
+        - {k: APP_TIMEZONE, v: "${{ params.timezone }}"}
+        # TLS is terminated in front of the app, so it has to believe the scheme the proxy
+        # forwards rather than the one it sees.
+        - {k: APP_TRUSTED_PROXIES, v: "*"}
+        - {k: DB_CONNECTION, v: mysql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # No mail server is configured; mail is written to the log until one is.
+        - {k: MAIL_MAILER, v: log}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

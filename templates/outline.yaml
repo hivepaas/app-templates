@@ -1,0 +1,196 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: outline
+  title: Outline
+  tagline: A fast, collaborative knowledge base for your team
+  description: |
+    Outline is a team wiki that feels like a modern editor: documents in collections,
+    Markdown shortcuts, real-time collaborative editing, comments, version history, and
+    search that is fast enough to use as navigation. It imports from Notion and Confluence,
+    and has an API and Slack integration.
+
+    **This template creates three apps**
+
+    - **Outline**, on a volume for uploaded files and images
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+    - **a Redis** for collaboration and queues, with `-cache` added
+
+    **It signs in through OpenID Connect**
+
+    Outline has no passwords of its own. Register it as a client with your identity
+    provider - Pocket ID, Authentik, Keycloak and Authelia are all in this store - using
+    `<public address>/auth/oidc.callback` as the redirect URI, and give the issuer, client
+    ID and client secret here. The first person to sign in becomes the administrator.
+
+    **The public address has to be right**
+
+    The redirect back from the identity provider and every link Outline makes are built
+    from it. Set it to the HTTPS address of the domain you give the app.
+  categories: [webapps/knowledge]
+  tags: [wiki, documents, collaboration, open-source]
+  aliases: [wiki, notion alternative, confluence alternative, knowledge base, docs]
+  icon: icons/outline.svg
+  links:
+    website: https://www.getoutline.com
+    documentation: https://docs.getoutline.com/s/hosting
+    source: https://github.com/outline/outline
+  license: BSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://wiki.example.com. The sign-in
+      redirect and every link are built from it.
+    type: string
+    # Not the app's own name, as elsewhere: Outline refuses to start with a URL whose host
+    # has an underscore in it, which every app key does.
+    default: https://wiki.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: oidcIssuer
+    title: OIDC issuer
+    description: >-
+      Your identity provider's issuer address; Outline reads the rest from its
+      /.well-known/openid-configuration.
+    type: string
+    default: https://id.example.com
+    pattern: '^https?://[^\s?#]+$'
+  - name: oidcClientId
+    title: OIDC client ID
+    type: string
+    default: outline
+    pattern: '^[^\s]{1,200}$'
+  - name: oidcClientSecret
+    title: OIDC client secret
+    description: The secret your identity provider gave the client.
+    type: secret
+  - name: oidcDisplayName
+    title: Sign-in button
+    description: What the sign-in button says - "Continue with ..."
+    type: string
+    default: SSO
+    pattern: '^[^"\\\n]{1,40}$'
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Encrypts what Outline stores - exactly 64 hexadecimal characters. Leave empty to
+      generate one; changing it makes that data unreadable.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: utilsSecret
+    title: Utilities secret
+    description: Signs internal maintenance requests. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Upload volume
+    description: The volume uploaded files and images are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: outline
+      username: outline
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "1.10"
+    release: "1.10.1"
+    default: true
+    image: outlinewiki/outline:1.10.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/outline/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check. The image has wget and no curl.
+        command: wget -qO- http://127.0.0.1:3000/_health | grep -q OK
+        interval: 20s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: outline
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: URL, v: "${{ params.appUrl }}"}
+        - {k: PORT, v: "3000"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: UTILS_SECRET, v: "${secrets.UTILS_SECRET}"}
+        # Separate fields rather than DATABASE_URL: the database's name on the project
+        # network has an underscore, which a strict URL parser refuses in a host.
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The database is on the project network, which does not carry TLS.
+        - {k: PGSSLMODE, v: disable}
+        # Redis has no user name to set: it authenticates as its built-in `default` user.
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
+        - {k: FILE_STORAGE, v: local}
+        - {k: FILE_STORAGE_LOCAL_ROOT_DIR, v: /var/lib/outline/data}
+        # The reverse proxy already sends plain HTTP to HTTPS; Outline doing it too would
+        # also redirect its own health check.
+        - {k: FORCE_HTTPS, v: "false"}
+        - {k: OIDC_ISSUER_URL, v: "${{ params.oidcIssuer }}"}
+        - {k: OIDC_CLIENT_ID, v: "${{ params.oidcClientId }}"}
+        - {k: OIDC_CLIENT_SECRET, v: "${secrets.OIDC_CLIENT_SECRET}"}
+        - {k: OIDC_DISPLAY_NAME, v: "${{ params.oidcDisplayName }}"}
+        - {k: OIDC_SCOPES, v: "openid profile email"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      UTILS_SECRET:
+        value: "${{ params.utilsSecret }}"
+      OIDC_CLIENT_SECRET:
+        value: "${{ params.oidcClientSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

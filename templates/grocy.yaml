@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: grocy
+  title: Grocy
+  tagline: ERP beyond your fridge - groceries, stock, chores and recipes at home
+  description: |
+    Grocy runs a household like a small warehouse: what is in stock and where, what is
+    about to expire, what to buy next, which recipes you can cook with what you have, and
+    whose turn it is to do the chores. Scan barcodes to add and consume products.
+
+    **This template sets up**
+
+    - Grocy with its SQLite database, on a volume
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `admin` and change it straight away - it is the
+    account every Grocy starts with.
+  categories: [webapps/project-management]
+  tags: [tasks, open-source]
+  aliases: [groceries, pantry, household, chores, stock]
+  icon: icons/grocy.svg
+  links:
+    website: https://grocy.info
+    documentation: https://github.com/grocy/grocy#readme
+    source: https://github.com/grocy/grocy
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: Decides what "today" is for due dates. An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and uploaded pictures are kept on.
+    type: volume
+
+versions:
+  - name: "4.7"
+    release: "4.7.1"
+    default: true
+    image: lscr.io/linuxserver/grocy:v4.7.1-ls341
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The root, not /login: Grocy creates and migrates its database only when / is
+        # requested, and until then signing in fails with "no such table". This makes the
+        # first check do it.
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: grocy
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

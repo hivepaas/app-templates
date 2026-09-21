@@ -1,0 +1,94 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: readeck
+  title: Readeck
+  tagline: Save web pages to read later - kept in full, not just bookmarked
+  description: |
+    Readeck saves the articles, videos and pictures you want to come back to: it keeps the
+    readable text and images of each page, so they survive the original going away. Label,
+    highlight and annotate them, organise them into collections, read them on any device or
+    export them as e-books. A browser extension saves pages in one click.
+
+    **This template sets up**
+
+    - Readeck with its SQLite database, on one volume with the saved pages
+    - a configuration and secret key generated on the first start, on the volume
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open it: the first page creates the administrator account.
+  categories: [webapps/knowledge]
+  tags: [notes, open-source]
+  aliases: [read later, pocket alternative, bookmarks, wallabag alternative, articles]
+  icon: icons/readeck.svg
+  links:
+    website: https://readeck.org
+    documentation: https://readeck.org/en/docs/
+    source: https://codeberg.org/readeck/readeck
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration, database and saved pages are kept on.
+    type: volume
+
+versions:
+  - name: "0.23"
+    release: "0.23.4"
+    default: true
+    image: codeberg.org/readeck/readeck:0.23.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The working directory: config.toml is written here on the first start, with a
+        # generated secret key, and the data directory beside it.
+        /readeck: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: cd /readeck && /bin/readeck healthcheck -config config.toml
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: readeck
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # TLS ends at the reverse proxy; believe the scheme and host it forwards.
+        - {k: READECK_USE_X_FORWARDED, v: "true"}
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

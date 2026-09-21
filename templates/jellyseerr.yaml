@@ -1,0 +1,100 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jellyseerr
+  title: Jellyseerr
+  tagline: Let people request films and shows for your Jellyfin, Plex or Emby
+  description: |
+    Jellyseerr is the front desk of a media server: people browse and search films and
+    series, see what is already there, and request what is not. Requests go to Sonarr and
+    Radarr once approved, and people are told when their request is ready to watch.
+
+    **This template sets up**
+
+    - Jellyseerr, on a volume for its settings and database
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open it: the setup wizard asks which media server you use - the Jellyfin template in
+    this store works, at `http://<its app key>:8096` - and signs you in with an account on
+    it, which becomes the administrator. Then connect Sonarr and Radarr if you have them.
+  categories: [webapps/documents]
+  tags: [open-source]
+  aliases: [overseerr, jellyfin requests, plex requests, media requests]
+  icon: icons/jellyseerr.svg
+  links:
+    website: https://docs.jellyseerr.dev
+    documentation: https://docs.jellyseerr.dev
+    source: https://github.com/fallenbagel/jellyseerr
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the settings and the request database are kept on.
+    type: volume
+
+versions:
+  - name: "2.7"
+    release: "2.7.3"
+    default: true
+    image: fallenbagel/jellyseerr:2.7.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image's entry point is tini, which has to be process 1 to do its job.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:5055/api/v1/status
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jellyseerr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 5055
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

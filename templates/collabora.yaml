@@ -1,0 +1,119 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: collabora
+  title: Collabora Online
+  tagline: LibreOffice in the browser, for editing files together inside Nextcloud
+  description: |
+    Collabora Online is LibreOffice as a server: documents, spreadsheets, presentations and
+    drawings in the browser, in ODF and Microsoft formats, with several people editing at
+    once. Nextcloud, ownCloud, Seafile and others open files in it and keep them. This is
+    CODE, the development edition - the same software, meant for smaller deployments.
+
+    **This template sets up**
+
+    - Collabora Online, with TLS left to the reverse proxy
+    - the one host allowed to open files in it
+    - an admin console account at `/browser/dist/admin/admin.html`
+    - a memory limit you choose
+
+    **It keeps no documents**
+
+    Files stay in the app that opened them, so it takes no volume.
+
+    **Connecting Nextcloud**
+
+    Install Nextcloud Office in Nextcloud and give it this app's HTTPS address. The allowed
+    host below must be Nextcloud's own address, or Collabora refuses to open its files.
+  categories: [webapps/documents]
+  tags: [documents, collaboration, open-source]
+  aliases: [libreoffice online, code, nextcloud office, office, onlyoffice alternative]
+  icon: icons/collabora.svg
+  links:
+    website: https://www.collaboraonline.com/code/
+    documentation: https://sdk.collaboraonline.com/docs/installation/CODE_Docker_image.html
+    source: https://github.com/CollaboraOnline/online
+  license: MPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the editor answers at, which browsers open. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: allowedHost
+    title: Allowed host
+    description: >-
+      The address of the app that may open files here - Nextcloud's, scheme and port
+      included: https://cloud.example.com:443.
+    type: string
+    default: https://cloud.example.com:443
+    pattern: '^https?://[^\s/?#]+$'
+  - name: adminUser
+    title: Admin console user
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: adminPassword
+    title: Admin console password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: Each open document is a LibreOffice process of its own.
+    type: size
+    default: 2GB
+    min: 1GB
+
+versions:
+  - name: "26.04"
+    release: "26.04.4.1.1"
+    default: true
+    image: collabora/code:26.04.4.1.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image has no shell; its own probe mode is the check.
+        mode: CMD
+        command: /usr/bin/coolwsd --probe --use-env-vars
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: collabora
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: aliasgroup1, v: "${{ params.allowedHost }}"}
+        - {k: username, v: "${{ params.adminUser }}"}
+        - {k: password, v: "${secrets.COLLABORA_ADMIN_PASSWORD}"}
+        # TLS is the reverse proxy's job: serve plain HTTP, but build https links.
+        - {k: extra_params, v: "--o:ssl.enable=false --o:ssl.termination=true"}
+        - {k: DONT_GEN_SSL_CERT, v: "1"}
+    secrets:
+      COLLABORA_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 9980
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

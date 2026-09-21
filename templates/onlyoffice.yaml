@@ -1,0 +1,108 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: onlyoffice
+  title: ONLYOFFICE Docs
+  tagline: Edit Word, Excel and PowerPoint files together, inside Nextcloud and others
+  description: |
+    ONLYOFFICE Docs is an online office suite - documents, spreadsheets, presentations and
+    PDF forms - with Microsoft Office formats as its native ones and real-time co-editing.
+    It is an editing server: Nextcloud, Seafile, Moodle and many others open files in it
+    and keep them.
+
+    **This template sets up**
+
+    - the Document Server, with its own database and message queue inside
+    - requests signed with a JWT secret, generated unless you give one
+    - a memory limit you choose
+
+    **It keeps no documents**
+
+    Files stay in the app that opened them; the Document Server holds only what is being
+    edited right now, so it takes no volume. A restart during an edit loses the unsaved
+    part of that edit.
+
+    **Connecting Nextcloud**
+
+    Install the ONLYOFFICE app in Nextcloud, and in its settings give the Document Server's
+    HTTPS address and the JWT secret from this app's Secrets. Both apps have to reach each
+    other: the browser opens the editor at this app's domain, and the server calls back to
+    Nextcloud's.
+  categories: [webapps/documents]
+  tags: [documents, collaboration, open-source]
+  aliases: [onlyoffice, documentserver, office, word, excel, docx, collabora alternative]
+  icon: icons/onlyoffice.svg
+  links:
+    website: https://www.onlyoffice.com/docs-enterprise.aspx
+    documentation: https://helpcenter.onlyoffice.com/docs/installation/docs-community-install-docker.aspx
+    source: https://github.com/ONLYOFFICE/DocumentServer
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the editor answers at, which browsers open. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: jwtSecret
+    title: JWT secret
+    description: >-
+      What the Document Server and the apps using it sign their requests with. Leave empty
+      to generate one, then copy it into the app you connect.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: It runs its own PostgreSQL, RabbitMQ and several converters; 2 GB is the floor for real use.
+    type: size
+    default: 3GB
+    min: 2GB
+
+versions:
+  - name: "9.3"
+    release: "9.3.0.1"
+    default: true
+    image: onlyoffice/documentserver:9.3.0.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Answers "true" once the converters and the editors' services are up.
+        command: curl -fsS http://127.0.0.1/healthcheck | grep -q true
+        interval: 30s
+        timeout: 10s
+        startPeriod: 240s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: onlyoffice
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: JWT_ENABLED, v: "true"}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: JWT_HEADER, v: Authorization}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

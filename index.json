@@ -1340,6 +1340,45 @@
       }
     },
     {
+      "name": "collabora",
+      "file": {
+        "path": "templates/collabora.yaml",
+        "sha256": "03fdb7ed5b5de86682e2b5b6db7e45c74d909459ce672843f141c00c2374b074"
+      },
+      "icon": {
+        "path": "icons/collabora.svg",
+        "sha256": "0c1803650d64ae892596fd10007af1cc122583f2d9df8aa8bc2cb45dc18fc4e6"
+      },
+      "title": "Collabora Online",
+      "tagline": "LibreOffice in the browser, for editing files together inside Nextcloud",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "libreoffice online",
+        "code",
+        "nextcloud office",
+        "office",
+        "onlyoffice alternative"
+      ],
+      "license": "MPL-2.0",
+      "versions": [
+        {
+          "name": "26.04",
+          "release": "26.04.4.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "couchdb",
       "file": {
         "path": "templates/couchdb.yaml",
@@ -2128,6 +2167,50 @@
       }
     },
     {
+      "name": "formbricks",
+      "file": {
+        "path": "templates/formbricks.yaml",
+        "sha256": "a83fbbe499930e2924fc41140d7b0037d2b8044eed69d0388907bc9c6df1b8f8"
+      },
+      "icon": {
+        "path": "icons/formbricks.svg",
+        "sha256": "69a464f591debe37c8ac85f8b1d4772efb17c8ec6de6ca83cf1e4e0af5b41b23"
+      },
+      "title": "Formbricks",
+      "tagline": "Surveys and forms you host yourself - link, website and in-app",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "surveys",
+        "forms",
+        "typeform alternative",
+        "feedback",
+        "nps"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "pgvector"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.16",
+          "release": "3.16.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "freshrss",
       "file": {
         "path": "templates/freshrss.yaml",
@@ -2789,6 +2872,44 @@
       }
     },
     {
+      "name": "grocy",
+      "file": {
+        "path": "templates/grocy.yaml",
+        "sha256": "da7eb0b1a9d7777665c95c4dfc91cde83639533a993fa2a86f3ae007d8b7a72c"
+      },
+      "icon": {
+        "path": "icons/grocy.svg",
+        "sha256": "0dfcf359d5d84d5b8b0fa30242bb9e730180936aafd13571b39ebb33821e9695"
+      },
+      "title": "Grocy",
+      "tagline": "ERP beyond your fridge - groceries, stock, chores and recipes at home",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "groceries",
+        "pantry",
+        "household",
+        "chores",
+        "stock"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "4.7",
+          "release": "4.7.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "headscale",
       "file": {
         "path": "templates/headscale.yaml",
@@ -3247,6 +3368,42 @@
       }
     },
     {
+      "name": "jellyseerr",
+      "file": {
+        "path": "templates/jellyseerr.yaml",
+        "sha256": "9e63076aff47605d90e80f125c1760143dca8257db9d3c75f06c66b99605aa62"
+      },
+      "icon": {
+        "path": "icons/jellyseerr.svg",
+        "sha256": "9979b4da18104346d457eb0b281db4d888cacf4fa2e20a7dd5b03c0d0c9b512d"
+      },
+      "title": "Jellyseerr",
+      "tagline": "Let people request films and shows for your Jellyfin, Plex or Emby",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "overseerr",
+        "jellyfin requests",
+        "plex requests",
+        "media requests"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.7",
+          "release": "2.7.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "jenkins",
       "file": {
         "path": "templates/jenkins.yaml",
@@ -3615,6 +3772,42 @@
         {
           "name": "0.22",
           "release": "0.22.1"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "kutt",
+      "file": {
+        "path": "templates/kutt.yaml",
+        "sha256": "387d0c0f018a0538e66976ba9401eb2321ea5af39b7d260e2319b8b58bd627fe"
+      },
+      "icon": {
+        "path": "icons/kutt.svg",
+        "sha256": "470ea595a6e2a5d68c8041c7d0df4e5940ac894d3d83a1ee541265ee8175b098"
+      },
+      "title": "Kutt",
+      "tagline": "A URL shortener with your own domain, custom slugs and click stats",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "url shortener",
+        "short links",
+        "bitly alternative",
+        "link shortener"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "3.2",
+          "release": "3.2.6",
+          "default": true
         }
       ],
       "requires": {
@@ -5296,6 +5489,47 @@
       }
     },
     {
+      "name": "onlyoffice",
+      "file": {
+        "path": "templates/onlyoffice.yaml",
+        "sha256": "27f9b25378904af6246101b477ed320ebbb54e5bc53b14a2fd5f54085a88db0b"
+      },
+      "icon": {
+        "path": "icons/onlyoffice.svg",
+        "sha256": "3fb14848a68769606976bc164e2f586b1c6e94d5aad97f759a719dbf8ef176be"
+      },
+      "title": "ONLYOFFICE Docs",
+      "tagline": "Edit Word, Excel and PowerPoint files together, inside Nextcloud and others",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "onlyoffice",
+        "documentserver",
+        "office",
+        "word",
+        "excel",
+        "docx",
+        "collabora alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "9.3",
+          "release": "9.3.0.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "open-webui",
       "file": {
         "path": "templates/open-webui.yaml",
@@ -5490,6 +5724,58 @@
         {
           "name": "0.137",
           "release": "0.137.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "outline",
+      "file": {
+        "path": "templates/outline.yaml",
+        "sha256": "8481b4ce7694b2d4f8c0d0abac2d75fabdd420a116650f5ae8f577e6ad425fee"
+      },
+      "icon": {
+        "path": "icons/outline.svg",
+        "sha256": "e1839f33eba299444e656bd4288c9f4f1322b30f89b83cff86541abf5c652262"
+      },
+      "title": "Outline",
+      "tagline": "A fast, collaborative knowledge base for your team",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "wiki",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "wiki",
+        "notion alternative",
+        "confluence alternative",
+        "knowledge base",
+        "docs"
+      ],
+      "license": "BSL-1.1",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.10",
+          "release": "1.10.1",
           "default": true
         }
       ],
@@ -6486,6 +6772,44 @@
       }
     },
     {
+      "name": "readeck",
+      "file": {
+        "path": "templates/readeck.yaml",
+        "sha256": "7ce62923d6890f7bceaf6080ac520f11c503026324e1f29fdbbff7f9ea66b826"
+      },
+      "icon": {
+        "path": "icons/readeck.svg",
+        "sha256": "d89c8bcf9d6461a30202129bb55d96efdf34f0aa3c98ac79f28e391ea2dab4ce"
+      },
+      "title": "Readeck",
+      "tagline": "Save web pages to read later - kept in full, not just bookmarked",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "open-source"
+      ],
+      "aliases": [
+        "read later",
+        "pocket alternative",
+        "bookmarks",
+        "wallabag alternative",
+        "articles"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.23",
+          "release": "0.23.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "redis",
       "file": {
         "path": "templates/redis.yaml",
@@ -6944,6 +7268,50 @@
         {
           "name": "5.1",
           "release": "5.1.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "snipe-it",
+      "file": {
+        "path": "templates/snipe-it.yaml",
+        "sha256": "240e7f04786319fb58c0d0b023a9992114725676dad0c165c111d97b50926764"
+      },
+      "icon": {
+        "path": "icons/snipe-it.svg",
+        "sha256": "118faba8e67011d585bd2e98339e99029bba09cad6eedf6b4853755323348601"
+      },
+      "title": "Snipe-IT",
+      "tagline": "IT asset management - who has which laptop, license and cable",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "asset management",
+        "inventory",
+        "itam",
+        "licenses",
+        "hardware"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "8.7",
+          "release": "8.7.2",
           "default": true
         }
       ],
@@ -7861,6 +8229,43 @@
         {
           "name": "2.6",
           "release": "2.6.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "wallabag",
+      "file": {
+        "path": "templates/wallabag.yaml",
+        "sha256": "7a50ffca00d0b14365dbb23de58c3d040c8d7e62be3878c29462a88d2d7b143a"
+      },
+      "icon": {
+        "path": "icons/wallabag.svg",
+        "sha256": "bb3f2c30ba53e96cdeaa99ae1a4d16256531f4a0de65ffb13b192224c20f7b28"
+      },
+      "title": "wallabag",
+      "tagline": "A read-it-later app that keeps the article, without the rest of the page",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "open-source"
+      ],
+      "aliases": [
+        "read later",
+        "pocket alternative",
+        "instapaper alternative",
+        "articles"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.14",
           "default": true
         }
       ],
