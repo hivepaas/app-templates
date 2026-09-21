@@ -865,7 +865,7 @@
       "name": "backrest",
       "file": {
         "path": "templates/backrest.yaml",
-        "sha256": "670dfea841f3ea5b3f9fbcd129439384000bdef65e1666d939ab42cd2dc7249f"
+        "sha256": "6dd3995d494f7ec6596d66d307e4f988a40c205c6f154f9ad64f1413f791bdb2"
       },
       "icon": {
         "path": "icons/backrest.svg",
@@ -884,6 +884,43 @@
         "restic",
         "restic ui",
         "backups",
+        "snapshots",
+        "restore"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.14",
+          "release": "1.14.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "backrest-app",
+      "file": {
+        "path": "templates/backrest-app.yaml",
+        "sha256": "ea6de574492a27a6ad1efee496e96e842b41475d4a8216fe699ca80b6565e9ac"
+      },
+      "icon": {
+        "path": "icons/backrest.svg",
+        "sha256": "67a269a1fc0ed4c75c6c6f5780b3ec3d5813cea8fa2203e5e499eae6335a6863"
+      },
+      "title": "Backrest for an app",
+      "tagline": "Back up another app's files with restic, on a schedule, and browse the snapshots",
+      "categories": [
+        "storage/backup"
+      ],
+      "tags": [
+        "backup",
+        "open-source"
+      ],
+      "aliases": [
+        "restic",
+        "backup app",
         "snapshots",
         "restore"
       ],
@@ -943,6 +980,42 @@
         {
           "name": "1.35",
           "release": "1.35.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "bazarr",
+      "file": {
+        "path": "templates/bazarr.yaml",
+        "sha256": "9738baa40cfc0a3ec394ea816c0c611a638b0102bf5d7970b1652cbe7603855f"
+      },
+      "icon": {
+        "path": "icons/bazarr.svg",
+        "sha256": "a6c937f78022144a6e1d825d869f90e816032daa89a0bcf9f73e52c48461f2d7"
+      },
+      "title": "Bazarr",
+      "tagline": "Finds and downloads subtitles for the series and films in your library",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "subtitles",
+        "srt",
+        "servarr",
+        "arr"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.6",
+          "release": "1.6.1",
           "default": true
         }
       ],
@@ -2054,7 +2127,7 @@
       "name": "filebrowser",
       "file": {
         "path": "templates/filebrowser.yaml",
-        "sha256": "8d9c51a60a631dd906a5177671e4ecc7407adcfb314adeafd778db6ca5385f07"
+        "sha256": "1d1685d9312c2a2942ed104e6d8ba902bbb306105fb1307251eadd0ae81cda96"
       },
       "icon": {
         "path": "icons/filebrowser.svg",
@@ -2076,6 +2149,45 @@
         "web file manager",
         "upload",
         "share files"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.63",
+          "release": "2.63.23",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "filebrowser-app",
+      "file": {
+        "path": "templates/filebrowser-app.yaml",
+        "sha256": "2de09cb0edac721951f42601cd990b24b1b08cc82eb72c35f3448d86fdbc7f21"
+      },
+      "icon": {
+        "path": "icons/filebrowser.svg",
+        "sha256": "6e378aa902a448e614b030109be657abdc4a13004072c42c228da1bddc82efb3"
+      },
+      "title": "File Browser for an app",
+      "tagline": "Browse, upload and edit the files of another app in this project",
+      "categories": [
+        "webapps/documents",
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "file-transfer",
+        "open-source"
+      ],
+      "aliases": [
+        "file manager",
+        "edit app files",
+        "uploads",
+        "sftp alternative"
       ],
       "license": "Apache-2.0",
       "versions": [
@@ -6675,7 +6787,7 @@
       "name": "pocket-id",
       "file": {
         "path": "templates/pocket-id.yaml",
-        "sha256": "0fb051327894b934b1bfd00438d4b2131f86a2052b6f3800f9f47c3e3f3d723d"
+        "sha256": "93ec20f0d6ac361727c39808f388089ef4787e0e9ba3e92694510237004c416a"
       },
       "icon": {
         "path": "icons/pocket-id.svg",
@@ -7095,6 +7207,80 @@
       }
     },
     {
+      "name": "prowlarr",
+      "file": {
+        "path": "templates/prowlarr.yaml",
+        "sha256": "2c989ea265814ab06a03801e2eba1911e14fdbcb2dd8de0f1c8a622547d5e4a9"
+      },
+      "icon": {
+        "path": "icons/prowlarr.svg",
+        "sha256": "49a94062fc95867a8d70756b45cf25ab43204ef692e46e74a99212e10ec28e94"
+      },
+      "title": "Prowlarr",
+      "tagline": "One place to manage indexers for Sonarr, Radarr and the rest",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "indexers",
+        "jackett alternative",
+        "servarr",
+        "arr",
+        "torznab"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.5.5623",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "qbittorrent",
+      "file": {
+        "path": "templates/qbittorrent.yaml",
+        "sha256": "274f6c75e7d4c982844a574d966d0a7056f5e582ee82f887416b16ecdeab74fd"
+      },
+      "icon": {
+        "path": "icons/qbittorrent.svg",
+        "sha256": "e71d9f6635ee2fda27b6d59a33ee788979ec946516a7b3c77fb9b72fc01b7dd6"
+      },
+      "title": "qBittorrent",
+      "tagline": "A BitTorrent client with a web interface, for downloading on the server",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "file-transfer",
+        "open-source"
+      ],
+      "aliases": [
+        "torrent",
+        "bittorrent",
+        "downloader",
+        "transmission alternative"
+      ],
+      "license": "GPL-2.0-or-later",
+      "versions": [
+        {
+          "name": "5.2",
+          "release": "5.2.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "qdrant",
       "file": {
         "path": "templates/qdrant.yaml",
@@ -7197,6 +7383,43 @@
         {
           "name": "4.3",
           "release": "4.3.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "radarr",
+      "file": {
+        "path": "templates/radarr.yaml",
+        "sha256": "2cda1cf1bcfbb065ff683ccdefa4e00118f458895ce50bfda72b050171166713"
+      },
+      "icon": {
+        "path": "icons/radarr.svg",
+        "sha256": "37f70d8d786a28d81cc484cb9b33ab965b19a70cf50762e46579b6a2aa243d9d"
+      },
+      "title": "Radarr",
+      "tagline": "Automatically find, download and organise films",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "movies",
+        "films",
+        "pvr",
+        "servarr",
+        "arr"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "6.4",
+          "release": "6.4.4.10685",
           "default": true
         }
       ],
@@ -7910,6 +8133,43 @@
         {
           "name": "26.9",
           "release": "26.9.0.129388",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "sonarr",
+      "file": {
+        "path": "templates/sonarr.yaml",
+        "sha256": "320a81fde20e2d4218c2c1f4bc9dc08aec00a0e97dd587636a000c3ecc8faa1f"
+      },
+      "icon": {
+        "path": "icons/sonarr.svg",
+        "sha256": "cf9886303a88e99ba9694da9cf3677f4dccd781f6e5ac371354f97d16f5986a3"
+      },
+      "title": "Sonarr",
+      "tagline": "Automatically find, download and organise TV series",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "tv",
+        "series",
+        "pvr",
+        "servarr",
+        "arr"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "4.0",
+          "release": "4.0.20.3014",
           "default": true
         }
       ],

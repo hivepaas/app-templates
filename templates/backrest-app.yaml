@@ -2,32 +2,37 @@ apiVersion: hivepaas.com/v1
 kind: AppTemplate
 
 metadata:
-  name: backrest
-  title: Backrest
-  tagline: A web interface for restic - schedule backups, browse and restore them
+  name: backrest-app
+  title: Backrest for an app
+  tagline: Back up another app's files with restic, on a schedule, and browse the snapshots
   description: |
-    Backrest runs restic for you: repositories on S3, a restic REST server, SFTP or a local
-    path; plans that back up on a schedule and prune by a retention policy; and a web page
-    to browse any snapshot and restore a file or a folder from it. Notifications tell you
-    when a backup fails.
+    Backrest - a web interface for restic - set up to back up another app in this project:
+    its files on the volume you pick are mounted here, read-only, and backed up on the
+    schedule you set to any restic repository - S3, a restic REST server, SFTP.
 
     **This template sets up**
 
-    - Backrest, on a volume for its configuration, operation history and restic cache
+    - Backrest, on a volume for its configuration, history and restic cache
+    - the files the app you pick keeps on the volume you pick, at `/source`, read-only
     - a memory limit you choose
 
     **After the first deployment**
 
     Open the app: the first page asks for an instance name and an administrator account.
-    Then add a repository - the Restic REST Server template in this store makes one, at
-    `rest:http://<user>:<password>@<its app key>:8000/<name>` - and a plan.
+    Add a repository - the Restic REST Server and Garage templates in this store both make
+    one - and a plan with `/source` as its path.
 
-    **What it can back up**
+    **Files, not databases**
 
-    Backrest backs up paths inside its own container, and HivePaaS gives every app its own
-    folder on a volume: mounting another app's volume here shows this app's folder on it,
-    not the other app's data. So it backs up what is on its own volume. To back up another
-    app's files, create Backrest for an app, also in this store.
+    It copies files as they are at that moment. That is right for uploads, media and
+    documents; a database's data directory copied while it runs may not restore. Back up
+    databases with their own dump tools.
+
+    **Restoring**
+
+    `/source` is read-only, so restore a snapshot to Backrest's own volume or download it
+    from the snapshot browser, then put the files back - File Browser for an app, in this
+    store, can do that part.
 
     **Keep the repository password**
 
@@ -35,7 +40,7 @@ metadata:
     can be restored without it. Keep a copy outside this app.
   categories: [storage/backup]
   tags: [backup, open-source]
-  aliases: [restic, restic ui, backups, snapshots, restore]
+  aliases: [restic, backup app, snapshots, restore]
   icon: icons/backrest.svg
   links:
     website: https://garethgeorge.github.io/backrest/
@@ -53,6 +58,14 @@ parameters:
       routing settings.
     type: domain
     optional: true
+  - name: targetApp
+    title: App
+    description: The app whose files to back up.
+    type: app
+  - name: targetVolume
+    title: The app's volume
+    description: The volume that app keeps the files on.
+    type: volume
   - name: timezone
     title: Time zone
     description: What the schedules are read in. An IANA name, such as Europe/Amsterdam.
@@ -84,6 +97,12 @@ app:
     storage:
       mounts:
         /data: {type: volume, source: "${{ params.dataVolume }}"}
+        # The other app's directory on that volume, read-only: a backup has no reason to
+        # change what it protects.
+        /source:
+          type: volume
+          source: "${{ params.targetVolume }}"
+          sourceApp: {app: "${{ params.targetApp }}"}
     container:
       # The image's entry point is tini, which has to be process 1 to reap the restic
       # processes Backrest starts.

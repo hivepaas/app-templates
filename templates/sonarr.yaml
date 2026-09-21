@@ -1,0 +1,147 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: sonarr
+  title: Sonarr
+  tagline: Automatically find, download and organise TV series
+  description: |
+    Sonarr watches for new episodes of the series you follow, finds releases through your indexers, sends them to
+    qBittorrent, and when they finish renames and files them into Jellyfin's library. It
+    upgrades to better quality as it appears and keeps a calendar of what is due.
+
+    **This template sets up**
+
+    - Sonarr, on a volume for its settings and database
+    - qBittorrent's downloads, mounted at `/downloads` - the path qBittorrent reports them
+      at - with write access, so finished downloads can be moved out
+    - Jellyfin's media library, mounted at `/media` - Jellyfin's own path - with write
+      access, which is where Sonarr files what it imports
+    - a memory limit you choose
+
+    **Before you create it**
+
+    qBittorrent and Jellyfin have to exist, both from this store. Pick each app, and the
+    volume that app keeps its downloads or its media on. Because every app sees the same
+    paths, nothing needs a path mapping.
+
+    **After the first deployment**
+
+    Open it and set up authentication first - it asks. Then add `/media/tv` as the root
+    folder, qBittorrent as the download client at `<its app key>:8080`, and your indexers -
+    or let Prowlarr, also in this store, add them. Jellyseerr can send requests here, at
+    `http://<this app's key>:8989`.
+
+    Moving between `/downloads` and `/media` is a copy and a delete rather than a hard link,
+    since they are two mounts: keep enough free space for one more copy of what is
+    importing.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [tv, series, pvr, servarr, arr]
+  icon: icons/sonarr.svg
+  links:
+    website: https://sonarr.tv
+    documentation: https://wiki.servarr.com/sonarr
+    source: https://github.com/Sonarr/Sonarr
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: downloadClient
+    title: qBittorrent app
+    description: The qBittorrent app that downloads for it.
+    type: app
+    engine: qbittorrent
+  - name: downloadsVolume
+    title: qBittorrent's downloads volume
+    description: The volume that qBittorrent app writes its downloads to.
+    type: volume
+  - name: mediaServer
+    title: Jellyfin app
+    description: The Jellyfin app whose library it files into.
+    type: app
+    engine: jellyfin
+  - name: mediaVolume
+    title: Jellyfin's media volume
+    description: The volume that Jellyfin app keeps its media on.
+    type: volume
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Settings volume
+    description: The volume Sonarr's settings and database are kept on.
+    type: volume
+
+versions:
+  - name: "4.0"
+    release: "4.0.20.3014"
+    default: true
+    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls325
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+        # The other apps' directories, at the paths they use themselves, so a path one of
+        # them reports is a path this one can open.
+        /downloads:
+          type: volume
+          source: "${{ params.downloadsVolume }}"
+          sourceApp: {app: "${{ params.downloadClient }}", write: true}
+        /media:
+          type: volume
+          source: "${{ params.mediaVolume }}"
+          sourceApp: {app: "${{ params.mediaServer }}", write: true}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /ping answers without signing in.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8989/ping
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: sonarr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 8989
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

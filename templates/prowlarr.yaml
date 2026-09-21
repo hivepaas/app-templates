@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: prowlarr
+  title: Prowlarr
+  tagline: One place to manage indexers for Sonarr, Radarr and the rest
+  description: |
+    Prowlarr keeps the list of torrent trackers and Usenet indexers in one place and hands
+    it to Sonarr, Radarr, Lidarr and Readarr, so an indexer is added once rather than in
+    every app. It searches them all from its own page too, and tracks which ones fail.
+
+    **This template sets up**
+
+    - Prowlarr, on a volume for its settings and database
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open it and set up authentication first - it asks. Add your indexers, then under
+    Settings, Apps add Sonarr and Radarr by their app keys and API keys:
+    `http://<its app key>:8989` for Sonarr, `:7878` for Radarr. Prowlarr pushes the indexers
+    to them and keeps them in step.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [indexers, jackett alternative, servarr, arr, torznab]
+  icon: icons/prowlarr.svg
+  links:
+    website: https://prowlarr.com
+    documentation: https://wiki.servarr.com/prowlarr
+    source: https://github.com/Prowlarr/Prowlarr
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Settings volume
+    description: The volume Prowlarr's settings and database are kept on.
+    type: volume
+
+versions:
+  - name: "2.6"
+    release: "2.6.5.5623"
+    default: true
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls161
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /ping answers without signing in.
+        command: curl -fsS -o /dev/null http://127.0.0.1:9696/ping
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: prowlarr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 9696
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,126 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: bazarr
+  title: Bazarr
+  tagline: Finds and downloads subtitles for the series and films in your library
+  description: |
+    Bazarr works beside Sonarr and Radarr: for every episode and film they manage it finds
+    subtitles in the languages you want, from the providers you choose, and saves them next
+    to the video - and keeps looking for better ones.
+
+    **This template sets up**
+
+    - Bazarr, on a volume for its settings and database
+    - the media library of the Jellyfin app you pick, mounted at `/media` with write access,
+      which is where the subtitles are saved
+    - a memory limit you choose
+
+    **Before you create it**
+
+    Jellyfin has to exist, and its media volume is the one to pick below. Sonarr and Radarr
+    see the same library at the same `/media` path, so the paths they report need no
+    mapping.
+
+    **After the first deployment**
+
+    Open it and set up authentication under Settings, General. Then connect Sonarr and
+    Radarr by their app keys and API keys - `http://<its app key>:8989` and `:7878` - choose
+    languages and add subtitle providers.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [subtitles, srt, servarr, arr]
+  icon: icons/bazarr.svg
+  links:
+    website: https://www.bazarr.media
+    documentation: https://wiki.bazarr.media
+    source: https://github.com/morpheus65535/bazarr
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: mediaServer
+    title: Jellyfin app
+    description: The Jellyfin app whose media library the subtitles are saved into.
+    type: app
+    engine: jellyfin
+  - name: mediaVolume
+    title: Jellyfin's media volume
+    description: The volume that Jellyfin app keeps its media on.
+    type: volume
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Settings volume
+    description: The volume Bazarr's settings and database are kept on.
+    type: volume
+
+versions:
+  - name: "1.6"
+    release: "1.6.1"
+    default: true
+    image: lscr.io/linuxserver/bazarr:v1.6.1-ls364
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+        # Jellyfin's own /media, at the same path: subtitles land next to the videos,
+        # where Jellyfin picks them up.
+        /media:
+          type: volume
+          source: "${{ params.mediaVolume }}"
+          sourceApp: {app: "${{ params.mediaServer }}", write: true}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:6767/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: bazarr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 6767
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
