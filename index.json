@@ -1470,6 +1470,45 @@
       }
     },
     {
+      "name": "databend",
+      "file": {
+        "path": "templates/databend.yaml",
+        "sha256": "554f0b4311d9750a54f526c619f44abbd2a8aed401fd48cd8ea687fb134ae35a"
+      },
+      "icon": {
+        "path": "icons/databend.svg",
+        "sha256": "801da2674b98c36755447eb89abc597bb857fe6a98c43e73ac03fbeaae368b21"
+      },
+      "title": "Databend",
+      "tagline": "A cloud-native analytics warehouse that speaks SQL, in one container",
+      "categories": [
+        "databases/analytics"
+      ],
+      "tags": [
+        "sql",
+        "analytics",
+        "olap",
+        "open-source"
+      ],
+      "aliases": [
+        "data warehouse",
+        "olap",
+        "snowflake alternative",
+        "analytics database"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.2",
+          "release": "1.2.947",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "directus",
       "file": {
         "path": "templates/directus.yaml",
@@ -1967,6 +2006,51 @@
       }
     },
     {
+      "name": "ferretdb",
+      "file": {
+        "path": "templates/ferretdb.yaml",
+        "sha256": "d45d52aa22b98f0b89a29434f8324a10173357c8403c56e80bdc4351c1305ec2"
+      },
+      "icon": {
+        "path": "icons/ferretdb.svg",
+        "sha256": "fea572b73c66da716090a3ac3cfd32f6090bb75b6d40ed489f0b9d52dd42360f"
+      },
+      "title": "FerretDB",
+      "tagline": "A MongoDB-compatible database, open source, running on PostgreSQL",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "document",
+        "json",
+        "open-source"
+      ],
+      "aliases": [
+        "mongodb",
+        "mongo",
+        "mongodb alternative",
+        "documentdb"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres-documentdb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.7",
+          "release": "2.7.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "filebrowser",
       "file": {
         "path": "templates/filebrowser.yaml",
@@ -2226,6 +2310,54 @@
         {
           "name": "4.9",
           "release": "4.9.7",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "freescout",
+      "file": {
+        "path": "templates/freescout.yaml",
+        "sha256": "7a2d192d3b41e8d2391a6820b6f2f1f2dcb4728b9b4eaa4934c7b8f591bd346a"
+      },
+      "icon": {
+        "path": "icons/freescout.svg",
+        "sha256": "53031aa34c80fa9c273d50f931855beeb03f5b6df439159b599d31dbcaac89c1"
+      },
+      "title": "FreeScout",
+      "tagline": "A shared inbox and help desk, in the spirit of Help Scout",
+      "categories": [
+        "webapps/communication",
+        "webapps/business"
+      ],
+      "tags": [
+        "email",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "help desk",
+        "helpdesk",
+        "shared inbox",
+        "zendesk alternative",
+        "help scout alternative",
+        "support"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.2",
+          "release": "2.2.12",
           "default": true
         }
       ],
@@ -2647,6 +2779,45 @@
       }
     },
     {
+      "name": "goatcounter",
+      "file": {
+        "path": "templates/goatcounter.yaml",
+        "sha256": "606e0cf91ec3630b6ea7cea17927e90b95371680786f777561c03ca24553394c"
+      },
+      "icon": {
+        "path": "icons/goatcounter.svg",
+        "sha256": "70f357eb924b99db9f523ee9d54893ddd7cf50085886078e6f5d671f2ea6fe1b"
+      },
+      "title": "GoatCounter",
+      "tagline": "Simple web analytics that respects visitors and needs no cookie banner",
+      "categories": [
+        "observability/analytics"
+      ],
+      "tags": [
+        "web-analytics",
+        "analytics",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "analytics",
+        "stats",
+        "google analytics alternative",
+        "privacy analytics"
+      ],
+      "license": "EUPL-1.2",
+      "versions": [
+        {
+          "name": "2.7",
+          "release": "2.7.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "gotenberg",
       "file": {
         "path": "templates/gotenberg.yaml",
@@ -2764,6 +2935,44 @@
         {
           "name": "3.1",
           "release": "3.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gotosocial",
+      "file": {
+        "path": "templates/gotosocial.yaml",
+        "sha256": "d923074446e6ce2f989037d8d172a2f92112c4121ea0dd3f772f288f08cf0eec"
+      },
+      "icon": {
+        "path": "icons/gotosocial.svg",
+        "sha256": "e793f0b4405a1ccf82a8c2d578539b7ab9a1e70f60df7f6a218db92d1aeef7b9"
+      },
+      "title": "GoToSocial",
+      "tagline": "A small, fast Fediverse server - your own Mastodon-compatible instance",
+      "categories": [
+        "webapps/social"
+      ],
+      "tags": [
+        "chat",
+        "open-source"
+      ],
+      "aliases": [
+        "mastodon",
+        "fediverse",
+        "activitypub",
+        "microblog",
+        "twitter alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.22",
+          "release": "0.22.1",
           "default": true
         }
       ],
@@ -4849,6 +5058,44 @@
       }
     },
     {
+      "name": "minecraft",
+      "file": {
+        "path": "templates/minecraft.yaml",
+        "sha256": "597ef2be2f0454bbece57b608fa7bae5174adb9c3007abe23b5309430ed51491"
+      },
+      "icon": {
+        "path": "icons/minecraft.svg",
+        "sha256": "ea0a741457de36c6eec7f6cfa668a7cf8b34a4307abe7f3aeeca3809afb97d02"
+      },
+      "title": "Minecraft Server",
+      "tagline": "A Java Edition server for you and your friends - vanilla, Paper or modded",
+      "categories": [
+        "games/servers"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "minecraft java",
+        "paper",
+        "spigot",
+        "fabric",
+        "forge",
+        "game server"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "miniflux",
       "file": {
         "path": "templates/miniflux.yaml",
@@ -6623,6 +6870,44 @@
       }
     },
     {
+      "name": "postgres-documentdb",
+      "file": {
+        "path": "templates/postgres-documentdb.yaml",
+        "sha256": "d8394783d2aa63cc91a696ea46cd1928d3bc2ac35968e750d02c7027a9144135"
+      },
+      "icon": {
+        "path": "icons/postgres-documentdb.svg",
+        "sha256": "350cda40a42ec1c267e4c4506f7f224fe06735fb93320b8ed71aabb6d80833e8"
+      },
+      "title": "PostgreSQL + DocumentDB",
+      "tagline": "PostgreSQL with the DocumentDB extension, the storage FerretDB runs on",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "document",
+        "json",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "documentdb",
+        "ferretdb backend",
+        "mongodb on postgres"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.107",
+          "release": "17-0.107.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "postgres-replica",
       "file": {
         "path": "templates/postgres-replica.yaml",
@@ -7843,6 +8128,44 @@
       }
     },
     {
+      "name": "syncthing",
+      "file": {
+        "path": "templates/syncthing.yaml",
+        "sha256": "c6c6bb2174c50dd884d98a697be95ad60b8802599189d4551cc2de8c28547756"
+      },
+      "icon": {
+        "path": "icons/syncthing.svg",
+        "sha256": "d2f76d43a9722c2d2c6dfb126a4b6e4204eee65326cde55ded64e8a448cd431d"
+      },
+      "title": "Syncthing",
+      "tagline": "Keep folders in sync between your devices, with no cloud in between",
+      "categories": [
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "file-transfer",
+        "open-source"
+      ],
+      "aliases": [
+        "sync",
+        "dropbox alternative",
+        "file sync",
+        "backup devices"
+      ],
+      "license": "MPL-2.0",
+      "versions": [
+        {
+          "name": "2.1",
+          "release": "2.1.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "tandoor",
       "file": {
         "path": "templates/tandoor.yaml",
@@ -8800,6 +9123,53 @@
       }
     },
     {
+      "name": "windmill",
+      "file": {
+        "path": "templates/windmill.yaml",
+        "sha256": "1320ec3deaf8cb3b8722afd09a4c04bfd720550b0ccaa3e4037caa28d284b8ad"
+      },
+      "icon": {
+        "path": "icons/windmill.svg",
+        "sha256": "2ce7482cdc4e2aa65397ef9c5fa8f4cada729272d7b2800acefead113144890e"
+      },
+      "title": "Windmill",
+      "tagline": "Turn scripts into workflows, internal apps and scheduled jobs",
+      "categories": [
+        "webapps/automation",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "automation",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "retool alternative",
+        "airflow alternative",
+        "scripts",
+        "workflows",
+        "internal tools"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.815",
+          "release": "1.815.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "wordpress",
       "file": {
         "path": "templates/wordpress.yaml",
@@ -8879,6 +9249,45 @@
         {
           "name": "4.7",
           "release": "4.7.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "zot",
+      "file": {
+        "path": "templates/zot.yaml",
+        "sha256": "a001e2116426529fcffd6f660a6f7531121913dc2ab195d3eb357ae9cb782d63"
+      },
+      "icon": {
+        "path": "icons/zot.svg",
+        "sha256": "90455caa12695c1332e3e32bc899d8f4a9f9e1224a66a1d6819bd65d44eaded9"
+      },
+      "title": "zot",
+      "tagline": "An OCI registry with accounts, a web interface and search built in",
+      "categories": [
+        "storage/object-storage",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "containers",
+        "open-source"
+      ],
+      "aliases": [
+        "oci registry",
+        "docker registry",
+        "container registry",
+        "harbor alternative",
+        "helm"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.1",
+          "release": "2.1.21",
           "default": true
         }
       ],

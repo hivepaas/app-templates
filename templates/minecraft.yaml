@@ -1,0 +1,171 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: minecraft
+  title: Minecraft Server
+  tagline: A Java Edition server for you and your friends - vanilla, Paper or modded
+  description: |
+    A Minecraft Java Edition server, from the widely used itzg image: it downloads the
+    server you choose - vanilla, Paper, Fabric, Forge and more - at the version you ask for,
+    keeps the world on a volume, and stops cleanly so nothing is lost.
+
+    **This template sets up**
+
+    - the server, on a volume for the world, settings and plugins
+    - the game port published on the node over TCP
+    - an RCON password for the console, generated unless you give one
+    - a Java heap and a memory limit you choose
+
+    **You have to accept the EULA**
+
+    Running a Minecraft server means agreeing to Mojang's EULA,
+    https://aka.ms/MinecraftEULA. The server does not start until "Accept the EULA" is on.
+
+    **Connecting**
+
+    Players join at the node's address and the game port - `play.example.com:25565`, or
+    without the port when it is 25565. A DNS name pointing at the node is all it takes; no
+    domain is set up through HivePaaS, since Minecraft does not speak HTTP.
+
+    **Memory**
+
+    The heap is what Minecraft gets; the memory limit has to leave room above it for Java
+    itself. Keep the limit about a gigabyte higher than the heap.
+  categories: [games/servers]
+  tags: [open-source]
+  aliases: [minecraft java, paper, spigot, fabric, forge, game server]
+  icon: icons/minecraft.svg
+  links:
+    website: https://www.minecraft.net
+    documentation: https://docker-minecraft-server.readthedocs.io
+    source: https://github.com/itzg/docker-minecraft-server
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: eula
+    title: Accept the EULA
+    description: I agree to the Minecraft EULA at https://aka.ms/MinecraftEULA.
+    type: bool
+    default: false
+  - name: serverType
+    title: Server type
+    type: select
+    default: PAPER
+    options:
+      - {value: VANILLA, title: Vanilla}
+      - {value: PAPER, title: "Paper (plugins, faster)"}
+      - {value: FABRIC, title: "Fabric (mods)"}
+      - {value: FORGE, title: "Forge (mods)"}
+  - name: mcVersion
+    title: Minecraft version
+    description: A release such as 1.21.8, or LATEST for the newest one at each start.
+    type: string
+    default: LATEST
+    pattern: '^(LATEST|SNAPSHOT|[0-9]+\.[0-9]+(\.[0-9]+)?)$'
+  - name: motd
+    title: Message of the day
+    description: What the server list shows under its name.
+    type: string
+    default: A Minecraft server on HivePaaS
+    pattern: '^[^\n]{1,100}$'
+  - name: difficulty
+    title: Difficulty
+    type: select
+    default: normal
+    options:
+      - {value: peaceful, title: Peaceful}
+      - {value: easy, title: Easy}
+      - {value: normal, title: Normal}
+      - {value: hard, title: Hard}
+  - name: maxPlayers
+    title: Player limit
+    type: int
+    default: 10
+    min: 1
+    max: 500
+  - name: gamePort
+    title: Game port
+    description: The port on the node players connect to.
+    type: int
+    default: 25565
+    min: 1
+    max: 65535
+  - name: rconPassword
+    title: RCON password
+    description: For the console and rcon-cli. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: heap
+    title: Java heap
+    description: Memory for Minecraft itself, as Java writes it - 2G, 3072M.
+    type: string
+    default: 2G
+    pattern: '^[1-9][0-9]*[MG]$'
+  - name: memoryLimit
+    title: Memory limit
+    description: About a gigabyte more than the heap.
+    type: size
+    default: 3GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the world, settings and plugins are kept on.
+    type: volume
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.1"
+    default: true
+    # Java 25: Minecraft 26.1 and later refuse anything older, and it runs the
+    # older releases too.
+    image: itzg/minecraft-server:2026.9.1-java25
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: 25565, published: "${{ params.gamePort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: a server list ping, as a client would send.
+        command: mc-health
+        interval: 30s
+        timeout: 10s
+        # The first start downloads the server and generates the world.
+        startPeriod: 300s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: minecraft
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: EULA, v: "${{ params.eula }}"}
+        - {k: TYPE, v: "${{ params.serverType }}"}
+        - {k: VERSION, v: "${{ params.mcVersion }}"}
+        - {k: MOTD, v: "${{ params.motd }}"}
+        - {k: DIFFICULTY, v: "${{ params.difficulty }}"}
+        - {k: MAX_PLAYERS, v: "${{ params.maxPlayers }}"}
+        - {k: MEMORY, v: "${{ params.heap }}"}
+        - {k: RCON_PASSWORD, v: "${secrets.RCON_PASSWORD}"}
+        - {k: TZ, v: UTC}
+    secrets:
+      RCON_PASSWORD:
+        value: "${{ params.rconPassword }}"

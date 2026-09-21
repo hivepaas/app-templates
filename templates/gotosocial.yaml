@@ -1,0 +1,122 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gotosocial
+  title: GoToSocial
+  tagline: A small, fast Fediverse server - your own Mastodon-compatible instance
+  description: |
+    GoToSocial is an ActivityPub server: accounts on it follow and are followed by people
+    on Mastodon, Pixelfed, Misskey and the rest of the Fediverse. It is one binary with
+    SQLite, light enough for a single person or a small group, and works with the Mastodon
+    apps people already use - Tusky, Ivory, Elk, Phanpy.
+
+    **This template sets up**
+
+    - GoToSocial with its SQLite database, on one volume with uploaded media
+    - HTTPS left to the reverse proxy, whose address it trusts
+    - a memory limit you choose
+
+    **The host is forever**
+
+    It is the part after the second @ in every account - `@alice@social.example.com` - and
+    other servers remember it. Set it to the domain you give the app, and never change it.
+
+    **After the first deployment**
+
+    Registration is closed. Create your account from the app's console, and make it an
+    administrator:
+
+    ```sh
+    /gotosocial/gotosocial admin account create --username alice --email alice@example.com --password '...'
+    /gotosocial/gotosocial admin account promote --username alice
+    ```
+
+    Then restart the app once, and sign in from any Mastodon app at the domain.
+  categories: [webapps/social]
+  tags: [chat, open-source]
+  aliases: [mastodon, fediverse, activitypub, microblog, twitter alternative]
+  icon: icons/gotosocial.svg
+  links:
+    website: https://gotosocial.org
+    documentation: https://docs.gotosocial.org
+    source: https://codeberg.org/superseriousbusiness/gotosocial
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: host
+    title: Host
+    description: >-
+      The domain in every account's address, and the one the app answers at -
+      social.example.com. It cannot be changed later.
+    type: string
+    default: social.example.com
+    pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host above. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and uploaded media are kept on.
+    type: volume
+
+versions:
+  - name: "0.22"
+    release: "0.22.1"
+    default: true
+    image: superseriousbusiness/gotosocial:0.22.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /gotosocial/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/livez
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gotosocial
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: GTS_HOST, v: "${{ params.host }}"}
+        - {k: GTS_PROTOCOL, v: https}
+        - {k: GTS_PORT, v: "8080"}
+        - {k: GTS_DB_TYPE, v: sqlite}
+        - {k: GTS_DB_ADDRESS, v: /gotosocial/storage/sqlite.db}
+        - {k: GTS_STORAGE_LOCAL_BASE_PATH, v: /gotosocial/storage}
+        # The reverse proxy holds the certificate and sits on the private network.
+        - {k: GTS_LETSENCRYPT_ENABLED, v: "false"}
+        - {k: GTS_TRUSTED_PROXIES, v: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"}
+        - {k: GTS_ACCOUNTS_REGISTRATION_OPEN, v: "false"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

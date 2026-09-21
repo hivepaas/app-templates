@@ -1,0 +1,119 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: windmill
+  title: Windmill
+  tagline: Turn scripts into workflows, internal apps and scheduled jobs
+  description: |
+    Windmill runs scripts written in Python, TypeScript, Go, Bash or SQL as endpoints,
+    scheduled jobs and multi-step flows, and builds internal tools on top of them. Each
+    script gets a generated form and an API; flows add branches, retries, approvals and
+    error handlers; resources keep credentials out of the code.
+
+    **This template creates two apps**
+
+    - **Windmill**, running the server and a worker in one process
+    - **a PostgreSQL database** for it, named after the app with `-db` added, where the
+      scripts, runs and queue live
+
+    **After the first deployment**
+
+    Sign in as `admin@windmill.dev` with the password `changeme` and change both straight
+    away - it is the account every Windmill starts with. Then create a workspace.
+
+    **One worker**
+
+    Jobs run one at a time in this app, alongside the server. That suits a team's
+    automations; heavy or parallel workloads want workers of their own, which this
+    template does not create.
+  categories: [webapps/automation, webapps/low-code]
+  tags: [automation, low-code, open-source]
+  aliases: [retool alternative, airflow alternative, scripts, workflows, internal tools]
+  icon: icons/windmill.svg
+  links:
+    website: https://www.windmill.dev
+    documentation: https://www.windmill.dev/docs/intro
+    source: https://github.com/windmill-labs/windmill
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://windmill.example.com.
+      Webhook URLs and links are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: The server and every job it runs share this.
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: windmill
+      username: windmill
+
+versions:
+  - name: "1.815"
+    release: "1.815.0"
+    default: true
+    image: ghcr.io/windmill-labs/windmill:1.815.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8000/api/version
+        interval: 20s
+        timeout: 5s
+        # The first start creates the database and its roles.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: windmill
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Server and worker in one process.
+        - {k: MODE, v: standalone}
+        - {k: BASE_URL, v: "${{ params.appUrl }}"}
+        # Rust's URL parser takes the underscore in the database's host name.
+        - k: DATABASE_URL
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

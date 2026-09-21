@@ -1,0 +1,139 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: zot
+  title: zot
+  tagline: An OCI registry with accounts, a web interface and search built in
+  description: |
+    zot is a CNCF container registry built only on the OCI specifications: it stores
+    images, Helm charts and any other OCI artifact, deduplicates their layers, collects its
+    own garbage, and has a web interface to browse and search what it holds. Unlike the
+    plain Docker registry, it signs people in on its own.
+
+    **This template sets up**
+
+    - zot, on a volume for everything pushed to it
+    - sign-in from an htpasswd file you give it; nothing is readable without an account
+    - the web interface and search
+    - a memory limit you choose
+
+    **The accounts**
+
+    zot checks passwords against bcrypt hashes, which nothing here can make for you. Make
+    the line with
+
+    ```sh
+    docker run --rm httpd:2 htpasswd -nbB <user> '<password>'
+    ```
+
+    and paste it into "Accounts" - several lines for several people. It is kept under the
+    app's Secrets; edit it there to change them later.
+
+    **Use it through the domain**
+
+    An image name cannot carry the app's key as its registry - the key has an underscore,
+    and image references refuse one in a host name - and Docker wants HTTPS anyway. Give it
+    a domain and push to `<the domain>/<repository>`.
+
+    **No health check**
+
+    The image is the zot binary alone, named after its architecture, with nothing to run a
+    check with.
+  categories: [storage/object-storage, webapps/dev-tools]
+  tags: [containers, open-source]
+  aliases: [oci registry, docker registry, container registry, harbor alternative, helm]
+  icon: icons/zot.svg
+  links:
+    website: https://zotregistry.dev
+    documentation: https://zotregistry.dev/latest/
+    source: https://github.com/project-zot/zot
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at, which image names use. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: htpasswd
+    title: Accounts
+    description: >-
+      htpasswd lines with bcrypt hashes, one per person - see the description for how to
+      make one.
+    type: secret
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the images and their metadata are kept on.
+    type: volume
+
+versions:
+  - name: "2.1"
+    release: "2.1.21"
+    default: true
+    image: ghcr.io/project-zot/zot:v2.1.21
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/registry: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: one static binary, no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: zot
+      version: "${{ version.name }}"
+      webapp: {}
+    secrets:
+      ZOT_HTPASSWD:
+        value: "${{ params.htpasswd }}"
+        swarmRef:
+          file: {name: /etc/zot/htpasswd, mode: 444}
+    configFiles:
+      config.json:
+        content: |
+          {
+            "distSpecVersion": "1.1.1",
+            "storage": {
+              "rootDirectory": "/var/lib/registry",
+              "dedupe": true,
+              "gc": true
+            },
+            "http": {
+              "address": "0.0.0.0",
+              "port": "5000",
+              "auth": {
+                "htpasswd": {"path": "/etc/zot/htpasswd"}
+              }
+            },
+            "log": {"level": "info"},
+            "extensions": {
+              "search": {"enable": true},
+              "ui": {"enable": true}
+            }
+          }
+        swarmRef:
+          file: {name: /etc/zot/config.json, mode: 444}
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

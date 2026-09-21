@@ -1,0 +1,101 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: goatcounter
+  title: GoatCounter
+  tagline: Simple web analytics that respects visitors and needs no cookie banner
+  description: |
+    GoatCounter counts page views, referrers, browsers, screen sizes and locations with a
+    small script, keeps no personal data and sets no cookies, so there is nothing to ask
+    consent for. It is one binary with SQLite, fast on very little, and can also count from
+    server logs instead of a script.
+
+    **This template sets up**
+
+    - GoatCounter with its SQLite database, on a volume
+    - a memory limit you choose
+
+    **It needs a domain**
+
+    GoatCounter tells its sites apart by the address they are opened at, and the tracking
+    script is loaded by visitors' browsers from it. Give the app its domain before
+    anything else.
+
+    **After the first deployment**
+
+    Open the domain: the first page creates the site and its administrator. Then copy the
+    tracking script from Settings into your pages.
+  categories: [observability/analytics]
+  tags: [web-analytics, analytics, privacy, open-source]
+  aliases: [analytics, stats, google analytics alternative, privacy analytics]
+  icon: icons/goatcounter.svg
+  links:
+    website: https://www.goatcounter.com
+    documentation: https://www.goatcounter.com/help
+    source: https://github.com/arp242/goatcounter
+  license: EUPL-1.2
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the dashboard and the tracking script answer at. Leave it empty to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 64MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database is kept on.
+    type: volume
+
+versions:
+  - name: "2.7"
+    release: "2.7.0"
+    default: true
+    image: arp242/goatcounter:2.7.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Plain HTTP on 8080 behind the reverse proxy, which holds the certificate; the
+      # image's default serves TLS itself on 443.
+      command: >-
+        serve -listen :8080 -tls http -automigrate
+        -db sqlite+/home/goatcounter/goatcounter-data/goatcounter.sqlite3
+    storage:
+      mounts:
+        /home/goatcounter/goatcounter-data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /status answers whatever the host, before any site exists. The image has wget
+        # and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/status
+        interval: 20s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: goatcounter
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

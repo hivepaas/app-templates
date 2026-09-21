@@ -1,0 +1,115 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: syncthing
+  title: Syncthing
+  tagline: Keep folders in sync between your devices, with no cloud in between
+  description: |
+    Syncthing synchronises folders between devices directly, encrypted and authenticated:
+    laptops, phones, servers. Running it here gives your devices one that is always on, so
+    changes reach the others even when they are never online at the same time.
+
+    **This template sets up**
+
+    - Syncthing, on a volume for its configuration and the synced folders
+    - the sync port published on the node over TCP and UDP
+    - the web interface through the reverse proxy
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the web interface and set a user name and password under Actions, Settings, GUI
+    straight away - until you do, anyone who can reach the page controls it. Then add your
+    devices by their IDs and share folders under `/var/syncthing`.
+
+    **Devices find it by the node**
+
+    Other devices connect to the node's address on the sync port. Global discovery and
+    relays work too, so it is found even without a fixed address; local discovery does not,
+    since broadcasts do not cross into the container.
+  categories: [storage/files]
+  tags: [files, file-transfer, open-source]
+  aliases: [sync, dropbox alternative, file sync, backup devices]
+  icon: icons/syncthing.svg
+  links:
+    website: https://syncthing.net
+    documentation: https://docs.syncthing.net
+    source: https://github.com/syncthing/syncthing
+  license: MPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web interface answers at. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: syncPort
+    title: Sync port
+    description: >-
+      The port on the node other devices connect to, over TCP and QUIC. 22000 is what they
+      try without being told otherwise.
+    type: int
+    default: 22000
+    min: 1
+    max: 65535
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration and the synced folders are kept on.
+    type: volume
+
+versions:
+  - name: "2.1"
+    release: "2.1.5"
+    default: true
+    image: syncthing/syncthing:2.1.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/syncthing: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: 22000, published: "${{ params.syncPort }}", protocol: tcp, publishMode: host}
+          - {target: 22000, published: "${{ params.syncPort }}", protocol: udp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check; this endpoint needs no sign-in.
+        command: curl -fsS -m 2 http://127.0.0.1:8384/rest/noauth/health | grep -q OK
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: syncthing
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+    routing:
+      port: 8384
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

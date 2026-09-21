@@ -1,0 +1,97 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: ferretdb
+  title: FerretDB
+  tagline: A MongoDB-compatible database, open source, running on PostgreSQL
+  description: |
+    FerretDB speaks the MongoDB wire protocol, so MongoDB drivers, mongosh and most tools
+    connect to it unchanged, and stores the documents in PostgreSQL through the DocumentDB
+    extension. It is Apache-licensed, where MongoDB is not, and it runs where MongoDB 8 does
+    not: MongoDB refuses to start on Linux 6.19 and later.
+
+    **This template creates two apps**
+
+    - **FerretDB**, which keeps nothing of its own
+    - **PostgreSQL with DocumentDB** for the documents, named after the app with `-db` added
+
+    **Connecting**
+
+    Other apps connect with
+    `mongodb://<user>:<password>@<the app's key>:27017/<database>`, where the user and
+    password are the `-db` app's - FerretDB authenticates against PostgreSQL. Databases and
+    collections are created on first write, as in MongoDB.
+
+    **What is different**
+
+    Most applications work unchanged; a few MongoDB features - some aggregation stages,
+    change streams, sessions across replicas - are missing or partial. The FerretDB
+    documentation keeps the list. Backups are the `-db` app: it is ordinary PostgreSQL.
+  categories: [databases/nosql]
+  tags: [document, json, open-source]
+  aliases: [mongodb, mongo, mongodb alternative, documentdb]
+  icon: icons/ferretdb.svg
+  links:
+    website: https://www.ferretdb.com
+    documentation: https://docs.ferretdb.io
+    source: https://github.com/FerretDB/FerretDB
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres-documentdb
+    version: "0.107"
+    params:
+      username: ferretdb
+
+versions:
+  - name: "2.7"
+    release: "2.7.0"
+    default: true
+    image: ghcr.io/ferretdb/ferretdb:2.7.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # The image has no shell; its own ping connects to the listener and through it
+        # to PostgreSQL.
+        mode: CMD
+        command: /ferretdb ping
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: ferretdb
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # Go's URL parser accepts the underscore in the database's host name.
+        - k: FERRETDB_POSTGRESQL_URL
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: FERRETDB_TELEMETRY, v: disable}
+    routing:
+      port: 27017

@@ -1,0 +1,153 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: freescout
+  title: FreeScout
+  tagline: A shared inbox and help desk, in the spirit of Help Scout
+  description: |
+    FreeScout turns support mailboxes into a shared inbox: conversations assigned to people,
+    notes, saved replies, customer history, and no one answering the same email twice. It
+    fetches mail over IMAP and sends over SMTP, and modules add live chat, satisfaction
+    ratings, a knowledge base and more.
+
+    **This template creates two apps**
+
+    - **FreeScout**, on a volume for attachments, modules and its keys
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in with the administrator email and password you gave it. Then add a mailbox and
+    its IMAP and SMTP settings - FreeScout does not receive mail itself.
+
+    The image is maintained by nfrastack (formerly tiredofit), as FreeScout publishes
+    none of its own.
+  categories: [webapps/communication, webapps/business]
+  tags: [email, collaboration, open-source]
+  aliases: [help desk, helpdesk, shared inbox, zendesk alternative, help scout alternative, support]
+  icon: icons/freescout.svg
+  links:
+    website: https://freescout.net
+    documentation: https://github.com/freescout-help-desk/freescout/wiki
+    source: https://github.com/freescout-help-desk/freescout
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://support.example.com. Links
+      in replies and notifications are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      Used once, when the first start creates the account. Leave empty to generate one; it
+      is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume attachments, modules and the application key are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: freescout
+      username: freescout
+
+versions:
+  - name: "2.2"
+    release: "2.2.12"
+    default: true
+    image: nfrastack/freescout:2.2.12
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1/login
+        interval: 20s
+        timeout: 10s
+        # The first start creates the database and the administrator.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: freescout
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SITE_URL, v: "${{ params.appUrl }}"}
+        - {k: DB_TYPE, v: mysql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASS, v: "${secrets.ADMIN_PASS}"}
+        - {k: ADMIN_FIRST_NAME, v: Admin}
+        - {k: ADMIN_LAST_NAME, v: User}
+        - {k: TIMEZONE, v: "${{ params.timezone }}"}
+        # TLS is terminated in front of the app, so it has to believe the scheme the proxy
+        # forwards rather than the one it sees.
+        - {k: APP_TRUSTED_PROXIES, v: "*"}
+    secrets:
+      ADMIN_PASS:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

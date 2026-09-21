@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: databend
+  title: Databend
+  tagline: A cloud-native analytics warehouse that speaks SQL, in one container
+  description: |
+    Databend is a columnar analytics database in Rust: standard SQL, fast aggregation over
+    large tables, time travel, JSON and array types, and loading straight from CSV,
+    Parquet and NDJSON files. It is built to keep its data in object storage; this
+    template runs its all-in-one image with the data on a volume instead.
+
+    **This template sets up**
+
+    - the meta service and the query engine in one container, with the data on a volume
+    - one user and a generated password
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps connect with any MySQL client at `<the app's key>:3307`, or to the HTTP API at
+    port 8000 - `databend://<user>:<password>@<the app's key>:8000/?sslmode=disable` for
+    the Databend drivers and BendSQL.
+
+    **Versions**
+
+    Databend publishes every release under a tag ending in `-nightly`; the one pinned here
+    is a release, not a nightly build.
+  categories: [databases/analytics]
+  tags: [sql, analytics, olap, open-source]
+  aliases: [data warehouse, olap, snowflake alternative, analytics database]
+  icon: icons/databend.svg
+  links:
+    website: https://www.databend.com
+    documentation: https://docs.databend.com
+    source: https://github.com/databendlabs/databend
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the tables and the meta service's log are kept on.
+    type: volume
+
+versions:
+  - name: "1.2"
+    release: "1.2.947"
+    default: true
+    image: datafuselabs/databend:v1.2.947-nightly
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/databend: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The admin API's health endpoint, on its own port.
+        command: curl -fsS http://127.0.0.1:8080/v1/health | grep -q pass
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: databend
+      version: "${{ version.name }}"
+      database:
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        # The bootstrap script writes these into the query configuration as its only user.
+        - {k: QUERY_DEFAULT_USER, v: "${HIVEPAAS_USER}"}
+        - {k: QUERY_DEFAULT_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: QUERY_STORAGE_TYPE, v: fs}
+    routing:
+      port: 8000
