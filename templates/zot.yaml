@@ -32,9 +32,8 @@ metadata:
 
     **Use it through the domain**
 
-    An image name cannot carry the app's key as its registry - the key has an underscore,
-    and image references refuse one in a host name - and Docker wants HTTPS anyway. Give it
-    a domain and push to `<the domain>/<repository>`.
+    Docker only talks to a registry over HTTPS, unless each daemon is configured to allow it
+    insecurely. Give it a domain and push to `<the domain>/<repository>`.
 
     **No health check**
 

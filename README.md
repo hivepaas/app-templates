@@ -71,7 +71,7 @@ dependencies:
 ```
 
 The app refers to what a dependency shares with `${{ deps.db.ref.HIVEPAAS_PASSWORD }}`, which
-renders to an ordinary reference, `${blog_db.HIVEPAAS_PASSWORD}`, resolved at deploy time.
+renders to an ordinary reference, `${blog-db.HIVEPAAS_PASSWORD}`, resolved at deploy time.
 `${{ deps.db.key }}` is the dependency app's key alone.
 
 The rules, all checked by `apptemplate lint`:

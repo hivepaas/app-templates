@@ -27,12 +27,11 @@ metadata:
 
     **Use it through the domain**
 
-    An image name cannot carry the app's key as its registry: the key has an underscore,
-    and image references refuse one in a host name. Docker also only talks to a registry
-    over HTTPS. Both point the same way - push and pull as `<the domain>/<repository>`,
-    with the certificate HivePaaS issues for it, from your machine, from CI and from the
-    cluster's own nodes alike. The Docker Registry UI in this store can browse it from
-    inside the project without a domain.
+    Docker only talks to a registry over HTTPS, unless each daemon is configured to allow
+    it insecurely, so push and pull as `<the domain>/<repository>`, with the certificate
+    HivePaaS issues for it - from your machine, from CI and from the cluster's own nodes
+    alike. The Docker Registry UI in this store can browse it from inside the project
+    without a domain.
 
     **Deleting does not free space by itself**
 

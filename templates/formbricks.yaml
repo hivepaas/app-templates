@@ -143,7 +143,6 @@ app:
         - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
         - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
         - {k: CRON_SECRET, v: "${secrets.CRON_SECRET}"}
-        # Prisma reads the URL's host without objecting to the underscore in it.
         - k: DATABASE_URL
           v: >-
             postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{

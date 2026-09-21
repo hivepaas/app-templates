@@ -26,9 +26,6 @@ metadata:
     secret are under the app's Secrets as `GARAGE_DEFAULT_ACCESS_KEY` and
     `GARAGE_DEFAULT_SECRET_KEY`.
 
-    Some S3 clients - the AWS CLI and boto3 among them - refuse an endpoint whose host name
-    has an underscore in it, which app keys do. Give those the domain instead.
-
     **More buckets and keys**
 
     They are made with the `garage` command in the app's console - `/garage bucket create

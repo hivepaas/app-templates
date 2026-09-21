@@ -102,8 +102,7 @@ app:
       webapp: {}
     envVars:
       data:
-        # The entry point writes database.yml from these - fields, not a URL, which is what
-        # keeps the underscore in the database's host name from mattering to Rails.
+        # The entry point writes database.yml from these.
         - {k: REDMINE_DB_POSTGRES, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
         - {k: REDMINE_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
         - {k: REDMINE_DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}

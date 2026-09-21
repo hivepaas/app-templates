@@ -86,7 +86,6 @@ app:
       version: "${{ version.name }}"
     envVars:
       data:
-        # Go's URL parser accepts the underscore in the database's host name.
         - k: FERRETDB_POSTGRESQL_URL
           v: >-
             postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{

@@ -65,17 +65,6 @@ app:
     source:
       activeMethod: image
       imageSource: {image: "${{ image }}"}
-      # Other apps reach this one by its key, which has an underscore; Django refuses such
-      # a Host outright, ALLOWED_HOSTS or not, and answers 400. This rewrites the image's
-      # nginx so a Host with an underscore reaches Django as localhost, then starts it as
-      # the image would.
-      command: >-
-        sh -c 'sed -i
-        -e "s/^http {/http {\n    map \$http_host \$apprise_host { ~_ localhost; default \$http_host; }/"
-        -e "s/proxy_set_header Host \$http_host;/proxy_set_header Host \$apprise_host;/"
-        -e "s/proxy_set_header X-Forwarded-Host \$http_host;/proxy_set_header X-Forwarded-Host \$apprise_host;/"
-        /opt/apprise/webapp/etc/nginx.conf /opt/apprise/webapp/etc/nginx-strict.conf
-        && exec /opt/apprise/webapp/supervisord-startup'
     storage:
       mounts:
         /config: {type: volume, source: "${{ params.dataVolume }}"}

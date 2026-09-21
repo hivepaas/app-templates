@@ -110,8 +110,8 @@ app:
         # TLS ends at the reverse proxy: believe what it forwards, and hand out https links.
         - {k: CORE_TRUST_PROXY, v: "true"}
         - {k: CORE_RETURN_HTTPS_URLS, v: "true"}
-        # Separate fields rather than DATABASE_URL: the database's name on the project
-        # network has an underscore, which a strict URL parser refuses in a host.
+        # Separate fields rather than DATABASE_URL, so nothing in the password has to be
+        # escaped.
         - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
         - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
         - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}

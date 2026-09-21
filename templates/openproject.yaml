@@ -156,13 +156,10 @@ app:
       webapp: {}
     envVars:
       data:
-        # Not DATABASE_URL. An app's key here contains an underscore - the database
-        # created with this one is reached at a name like `openproject_db` - and Rails
-        # parses DATABASE_URL with the strict RFC 2396 parser, which refuses an
-        # underscore in a host name: "the scheme postgres does not accept registry
-        # part". These say the same thing without a URL. PGHOST and PGPORT are read by
-        # libpq, which is also what carries the host to the seeder's psql call, and
-        # the OPENPROJECT_DB_* names are what its own database.yml reads.
+        # Not DATABASE_URL: separate fields, so nothing in the password has to be escaped.
+        # PGHOST and PGPORT are read by libpq, which is also what carries the host to the
+        # seeder's psql call, and the OPENPROJECT_DB_* names are what its own database.yml
+        # reads.
         - {k: PGHOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
         - {k: PGPORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
         - {k: PGUSER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}

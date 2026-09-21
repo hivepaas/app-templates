@@ -47,9 +47,7 @@ parameters:
       The address people reach it at, scheme and all - https://wiki.example.com. The sign-in
       redirect and every link are built from it.
     type: string
-    # Not the app's own name, as elsewhere: Outline refuses to start with a URL whose host
-    # has an underscore in it, which every app key does.
-    default: https://wiki.example.com
+    default: http://${HIVEPAAS_HOST}:3000
     # A scheme and a host, and nothing after them.
     pattern: '^https?://[^\s/?#]+$'
   - name: domain
@@ -158,8 +156,8 @@ app:
         - {k: PORT, v: "3000"}
         - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
         - {k: UTILS_SECRET, v: "${secrets.UTILS_SECRET}"}
-        # Separate fields rather than DATABASE_URL: the database's name on the project
-        # network has an underscore, which a strict URL parser refuses in a host.
+        # Separate fields rather than DATABASE_URL, so nothing in the password has to be
+        # escaped.
         - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
         - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
         - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}

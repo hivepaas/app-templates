@@ -106,8 +106,8 @@ app:
       webapp: {}
     envVars:
       data:
-        # Separate fields rather than CMD_DB_URL: the database's name on the project
-        # network has an underscore, which a strict URL parser refuses in a host.
+        # Separate fields rather than CMD_DB_URL, so nothing in the password has to be
+        # escaped.
         - {k: CMD_DB_DIALECT, v: postgres}
         - {k: CMD_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
         - {k: CMD_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}

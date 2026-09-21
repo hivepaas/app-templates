@@ -660,7 +660,7 @@
       "name": "apprise",
       "file": {
         "path": "templates/apprise.yaml",
-        "sha256": "12f850707f78cc7276d0cbcff424cd7e261dbb32ef81cdf7d9765d30ac69bf65"
+        "sha256": "8bab44eacf9f0ef9de71798d06d40a9a8eb6702fbd6ec69eb56a2e7c66e7fe2e"
       },
       "icon": {
         "path": "icons/apprise.svg",
@@ -2009,7 +2009,7 @@
       "name": "ferretdb",
       "file": {
         "path": "templates/ferretdb.yaml",
-        "sha256": "d45d52aa22b98f0b89a29434f8324a10173357c8403c56e80bdc4351c1305ec2"
+        "sha256": "4b8933acc3c6031e0967d7dfaa420e90a0b1f45210b8249cba2dae4d81776f4f"
       },
       "icon": {
         "path": "icons/ferretdb.svg",
@@ -2272,7 +2272,7 @@
       "name": "formbricks",
       "file": {
         "path": "templates/formbricks.yaml",
-        "sha256": "e4abedb70d0baf4c484fd7e5a05b08eb8f40de7fe1b5f65c8f0ce23fd6786f52"
+        "sha256": "113fede43c18c1b31834326a60c4b024ef6f5b05354d69c0bc667211c6f94bd3"
       },
       "icon": {
         "path": "icons/formbricks.svg",
@@ -2453,7 +2453,7 @@
       "name": "garage",
       "file": {
         "path": "templates/garage.yaml",
-        "sha256": "70a1a54da034a40e0366d65920385a2cd2e5460b62cb55aa53ce89160f665508"
+        "sha256": "83ac6e2948addbe4013618e66a4531a6647a23b526cc510dcf7a67e2d60f5df6"
       },
       "icon": {
         "path": "icons/garage.svg",
@@ -3230,7 +3230,7 @@
       "name": "hedgedoc",
       "file": {
         "path": "templates/hedgedoc.yaml",
-        "sha256": "796e5026c0306fad03e1a9e38e744b0bccc6be75525d157cf438ba25dd37b728"
+        "sha256": "d33d88fd002e1ad35263182853f3ce9ea1a1057fe5d3c1a597485e3df7925a0b"
       },
       "icon": {
         "path": "icons/hedgedoc.svg",
@@ -5999,7 +5999,7 @@
       "name": "openproject",
       "file": {
         "path": "templates/openproject.yaml",
-        "sha256": "9852d37921a5788e9e4fea8cc88e4edfd672eaaf1c1b8d86b98a4ae6c50f811d"
+        "sha256": "ee906c9dfa673cfccbe50ebf71a384e5cec15f43b04ebf2a70fd09604022ad28"
       },
       "icon": {
         "path": "icons/openproject.svg",
@@ -6128,7 +6128,7 @@
       "name": "outline",
       "file": {
         "path": "templates/outline.yaml",
-        "sha256": "8481b4ce7694b2d4f8c0d0abac2d75fabdd420a116650f5ae8f577e6ad425fee"
+        "sha256": "d4b19cb634b264f4207cbe4094f23db964d6b10b6632ec5f216aeff79f35c626"
       },
       "icon": {
         "path": "icons/outline.svg",
@@ -6675,7 +6675,7 @@
       "name": "pocket-id",
       "file": {
         "path": "templates/pocket-id.yaml",
-        "sha256": "5793f4b56e5948a1a63b0f1a36a44ad032f014c70fb3c367109478761cd6d5b9"
+        "sha256": "0fb051327894b934b1bfd00438d4b2131f86a2052b6f3800f9f47c3e3f3d723d"
       },
       "icon": {
         "path": "icons/pocket-id.svg",
@@ -7368,7 +7368,7 @@
       "name": "redmine",
       "file": {
         "path": "templates/redmine.yaml",
-        "sha256": "f54eac00f93f17cfd9d6d40a5449dd849186814e05c671f2fd47bfd4560d6f8e"
+        "sha256": "50042cefc2c5be7ef3c5871492e09cbe0f8f7d968213531a68e8ebcbca0b65b2"
       },
       "icon": {
         "path": "icons/redmine.svg",
@@ -7451,7 +7451,7 @@
       "name": "registry",
       "file": {
         "path": "templates/registry.yaml",
-        "sha256": "2fb4dd7b2402fa079fd6a68a8c21b8ab44b8c882d98fc9b86b39c8138c7f294b"
+        "sha256": "1880097e2b425df773cfa3d10b749b560d46dcbe5db87d5f6ff2a89b2ceea33f"
       },
       "icon": {
         "path": "icons/registry.svg",
@@ -7876,7 +7876,7 @@
       "name": "sonarqube",
       "file": {
         "path": "templates/sonarqube.yaml",
-        "sha256": "f060d153a06d36994bc9c804eb89ab600f60e76e42718a757bbe31d03d6638ae"
+        "sha256": "0f08e97239978ae089c67d309a2c1cf5f80a97b0b8aeca0b97cf42b1a32539e6"
       },
       "icon": {
         "path": "icons/sonarqube.svg",
@@ -9126,7 +9126,7 @@
       "name": "windmill",
       "file": {
         "path": "templates/windmill.yaml",
-        "sha256": "1320ec3deaf8cb3b8722afd09a4c04bfd720550b0ccaa3e4037caa28d284b8ad"
+        "sha256": "bfe4ab6908ebae36a3b56d94742d93991e7acf2ebe53d3d036b3ee303d95d0c0"
       },
       "icon": {
         "path": "icons/windmill.svg",
@@ -9214,7 +9214,7 @@
       "name": "zipline",
       "file": {
         "path": "templates/zipline.yaml",
-        "sha256": "0c6033b1266a69e0cc3f33ecfde4f24daaf93884d914a9a676a1db397b4bfb12"
+        "sha256": "13c47652ec779edea0b8ddc9d3b7d01b540a413863bf39ba9fe88526eebf9e7b"
       },
       "icon": {
         "path": "icons/zipline.svg",
@@ -9260,7 +9260,7 @@
       "name": "zot",
       "file": {
         "path": "templates/zot.yaml",
-        "sha256": "a001e2116426529fcffd6f660a6f7531121913dc2ab195d3eb357ae9cb782d63"
+        "sha256": "a8a788fe1f9665c7d8c7e2c3262d8a9e33e80d71fe121a7e5773857eb3a37f0b"
       },
       "icon": {
         "path": "icons/zot.svg",

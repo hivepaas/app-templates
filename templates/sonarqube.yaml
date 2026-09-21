@@ -19,8 +19,8 @@ metadata:
 
     Sign in as `admin` with the password `admin`; SonarQube makes you change it at once.
     Then create a project and a token, and run the scanner from CI with
-    `-Dsonar.host.url=https://<the domain>`. Use the domain from inside the project too: its
-    Tomcat answers 400 to a Host with an underscore, which the app's key has.
+    `-Dsonar.host.url=https://<the domain>`, or `http://<the app's key>:9000` from inside the
+    project.
 
     **Memory, and the search index**
 
@@ -112,7 +112,6 @@ app:
       webapp: {}
     envVars:
       data:
-        # JDBC's own parser accepts the underscore in the database's host name.
         - k: SONAR_JDBC_URL
           v: >-
             jdbc:postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT
