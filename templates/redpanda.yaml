@@ -16,6 +16,13 @@ metadata:
     between your own services with no replay, [NATS](nats) is smaller and simpler, and
     [RabbitMQ](rabbitmq) is the one with queues and routing.
 
+    **Defaults for new topics**
+
+    The number of partitions a topic gets when it is created without saying, and how long
+    messages are kept, are set below. They are read when the cluster is first formed; after
+    that they live in the cluster's own configuration, which `rpk cluster config set` in the
+    app's console changes.
+
     **One node, and what that costs**
 
     A single broker with one replica of everything. Topics work, consumer groups work,
@@ -74,6 +81,25 @@ parameters:
     type: size
     default: 1GB
     min: 512MB
+  - name: partitions
+    title: Default partitions
+    description: How many partitions a topic gets when it is created without saying.
+    type: int
+    default: 1
+    min: 1
+    max: 64
+  - name: retention
+    title: Retention
+    description: How long a message is kept before it is deleted, unless a topic says otherwise.
+    type: select
+    # Redpanda counts this in milliseconds, which is what the values are.
+    default: "604800000"
+    options:
+      - {value: "86400000", title: A day}
+      - {value: "604800000", title: A week}
+      - {value: "2592000000", title: 30 days}
+      - {value: "7776000000", title: 90 days}
+      - {value: "-1", title: Keep everything}
   - name: dataVolume
     title: Data volume
     description: The volume the log segments are kept on. This is where the messages live.
@@ -126,5 +152,14 @@ app:
         - {k: INTERNAL, v: "${HIVEPAAS_HOST}"}
         - {k: EXTERNAL, v: "${HIVEPAAS_HOST}"}
         - {k: NODE_ID, v: "0"}
+    configFiles:
+      bootstrap.yaml:
+        # Cluster properties for the first start: Redpanda reads this file only while
+        # forming the cluster, and keeps them in its own configuration afterwards.
+        content: |
+          default_topic_partitions: ${{ params.partitions }}
+          log_retention_ms: ${{ params.retention }}
+        swarmRef:
+          file: {name: /etc/redpanda/.bootstrap.yaml, mode: 444}
     routing:
       port: 9092

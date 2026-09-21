@@ -29,12 +29,13 @@ metadata:
     - **Anything else**: the Prometheus query API lives under `/api/v1/`, and the
       import endpoints accept Influx line protocol, Graphite and OpenTSDB as well
 
-    **There is no password**
+    **The password is optional, and off by default**
 
-    None at all - VictoriaMetrics is built to sit behind something that authenticates. On
-    the project's private network that is the same position as every other database here.
-    If you route it publicly, put basic authentication on it in the app's routing settings
-    first; a metrics store usually says more about a system than its logs do.
+    Set a user name below and every HTTP endpoint but `/health` asks for it - which is what
+    to do before giving this app a domain, since a metrics store usually says more about a
+    system than its logs do. Left empty, anything on the project's private network may read
+    and write, which is the same position as every other database here. Whatever scrapes or
+    queries it then needs the same user name and password.
 
     **A sample you just wrote is not queryable yet**
 
@@ -70,6 +71,20 @@ parameters:
       the private network.
     type: domain
     optional: true
+  - name: authUsername
+    title: User name
+    description: >-
+      Turns on basic authentication when it is set; leave it empty for a server anything on
+      the project network may read and write.
+    type: string
+    optional: true
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: authPassword
+    title: Password
+    description: Goes with the user name. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
   - name: retentionPeriod
     title: Retention
     description: >-
@@ -104,10 +119,14 @@ app:
       imageSource: {image: "${{ image }}"}
       # Flags to the binary the image runs. The default data path is not on the volume,
       # which is why it is named here.
+      # An empty -httpAuth.username leaves authentication off. The password is read from
+      # the file the secret below is mounted as, so it is not in the service spec.
       command: >-
         -storageDataPath=/storage
         -retentionPeriod=${{ params.retentionPeriod }}
         -httpListenAddr=:8428
+        -httpAuth.username=${{ params.authUsername }}
+        -httpAuth.password=file:///etc/victoriametrics/auth-password
     storage:
       mounts:
         /storage: {type: volume, source: "${{ params.dataVolume }}"}
@@ -128,6 +147,14 @@ app:
       category: database
       engine: victoriametrics
       version: "${{ version.name }}"
+      database:
+        username: "${{ params.authUsername }}"
+        password: "${{ params.authPassword }}"
+    secrets:
+      VM_AUTH_PASSWORD:
+        value: "${{ params.authPassword }}"
+        swarmRef:
+          file: {name: /etc/victoriametrics/auth-password, mode: 444}
     routing:
       port: 8428
       exposePublicly: true

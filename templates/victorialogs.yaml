@@ -24,11 +24,11 @@ metadata:
     JSON lines, `/insert/loki/api/v1/push` for anything that speaks Loki, and
     `/insert/opentelemetry/v1/logs` for OTLP. The web interface is at `/select/vmui`.
 
-    **It has no accounts**
+    **The password is optional, and off by default**
 
-    Anything that reaches it can write and read, which is why it takes no domain here. To
-    use the web interface from outside, add a domain together with basic authentication
-    in the app's routing settings.
+    Set a user name below and every HTTP endpoint asks for it - which is what to do before
+    giving this app a domain. Left empty, anything on the project's private network may
+    write and read, and whatever ships logs needs no credentials.
 
     **No health check**
 
@@ -47,6 +47,20 @@ metadata:
     versionCode: v000001
 
 parameters:
+  - name: authUsername
+    title: User name
+    description: >-
+      Turns on basic authentication when it is set; leave it empty for a server anything on
+      the project network may read and write.
+    type: string
+    optional: true
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: authPassword
+    title: Password
+    description: Goes with the user name. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
   - name: retention
     title: Retention
     description: How long logs are kept - 7d, 4w, 1y.
@@ -82,10 +96,14 @@ app:
     source:
       activeMethod: image
       imageSource: {image: "${{ image }}"}
+      # An empty -httpAuth.username leaves authentication off. The password is read from
+      # the file the secret below is mounted as, so it is not in the service spec.
       command: >-
         -storageDataPath=/victoria-logs-data
         -retentionPeriod=${{ params.retention }}
         -retention.maxDiskSpaceUsageBytes=${{ params.maxDiskUsage }}
+        -httpAuth.username=${{ params.authUsername }}
+        -httpAuth.password=file:///etc/victorialogs/auth-password
     storage:
       mounts:
         /victoria-logs-data: {type: volume, source: "${{ params.dataVolume }}"}
@@ -100,5 +118,13 @@ app:
       category: database
       engine: victorialogs
       version: "${{ version.name }}"
+      database:
+        username: "${{ params.authUsername }}"
+        password: "${{ params.authPassword }}"
+    secrets:
+      VL_AUTH_PASSWORD:
+        value: "${{ params.authPassword }}"
+        swarmRef:
+          file: {name: /etc/victorialogs/auth-password, mode: 444}
     routing:
       port: 9428

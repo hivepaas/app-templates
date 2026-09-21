@@ -7844,7 +7844,7 @@
       "name": "redpanda",
       "file": {
         "path": "templates/redpanda.yaml",
-        "sha256": "82063c48eab065e2488125344da44a5c4cecc07243348fdf04f86a5a7fd573ec"
+        "sha256": "2010d7fd59f35a648a291c9b99d0b688058a049c9bf41cacb9e04e25312dfa3d"
       },
       "icon": {
         "path": "icons/redpanda.svg",
@@ -9425,7 +9425,7 @@
       "name": "victorialogs",
       "file": {
         "path": "templates/victorialogs.yaml",
-        "sha256": "825fa34cf20250f962608e5a95125f8190b8adce38651cdf733dbd377eeebcf6"
+        "sha256": "69f93a5291f21f6b23dfab0dc6c4e89190f8f03a01703fe5c055fb4637453853"
       },
       "icon": {
         "path": "icons/victorialogs.svg",
@@ -9464,7 +9464,7 @@
       "name": "victoriametrics",
       "file": {
         "path": "templates/victoriametrics.yaml",
-        "sha256": "b61547b2d9f0ba1afc1de6864a5fba70f1c438c6b0a6d13677961ff3eabb99a0"
+        "sha256": "79c0aec54a5ecb31c94e5168da373ee429131fffdc244f3ca0d63fa751005706"
       },
       "icon": {
         "path": "icons/victoriametrics.svg",
