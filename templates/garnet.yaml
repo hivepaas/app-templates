@@ -12,7 +12,8 @@ metadata:
 
     **This template sets up**
 
-    - Garnet as a cache, holding everything in memory
+    - Garnet with a ceiling on the memory its data may fill
+    - an append-only file on a volume, or nothing at all - your choice
     - a password, generated unless you give one
     - a health check over the Redis protocol
     - a memory limit you choose
@@ -22,10 +23,20 @@ metadata:
     Other apps connect to `<the app's key>:6379` with the password under the app's Secrets,
     as they would to Redis.
 
-    **It keeps nothing**
+    **Its settings live in a file, not in App Kind**
 
-    This runs Garnet as a cache: a restart empties it. For data that has to survive one,
-    use Redis or Valkey from this store instead.
+    Garnet's image runs the server directly, with no shell to read the variables the App
+    Kind screen publishes, so what is set here is written into a configuration file instead -
+    kept as the secret `GARNET_CONF` because it holds the password. Change the ceiling or
+    the persistence there, under Secrets, and redeploy. Editing them under Settings, App
+    Kind does nothing for this engine; Redis and Valkey in this store are the ones that
+    follow that screen.
+
+    **When the ceiling is reached**
+
+    Garnet drops the oldest records from its log; there is no choice of policy as Redis
+    offers. Keep the ceiling below the memory limit, since the server needs room above its
+    data.
   categories: [databases/cache]
   tags: [cache, key-value, in-memory, redis-compatible, open-source]
   aliases: [redis, microsoft garnet, cache, key value]
@@ -45,11 +56,33 @@ parameters:
     type: secret
     minLength: 12
     generate: {length: 32}
+  - name: maxMemory
+    title: Memory ceiling
+    description: >-
+      How much of the container's memory Garnet fills with data, as it writes sizes - 256m,
+      2g. Leave room below the memory limit.
+    type: string
+    default: 256m
+    pattern: '^[1-9][0-9]*[mg]$'
+  - name: persistence
+    title: Persistence
+    description: What Garnet keeps on the volume, and so what it still has after a restart.
+    type: select
+    # The values go straight into the configuration file below, where they are booleans.
+    default: "true"
+    options:
+      - {value: "true", title: "Append-only file: every write, committed as it happens"}
+      - {value: "false", title: "Nothing: memory only, empty after a restart (pure cache)"}
   - name: memoryLimit
     title: Memory limit
+    description: The container's hard limit. Keep it above the memory ceiling.
     type: size
     default: 1GB
     min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the append-only file is kept on, when persistence is on.
+    type: volume
 
 versions:
   - name: "2.1"
@@ -65,6 +98,9 @@ app:
       # The settings, password included, come from a file mounted from a secret, so the
       # password is neither on the command line nor in the service spec.
       command: --config-import-path /etc/garnet/garnet.conf
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
     container:
       healthcheck:
         enabled: true
@@ -91,7 +127,9 @@ app:
       GARNET_CONF:
         value: >-
           {"Port": 6379, "Address": "0.0.0.0", "AuthenticationMode": "Password",
-          "Password": "${{ params.password }}"}
+          "Password": "${{ params.password }}", "MemorySize": "${{ params.maxMemory }}",
+          "EnableAOF": ${{ params.persistence }}, "CommitFrequencyMs": 0,
+          "CheckpointDir": "/data", "Recover": ${{ params.persistence }}}
         swarmRef:
           file: {name: /etc/garnet/garnet.conf, mode: 444}
     routing:

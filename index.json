@@ -2648,7 +2648,7 @@
       "name": "garnet",
       "file": {
         "path": "templates/garnet.yaml",
-        "sha256": "c404b73ae356b678634d7da2c7ea37b617891b5efb9ef5884c9930146b767a0d"
+        "sha256": "0f44fe2548437eda2f0db1bdbbd5976992e9f0ddc3488c4723c5eded9b8fa905"
       },
       "icon": {
         "path": "icons/garnet.svg",
