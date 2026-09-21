@@ -1,0 +1,94 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: manticore
+  title: Manticore Search
+  tagline: Fast full-text search that you query with SQL
+  description: |
+    Manticore Search is a full-text search engine that speaks the MySQL protocol: create a
+    table, insert documents and search them with `SELECT ... WHERE MATCH('...')` from any
+    MySQL client or driver. It also has an Elasticsearch-style JSON API, vector search,
+    facets, highlighting and percolate queries, and it is light on memory.
+
+    ```sql
+    CREATE TABLE products(title text, price float);
+    INSERT INTO products(title, price) VALUES ('crossbody bag with tassel', 19.85);
+    SELECT * FROM products WHERE MATCH('bag');
+    ```
+
+    **This template sets up**
+
+    - Manticore in real-time mode, on a volume for its tables
+    - a health check through its own MySQL listener
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps in the project use `<the app's key>:9306` with a MySQL client - no user or
+    password - or the HTTP API at port 9308.
+
+    **It has no accounts**
+
+    Anything that reaches it can read and write every table, which is why it takes no
+    domain: keep it inside the project.
+  categories: [databases/search]
+  tags: [search, full-text, sql, open-source]
+  aliases: [manticoresearch, sphinx, full text search, elasticsearch alternative]
+  icon: icons/manticore.svg
+  links:
+    website: https://manticoresearch.com
+    documentation: https://manual.manticoresearch.com
+    source: https://github.com/manticoresoftware/manticoresearch
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the tables are kept on.
+    type: volume
+
+versions:
+  - name: "29.9"
+    release: "29.9.0"
+    default: true
+    image: manticoresearch/manticore:29.9.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/manticore: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: mysql -h127.0.0.1 -P9306 -e 'SHOW STATUS' >/dev/null
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: manticore
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # The columnar library and the other extras, which the image downloads at the
+        # first start and keeps on the volume.
+        - {k: EXTRA, v: "1"}
+    routing:
+      port: 9306

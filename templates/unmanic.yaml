@@ -1,0 +1,107 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: unmanic
+  title: Unmanic
+  tagline: Watches a media library and re-encodes it to the formats you choose
+  description: |
+    Unmanic keeps a video library in shape: it scans for files that do not match the rules
+    you set - codec, container, audio tracks, subtitles - and converts them with FFmpeg, one
+    worker at a time, in the background. Re-encoding to H.265 alone often halves the space a
+    library takes.
+
+    **This template sets up**
+
+    - Unmanic, on a volume for its settings and database
+    - a volume of its own for a library, mounted at `/library`
+    - a scratch area inside the container for files being converted
+    - a memory limit you choose
+
+    **Converting another app's library**
+
+    To work on Jellyfin's library rather than a library of its own, add a mount under this
+    app's Configuration, Persistent Storage: pick the volume Jellyfin keeps its media on,
+    choose Jellyfin under "Data of", mount it at `/library/jellyfin`, turn on "Allow
+    writing", and redeploy. Then add `/library/jellyfin` as a library in Unmanic.
+
+    **CPU, not GPU**
+
+    Encoding runs on the node's processors; video is heavy work, so keep to one or two
+    workers on a node that serves other apps.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [transcode, ffmpeg, h265, hevc, tdarr alternative, media optimizer]
+  icon: icons/unmanic.svg
+  links:
+    website: https://docs.unmanic.app
+    documentation: https://docs.unmanic.app/docs/
+    source: https://github.com/Unmanic/unmanic
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: FFmpeg working on large files wants room; 2 GB is a comfortable floor.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Settings volume
+    description: The volume Unmanic's settings and database are kept on.
+    type: volume
+  - name: libraryVolume
+    title: Library volume
+    description: The volume for a library of its own, mounted at /library.
+    type: volume
+
+versions:
+  - name: "0.4"
+    release: "0.4.1"
+    default: true
+    image: josh5/unmanic:0.4.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+        /library: {type: volume, source: "${{ params.libraryVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8888/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: unmanic
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+    routing:
+      port: 8888
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

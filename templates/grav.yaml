@@ -1,0 +1,110 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: grav
+  title: Grav
+  tagline: A fast, flat-file CMS - pages are Markdown files, no database needed
+  description: |
+    Grav keeps a site as a folder of Markdown files and YAML: no database to run or back up,
+    and every page can live in Git. Its admin panel edits pages, media and settings in the
+    browser, and hundreds of themes and plugins cover blogs, documentation, forms and
+    multi-language sites.
+
+    **This template sets up**
+
+    - Grav with its admin panel, on one volume holding the whole site
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open `/admin`: the first visit asks you to create the administrator account. Until
+    someone does, whoever opens it first becomes the administrator, so do it straight away.
+
+    **Backups are the volume**
+
+    Pages, media, configuration and accounts are all files under `/config/www/user` on the
+    volume.
+
+    The image is maintained by LinuxServer.io.
+  categories: [webapps/cms]
+  tags: [cms, blog, open-source]
+  aliases: [flat file cms, markdown cms, blog, website, wordpress alternative]
+  icon: icons/grav.svg
+  links:
+    website: https://getgrav.org
+    documentation: https://learn.getgrav.org
+    source: https://github.com/getgrav/grav
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the whole site - pages, media, configuration, accounts - is kept on.
+    type: volume
+
+versions:
+  - name: "2.1"
+    release: "2.1.8"
+    default: true
+    image: lscr.io/linuxserver/grav:2.1.8-ls278
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: grav
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -29,6 +29,8 @@ categories:
       - {id: networking, title: Networking & VPN}
       - {id: media, title: Media & Libraries}
       - {id: social, title: Social & Community}
+      - {id: ecommerce, title: E-commerce}
+      - {id: scheduling, title: Scheduling & Booking}
   - id: games
     title: Games
     children:

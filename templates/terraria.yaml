@@ -1,0 +1,127 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: terraria
+  title: Terraria Server (TShock)
+  tagline: A Terraria server for you and your friends, with TShock's admin tools
+  description: |
+    A dedicated Terraria server running TShock, the server mod most public and private
+    servers use: accounts and permission groups, region protection, bans, a REST API and
+    plugins, on top of the game itself.
+
+    **This template sets up**
+
+    - the server, on a volume for the world, TShock's configuration and its database
+    - a world created on the first start if there is none, at the size you choose
+    - the game port published on the node over TCP
+    - a memory limit you choose
+
+    **Connecting**
+
+    Players join at the node's address and the game port. No domain is set up through
+    HivePaaS, since Terraria does not speak HTTP.
+
+    **After the first deployment**
+
+    TShock prints a one-time setup code in the app's logs. Join the game, type
+    `/setup <code>`, then `/user add <name> <password> owner` and `/login`, and turn the setup
+    code off with `/setup` again. A server password, if you want one, goes in
+    `config.json` on the volume.
+  categories: [games/servers]
+  tags: [game-server, open-source]
+  aliases: [terraria, tshock, game server]
+  icon: icons/terraria.svg
+  links:
+    website: https://github.com/Pryaxis/TShock
+    documentation: https://ikebukuro.tshock.co
+    source: https://github.com/ryansheehan/terraria
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: worldName
+    title: World file
+    description: The world to load, or to create on the first start.
+    type: string
+    default: world.wld
+    pattern: '^[A-Za-z0-9_-]{1,40}\.wld$'
+  - name: worldSize
+    title: World size
+    description: Only used when the world is created.
+    type: select
+    default: "2"
+    options:
+      - {value: "1", title: Small}
+      - {value: "2", title: Medium}
+      - {value: "3", title: Large}
+  - name: maxPlayers
+    title: Player limit
+    type: int
+    default: 8
+    min: 1
+    max: 255
+  - name: gamePort
+    title: Game port
+    description: The port on the node players connect to.
+    type: int
+    default: 7777
+    min: 1
+    max: 65535
+  - name: memoryLimit
+    title: Memory limit
+    description: A large world with many players wants 2 GB or more.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the world, TShock's configuration and its database are kept on.
+    type: volume
+
+versions:
+  - name: "1.4.5"
+    release: "tshock-1.4.5.6-6.1.0"
+    default: true
+    image: ryshe/terraria:tshock-1.4.5.6-6.1.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The bootstrap script loads WORLD_FILENAME and passes these on to the server;
+      # -autocreate makes the world when it does not exist yet.
+      command: -autocreate ${{ params.worldSize }} -maxplayers ${{ params.maxPlayers }} -port 7777
+    storage:
+      mounts:
+        # The image keeps the world and TShock's configuration in the same directory.
+        /root/.local/share/Terraria/Worlds: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: 7777, published: "${{ params.gamePort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has bash and nothing to speak the game's protocol with; an open
+        # listener means the world has loaded.
+        command: bash -c '</dev/tcp/127.0.0.1/7777'
+        interval: 30s
+        timeout: 5s
+        # Creating a large world takes minutes.
+        startPeriod: 300s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: terraria
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: WORLD_FILENAME, v: "${{ params.worldName }}"}

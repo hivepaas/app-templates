@@ -1,0 +1,170 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: prestashop
+  title: PrestaShop
+  tagline: A complete online shop - catalogue, checkout, payments and orders
+  description: |
+    PrestaShop is an e-commerce platform: a catalogue with variants and stock, a checkout
+    with the payment and shipping modules of most providers, customers and their orders,
+    promotions, taxes and invoices, in dozens of languages and currencies. Themes and
+    thousands of modules extend it.
+
+    **This template creates two apps**
+
+    - **PrestaShop**, on a volume for its code, modules, themes and product images
+    - **a MySQL database** for it, named after the app with `-db` added
+
+    **It installs itself**
+
+    The first start copies PrestaShop onto the volume and runs its installer with the shop
+    domain, the administrator and the back-office folder below, and deletes the installer
+    once it has run. That takes several minutes; the app is healthy once the shop answers.
+
+    **After the first deployment**
+
+    The back office is at `<the shop>/<back-office folder>` - keep that folder name to
+    yourself, it is the first thing attackers guess. Sign in with the administrator email
+    and password you gave it.
+
+    **The shop domain is baked in**
+
+    PrestaShop writes the domain into its database at installation and redirects every
+    request to it. Set it to the domain you give the app, and change it later from the back
+    office, under Shop Parameters, Traffic & SEO.
+  categories: [webapps/ecommerce]
+  tags: [ecommerce, cms, open-source]
+  aliases: [shop, store, online shop, woocommerce alternative, magento alternative]
+  icon: icons/prestashop.svg
+  links:
+    website: https://prestashop.com
+    documentation: https://devdocs.prestashop-project.org
+    source: https://github.com/PrestaShop/PrestaShop
+  license: OSL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: shopDomain
+    title: Shop domain
+    description: >-
+      The host the shop is reached at, without a scheme - shop.example.com. Every link and
+      redirect goes to it.
+    type: string
+    default: ${HIVEPAAS_HOST}
+    # A host and an optional port, or the app's own name as the default gives it.
+    pattern: '^(\$\{HIVEPAAS_HOST\}|[a-z0-9]([a-z0-9.-]*[a-z0-9])?)(:[0-9]{1,5})?$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the shop domain above. Leave it empty to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: https
+    title: HTTPS
+    description: Build links with https - on whenever the shop has a domain.
+    type: select
+    default: "1"
+    # The installer reads 1 and 0, not true and false.
+    options:
+      - {value: "1", title: "On"}
+      - {value: "0", title: "Off"}
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: adminFolder
+    title: Back-office folder
+    description: The path of the back office. Leave empty to generate one nobody can guess.
+    type: secret
+    minLength: 8
+    generate: {length: 12, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume PrestaShop's code, modules, themes and images are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mysql
+    version: "8.4"
+    params:
+      dbName: prestashop
+      username: prestashop
+
+versions:
+  # Not 9.x: its image's unattended installer fails while installing the back office's
+  # assets and leaves the installer in place, on 9.1.5 with and without a renamed admin
+  # folder. 8.2 installs cleanly and is supported into 2028.
+  - name: "8.2"
+    release: "8.2.8"
+    default: true
+    image: prestashop/prestashop:8.2.8-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The image copies PrestaShop here on the first start, when it finds it empty.
+        /var/www/html: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Any answer from Apache and PHP, redirects included: the shop redirects to its
+        # own domain, which the check does not follow.
+        command: curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1/ | grep -qE '^(200|30[12])$'
+        interval: 30s
+        timeout: 10s
+        # The first start copies the code and runs the installer.
+        startPeriod: 600s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: prestashop
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_SERVER, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: PS_INSTALL_AUTO, v: "1"}
+        - {k: PS_DOMAIN, v: "${{ params.shopDomain }}"}
+        - {k: PS_ENABLE_SSL, v: "${{ params.https }}"}
+        - {k: ADMIN_MAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWD, v: "${secrets.ADMIN_PASSWD}"}
+        - {k: PS_FOLDER_ADMIN, v: "${secrets.PS_FOLDER_ADMIN}"}
+    secrets:
+      ADMIN_PASSWD:
+        value: "${{ params.adminPassword }}"
+      PS_FOLDER_ADMIN:
+        value: "${{ params.adminFolder }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

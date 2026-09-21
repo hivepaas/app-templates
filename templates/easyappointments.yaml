@@ -1,0 +1,114 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: easyappointments
+  title: Easy!Appointments
+  tagline: Let customers book appointments with you online
+  description: |
+    Easy!Appointments puts a booking page in front of your calendar: customers pick a
+    service, a provider and a free time, and the appointment lands in the back office - and,
+    if you connect it, in Google Calendar. It handles several services and providers,
+    working plans and breaks, and reminders by email.
+
+    **This template creates two apps**
+
+    - **Easy!Appointments**, which keeps nothing of its own
+    - **a MySQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the public address: the installer asks for the administrator account and the
+    company details, and creates the tables. The booking page is then the address itself;
+    the back office is at `/index.php/backend`.
+
+    **The public address has to be right**
+
+    Every link, and the address in emails, is built from it. Set it to the HTTPS address of
+    the domain you give the app. Emails need an SMTP server: add the `MAIL_*` variables to
+    the app's environment.
+  categories: [webapps/scheduling]
+  tags: [scheduling, open-source]
+  aliases: [booking, appointments, calendly alternative, scheduler, reservations]
+  icon: icons/easyappointments.svg
+  links:
+    website: https://easyappointments.org
+    documentation: https://easyappointments.org/docs.html
+    source: https://github.com/alextselegidis/easyappointments
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://book.example.com. Every link
+      is built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: mysql
+    version: "8.4"
+    params:
+      dbName: easyappointments
+      username: easyappointments
+
+versions:
+  - name: "1.6"
+    release: "1.6.0"
+    default: true
+    image: alextselegidis/easyappointments:1.6.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: easyappointments
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The entry point writes config.php from these.
+        - {k: BASE_URL, v: "${{ params.appUrl }}"}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

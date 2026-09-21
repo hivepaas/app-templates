@@ -1,0 +1,100 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: scylladb
+  title: ScyllaDB
+  tagline: A Cassandra-compatible wide-column database, rewritten in C++
+  description: |
+    ScyllaDB speaks the Cassandra Query Language and the Cassandra drivers, and does the same
+    work with far lower latency: a shared-nothing design with a thread per core, written in
+    C++. It suits time series, event logs and anything written far more than it is read.
+
+    **This template sets up**
+
+    - one ScyllaDB node on a volume, on one core and the memory you give it
+    - developer mode, which lets it run beside other apps instead of expecting the machine
+      to itself
+    - a health check with `cqlsh`
+
+    **Connecting**
+
+    Other apps connect to `<the app's key>:9042` with any Cassandra or ScyllaDB driver; the
+    app's console has `cqlsh`. Create keyspaces with `NetworkTopologyStrategy` and a
+    replication factor of 1 - there is one node, and the tablets this version uses do not
+    take `SimpleStrategy`.
+
+    **It has no accounts**
+
+    Anything that reaches it can read and write every keyspace, which is why it takes no
+    domain: keep it inside the project.
+  categories: [databases/nosql]
+  tags: [open-source]
+  aliases: [scylla, cassandra, cql, wide column, nosql]
+  icon: icons/scylladb.svg
+  links:
+    website: https://www.scylladb.com
+    documentation: https://docs.scylladb.com
+    source: https://github.com/scylladb/scylladb
+  license: ScyllaDB-Source-Available-1.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memory
+    title: ScyllaDB memory
+    description: >-
+      What ScyllaDB itself takes, as it writes it - 750M, 2G. Keep the memory limit a few
+      hundred megabytes above it.
+    type: string
+    default: 1G
+    pattern: '^[1-9][0-9]*[MG]$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1536MB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the data and commit log are kept on.
+    type: volume
+
+versions:
+  - name: "2026.3"
+    release: "2026.3.1"
+    default: true
+    image: scylladb/scylla:2026.3.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # One core and a fixed amount of memory, and developer mode: without them ScyllaDB
+      # sizes itself to the whole machine and refuses to start where it is not alone on it.
+      # --reserve-memory: Seastar otherwise holds back a share meant for a whole server's
+      # operating system, which inside the memory limit leaves too little for --memory.
+      command: >-
+        --smp 1 --memory ${{ params.memory }} --reserve-memory 256M --overprovisioned 1
+        --developer-mode 1
+    storage:
+      mounts:
+        /var/lib/scylla: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: cqlsh -e 'SELECT now() FROM system.local' >/dev/null
+        interval: 30s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: scylladb
+      version: "${{ version.name }}"
+    routing:
+      port: 9042

@@ -99,6 +99,14 @@
         {
           "id": "social",
           "title": "Social & Community"
+        },
+        {
+          "id": "ecommerce",
+          "title": "E-commerce"
+        },
+        {
+          "id": "scheduling",
+          "title": "Scheduling & Booking"
         }
       ]
     },
@@ -405,6 +413,26 @@
     {
       "id": "whiteboard",
       "title": "Whiteboard"
+    },
+    {
+      "id": "ecommerce",
+      "title": "E-commerce"
+    },
+    {
+      "id": "forum",
+      "title": "Forum"
+    },
+    {
+      "id": "blog",
+      "title": "Blog"
+    },
+    {
+      "id": "scheduling",
+      "title": "Scheduling"
+    },
+    {
+      "id": "game-server",
+      "title": "Game Server"
     }
   ],
   "templates": [
@@ -1876,6 +1904,51 @@
       }
     },
     {
+      "name": "easyappointments",
+      "file": {
+        "path": "templates/easyappointments.yaml",
+        "sha256": "98e372539ac2512c64bf0b6affc84eb16109a51269d116cf0f8c962c738af068"
+      },
+      "icon": {
+        "path": "icons/easyappointments.svg",
+        "sha256": "25cc27b3454c77ca5fc4db9fdc3867c3d6463c3891f5eb4cd6c519fe78a07e15"
+      },
+      "title": "Easy!Appointments",
+      "tagline": "Let customers book appointments with you online",
+      "categories": [
+        "webapps/scheduling"
+      ],
+      "tags": [
+        "scheduling",
+        "open-source"
+      ],
+      "aliases": [
+        "booking",
+        "appointments",
+        "calendly alternative",
+        "scheduler",
+        "reservations"
+      ],
+      "license": "GPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mysql"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.6",
+          "release": "1.6.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "element-web",
       "file": {
         "path": "templates/element-web.yaml",
@@ -2163,6 +2236,53 @@
         {
           "name": "6.7",
           "release": "6.7.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "flarum",
+      "file": {
+        "path": "templates/flarum.yaml",
+        "sha256": "d3e8bb00f89c64ef0a81b3540c54f9ffe219ef90aec217affe49b5160f379dfe"
+      },
+      "icon": {
+        "path": "icons/flarum.svg",
+        "sha256": "abb606592d63079dbac94677d4e36e7114def01271ec66bc561fe39bab9ec580"
+      },
+      "title": "Flarum",
+      "tagline": "A fast, simple forum for your community",
+      "categories": [
+        "webapps/social"
+      ],
+      "tags": [
+        "forum",
+        "chat",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "forum",
+        "discourse alternative",
+        "community",
+        "bulletin board",
+        "discussions"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.8",
+          "release": "1.8.19",
           "default": true
         }
       ],
@@ -2517,6 +2637,46 @@
         {
           "name": "2.4",
           "release": "2.4.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "garnet",
+      "file": {
+        "path": "templates/garnet.yaml",
+        "sha256": "c404b73ae356b678634d7da2c7ea37b617891b5efb9ef5884c9930146b767a0d"
+      },
+      "icon": {
+        "path": "icons/garnet.svg",
+        "sha256": "48a21ed3537728de9fe37bd0871c0b93e26d07559e96af3cdf6a79f544363282"
+      },
+      "title": "Garnet",
+      "tagline": "A Redis-compatible cache from Microsoft Research, built for throughput",
+      "categories": [
+        "databases/cache"
+      ],
+      "tags": [
+        "cache",
+        "key-value",
+        "in-memory",
+        "redis-compatible",
+        "open-source"
+      ],
+      "aliases": [
+        "redis",
+        "microsoft garnet",
+        "cache",
+        "key value"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.1",
+          "release": "2.1.8",
           "default": true
         }
       ],
@@ -3092,6 +3252,45 @@
         {
           "name": "13.0",
           "release": "13.0.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "grav",
+      "file": {
+        "path": "templates/grav.yaml",
+        "sha256": "5385a2dde747083f2b6664fe0385baf19dfc7228c01a21a97a1e357312ebc092"
+      },
+      "icon": {
+        "path": "icons/grav.svg",
+        "sha256": "2928d7c4c240418f7926d7d189a95625e58ec14a8415db4d5c373540b748d903"
+      },
+      "title": "Grav",
+      "tagline": "A fast, flat-file CMS - pages are Markdown files, no database needed",
+      "categories": [
+        "webapps/cms"
+      ],
+      "tags": [
+        "cms",
+        "blog",
+        "open-source"
+      ],
+      "aliases": [
+        "flat file cms",
+        "markdown cms",
+        "blog",
+        "website",
+        "wordpress alternative"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.1",
+          "release": "2.1.8",
           "default": true
         }
       ],
@@ -4630,6 +4829,45 @@
         {
           "name": "1.31",
           "release": "1.31.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "manticore",
+      "file": {
+        "path": "templates/manticore.yaml",
+        "sha256": "2582489b256abf9a38f16e78b0fa84947407ca5c0693c66f2a78d7cdeea48f9a"
+      },
+      "icon": {
+        "path": "icons/manticore.svg",
+        "sha256": "f6029a4de2759beba5e8146e3b77c6825ed1a2caa5d6142d2dd3fca19cf16ed2"
+      },
+      "title": "Manticore Search",
+      "tagline": "Fast full-text search that you query with SQL",
+      "categories": [
+        "databases/search"
+      ],
+      "tags": [
+        "search",
+        "full-text",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "manticoresearch",
+        "sphinx",
+        "full text search",
+        "elasticsearch alternative"
+      ],
+      "license": "GPL-3.0-or-later",
+      "versions": [
+        {
+          "name": "29.9",
+          "release": "29.9.0",
           "default": true
         }
       ],
@@ -7057,6 +7295,52 @@
       }
     },
     {
+      "name": "prestashop",
+      "file": {
+        "path": "templates/prestashop.yaml",
+        "sha256": "64e1931e3a920bce213a08ce91056e8af0464f27d2c60d26e9635c2b64f7edd0"
+      },
+      "icon": {
+        "path": "icons/prestashop.svg",
+        "sha256": "138eaa18d2a5b12cea0ddb1cca30dbffac37159de602f02b28b4dc9bd5899afb"
+      },
+      "title": "PrestaShop",
+      "tagline": "A complete online shop - catalogue, checkout, payments and orders",
+      "categories": [
+        "webapps/ecommerce"
+      ],
+      "tags": [
+        "ecommerce",
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "shop",
+        "store",
+        "online shop",
+        "woocommerce alternative",
+        "magento alternative"
+      ],
+      "license": "OSL-3.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mysql"
+        }
+      ],
+      "versions": [
+        {
+          "name": "8.2",
+          "release": "8.2.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "privatebin",
       "file": {
         "path": "templates/privatebin.yaml",
@@ -7781,6 +8065,43 @@
       }
     },
     {
+      "name": "scylladb",
+      "file": {
+        "path": "templates/scylladb.yaml",
+        "sha256": "0a4c160047afb03ba385be56471cabfc582bf1805a3852f5ff040dba619e36b0"
+      },
+      "icon": {
+        "path": "icons/scylladb.svg",
+        "sha256": "ffa81c9852f2572ae2f685e520834913a86ef2176110581f315209e8c720a33f"
+      },
+      "title": "ScyllaDB",
+      "tagline": "A Cassandra-compatible wide-column database, rewritten in C++",
+      "categories": [
+        "databases/nosql"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "scylla",
+        "cassandra",
+        "cql",
+        "wide column",
+        "nosql"
+      ],
+      "license": "ScyllaDB-Source-Available-1.0",
+      "versions": [
+        {
+          "name": "2026.3",
+          "release": "2026.3.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "searxng",
       "file": {
         "path": "templates/searxng.yaml",
@@ -7968,6 +8289,52 @@
         {
           "name": "5.1",
           "release": "5.1.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "shynet",
+      "file": {
+        "path": "templates/shynet.yaml",
+        "sha256": "5a8554c8508136509febb30a602976fa5230a2b286a87ccb0fc02b627cf2d916"
+      },
+      "icon": {
+        "path": "icons/shynet.svg",
+        "sha256": "65303995f525b942eb3e8ab9fe6c62fbb002d94ce29e1ecde9a633ef35434e44"
+      },
+      "title": "Shynet",
+      "tagline": "Modern, privacy-friendly web analytics that works without cookies or JavaScript",
+      "categories": [
+        "observability/analytics"
+      ],
+      "tags": [
+        "web-analytics",
+        "analytics",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "analytics",
+        "stats",
+        "google analytics alternative",
+        "privacy analytics"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.13",
+          "release": "0.13.1",
           "default": true
         }
       ],
@@ -8475,6 +8842,42 @@
       }
     },
     {
+      "name": "terraria",
+      "file": {
+        "path": "templates/terraria.yaml",
+        "sha256": "69b5b033362d201877c684705622e270e8ec73b24fb91a08010353e9447ddce4"
+      },
+      "icon": {
+        "path": "icons/terraria.svg",
+        "sha256": "e0d9bec5b6d2530298e41262851a2ab472c073d83d2d220b1883cd701e535c6d"
+      },
+      "title": "Terraria Server (TShock)",
+      "tagline": "A Terraria server for you and your friends, with TShock's admin tools",
+      "categories": [
+        "games/servers"
+      ],
+      "tags": [
+        "game-server",
+        "open-source"
+      ],
+      "aliases": [
+        "terraria",
+        "tshock",
+        "game server"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.4.5",
+          "release": "tshock-1.4.5.6-6.1.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "tika",
       "file": {
         "path": "templates/tika.yaml",
@@ -8733,6 +9136,44 @@
         {
           "name": "8.2",
           "release": "8.2.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "unmanic",
+      "file": {
+        "path": "templates/unmanic.yaml",
+        "sha256": "57a7df3a14e643b786b3cc2ddd3327dcfe993d289d02c2c558b2cd88a9f1bf25"
+      },
+      "icon": {
+        "path": "icons/unmanic.svg",
+        "sha256": "c6b64464cab38e1bf50075717546cf81afaf73bdee04d46199f38e7829c4026a"
+      },
+      "title": "Unmanic",
+      "tagline": "Watches a media library and re-encodes it to the formats you choose",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "transcode",
+        "ffmpeg",
+        "h265",
+        "hevc",
+        "tdarr alternative",
+        "media optimizer"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.4",
+          "release": "0.4.1",
           "default": true
         }
       ],

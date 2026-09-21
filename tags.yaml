@@ -66,3 +66,8 @@ tags:
   - {id: feature-flags, title: Feature Flags}
   - {id: notes, title: Notes}
   - {id: whiteboard, title: Whiteboard}
+  - {id: ecommerce, title: E-commerce}
+  - {id: forum, title: Forum}
+  - {id: blog, title: Blog}
+  - {id: scheduling, title: Scheduling}
+  - {id: game-server, title: Game Server}

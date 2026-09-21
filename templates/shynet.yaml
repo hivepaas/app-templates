@@ -1,0 +1,137 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: shynet
+  title: Shynet
+  tagline: Modern, privacy-friendly web analytics that works without cookies or JavaScript
+  description: |
+    Shynet counts visits, sessions, referrers, devices and locations for your sites without
+    cookies, and without JavaScript if you use its tracking pixel. It keeps no data that
+    identifies a person, respects Do Not Track, and shows it all on a clean dashboard.
+
+    **This template creates two apps**
+
+    - **Shynet**, which keeps nothing of its own
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Shynet has no sign-up page. Create the administrator from the app's console:
+
+    ```sh
+    ./manage.py registeradmin you@example.com
+    ```
+
+    It prints the password. Give the installation a name with
+    `./manage.py whitelabel "My analytics"`, sign in, add a service, and copy its script into
+    your site.
+
+    **It needs a domain**
+
+    The tracking script is loaded by visitors' browsers from this app, and sign-in is
+    refused from any address not listed as allowed. Give the app its domain when you create
+    it.
+  categories: [observability/analytics]
+  tags: [web-analytics, analytics, privacy, open-source]
+  aliases: [analytics, stats, google analytics alternative, privacy analytics]
+  icon: icons/shynet.svg
+  links:
+    website: https://github.com/milesmcc/shynet
+    documentation: https://github.com/milesmcc/shynet/blob/master/GUIDE.md
+    source: https://github.com/milesmcc/shynet
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the dashboard and the tracking script answer at. Sign-in is only accepted
+      there. Leave it empty to add one later - and to ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS.
+    type: domain
+    optional: true
+  - name: secretKey
+    title: Secret key
+    description: Signs sessions. Leave empty to generate one; changing it signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: timezone
+    title: Time zone
+    description: What the dashboard's days are counted in. An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: shynet
+      username: shynet
+
+versions:
+  - name: "0.13"
+    release: "0.13.1"
+    default: true
+    image: milesmcc/shynet:v0.13.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # 127.0.0.1 is among the allowed hosts below, so the check needs no Host header of
+        # its own. The image has wget and no curl.
+        command: wget -q -O /dev/null 'http://127.0.0.1:8080/healthz/?format=json'
+        interval: 30s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: shynet
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DJANGO_SECRET_KEY, v: "${secrets.DJANGO_SECRET_KEY}"}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The domain for people, the app's key for the rest of the project, and 127.0.0.1
+        # for the health check.
+        - {k: ALLOWED_HOSTS, v: "${{ params.domain }},${HIVEPAAS_HOST},127.0.0.1"}
+        - {k: CSRF_TRUSTED_ORIGINS, v: "https://${{ params.domain }}"}
+        - {k: SCRIPT_USE_HTTPS, v: "True"}
+        - {k: TIME_ZONE, v: "${{ params.timezone }}"}
+        - {k: PORT, v: "8080"}
+        # No Redis here: background work runs in the request instead of a Celery worker.
+        - {k: CELERY_TASK_ALWAYS_EAGER, v: "True"}
+        - {k: ACCOUNT_SIGNUPS_ENABLED, v: "False"}
+    secrets:
+      DJANGO_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

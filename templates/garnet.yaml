@@ -1,0 +1,98 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: garnet
+  title: Garnet
+  tagline: A Redis-compatible cache from Microsoft Research, built for throughput
+  description: |
+    Garnet is a cache server that speaks the Redis protocol - RESP - so Redis clients and
+    libraries connect to it unchanged. It is written in C# on Microsoft's Tsavorite storage
+    engine and aims at high throughput and low tail latency with many clients at once.
+
+    **This template sets up**
+
+    - Garnet as a cache, holding everything in memory
+    - a password, generated unless you give one
+    - a health check over the Redis protocol
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps connect to `<the app's key>:6379` with the password under the app's Secrets,
+    as they would to Redis.
+
+    **It keeps nothing**
+
+    This runs Garnet as a cache: a restart empties it. For data that has to survive one,
+    use Redis or Valkey from this store instead.
+  categories: [databases/cache]
+  tags: [cache, key-value, in-memory, redis-compatible, open-source]
+  aliases: [redis, microsoft garnet, cache, key value]
+  icon: icons/garnet.svg
+  links:
+    website: https://microsoft.github.io/garnet/
+    documentation: https://microsoft.github.io/garnet/docs
+    source: https://github.com/microsoft/garnet
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+
+versions:
+  - name: "2.1"
+    release: "2.1.8"
+    default: true
+    image: ghcr.io/microsoft/garnet:2.1.8
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The settings, password included, come from a file mounted from a secret, so the
+      # password is neither on the command line nor in the service spec.
+      command: --config-import-path /etc/garnet/garnet.conf
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has bash and no Redis client. Garnet does not take inline commands,
+        # so this sends PING in RESP; an answer of either PONG or NOAUTH means it serves.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/6379 && printf "*1\r\n\$4\r\nPING\r\n" >&3 &&
+          timeout 3 head -c 5 <&3 | grep -qE "PONG|NOAU"'
+        interval: 20s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: cache
+      engine: garnet
+      version: "${{ version.name }}"
+      cache:
+        password: "${{ params.password }}"
+    secrets:
+      GARNET_CONF:
+        value: >-
+          {"Port": 6379, "Address": "0.0.0.0", "AuthenticationMode": "Password",
+          "Password": "${{ params.password }}"}
+        swarmRef:
+          file: {name: /etc/garnet/garnet.conf, mode: 444}
+    routing:
+      port: 6379

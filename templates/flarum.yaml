@@ -1,0 +1,139 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: flarum
+  title: Flarum
+  tagline: A fast, simple forum for your community
+  description: |
+    Flarum is discussion software that feels like a modern app: threads organised by tags,
+    mentions and likes, real-time updates, a mobile-friendly layout, and extensions for
+    everything from reactions to single sign-on.
+
+    **This template creates two apps**
+
+    - **Flarum**, on a volume for uploaded files, extensions and assets
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    The first start installs Flarum with the administrator `flarum`, password `flarum`.
+    Sign in and change both straight away - they are the same on every installation made
+    this way.
+
+    **The public address has to be right**
+
+    Every link Flarum makes, and the assets it serves, use it. Set it to the HTTPS address
+    of the domain you give the app.
+
+    The image is maintained by CrazyMax; Flarum publishes none of its own.
+  categories: [webapps/social]
+  tags: [forum, chat, collaboration, open-source]
+  aliases: [forum, discourse alternative, community, bulletin board, discussions]
+  icon: icons/flarum.svg
+  links:
+    website: https://flarum.org
+    documentation: https://docs.flarum.org
+    source: https://github.com/flarum/flarum
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://forum.example.com. Every link
+      is built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:8000
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: title
+    title: Forum title
+    type: string
+    default: A Flarum forum
+    pattern: '^[^"\\\n]{1,80}$'
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploads, extensions and assets are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: flarum
+      username: flarum
+
+versions:
+  - name: "1.8"
+    release: "1.8.19"
+    default: true
+    image: crazymax/flarum:1.8.19
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8000/
+        interval: 20s
+        timeout: 10s
+        # The first start installs Flarum into the database.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: flarum
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: FLARUM_BASE_URL, v: "${{ params.appUrl }}"}
+        - {k: FLARUM_FORUM_TITLE, v: "${{ params.title }}"}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
