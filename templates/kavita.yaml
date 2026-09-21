@@ -33,7 +33,7 @@ metadata:
     A library is scanned when it is added and then on a schedule: metadata is read, covers
     are extracted, and series are grouped. A large collection takes a while the first time
     and is quiet afterwards.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, open-source]
   aliases: [ebooks, comics, manga, epub, library]
   icon: icons/kavita.svg

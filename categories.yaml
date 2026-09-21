@@ -27,6 +27,12 @@ categories:
       - {id: business, title: Business Intelligence}
       - {id: documents, title: Files & Documents}
       - {id: networking, title: Networking & VPN}
+      - {id: media, title: Media & Libraries}
+      - {id: social, title: Social & Community}
+  - id: games
+    title: Games
+    children:
+      - {id: servers, title: Game Servers}
   - id: observability
     title: Observability
     children:

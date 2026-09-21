@@ -45,7 +45,7 @@ metadata:
     Originals are kept as they arrived. A phone library of 50 GB stays 50 GB here, plus
     thumbnails - so put the volume somewhere it can grow, and keep a copy of it elsewhere.
     Immich is not a backup by itself: it is where the photos live.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, files, open-source]
   aliases: [photos, google-photos, gallery, backup-photos, pictures]
   icon: icons/immich.svg

@@ -48,7 +48,7 @@ metadata:
     Originals are kept as they arrived, and thumbnails add roughly a third on top. Put the
     volume somewhere it can grow, and keep a copy of the originals elsewhere - a photo
     library is not a backup of itself.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, files, open-source]
   aliases: [photos, gallery, pictures, google-photos, image search]
   icon: icons/photoprism.svg

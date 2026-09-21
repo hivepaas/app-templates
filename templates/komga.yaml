@@ -30,7 +30,7 @@ metadata:
     **It does not download anything**
 
     Komga organises what is already on the volume. Put files there however you like.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, files, open-source]
   aliases: [comics, manga, cbz, opds, ebooks]
   icon: icons/komga.svg

@@ -20,7 +20,7 @@ metadata:
     Open it: the setup wizard asks which media server you use - the Jellyfin template in
     this store works, at `http://<its app key>:8096` - and signs you in with an account on
     it, which becomes the administrator. Then connect Sonarr and Radarr if you have them.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [open-source]
   aliases: [overseerr, jellyfin requests, plex requests, media requests]
   icon: icons/jellyseerr.svg

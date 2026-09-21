@@ -27,7 +27,7 @@ metadata:
     Calibre-Web reads the `metadata.db` Calibre keeps beside the books - it does not make
     one. Copy an existing library onto the books volume, or enable uploads in the admin
     settings to start one from nothing.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, open-source]
   aliases: [calibre, ebooks, epub, opds, kindle, library]
   icon: icons/calibre-web.svg

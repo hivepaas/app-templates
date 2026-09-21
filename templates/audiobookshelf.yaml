@@ -30,7 +30,7 @@ metadata:
 
     Covers and descriptions are looked up from Audible, iTunes and Google Books when you ask
     for them. Nothing leaves the server unless you press the button.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, files, open-source]
   aliases: [audiobooks, podcasts, plex-alternative, books]
   icon: icons/audiobookshelf.svg

@@ -91,6 +91,24 @@
         {
           "id": "networking",
           "title": "Networking & VPN"
+        },
+        {
+          "id": "media",
+          "title": "Media & Libraries"
+        },
+        {
+          "id": "social",
+          "title": "Social & Community"
+        }
+      ]
+    },
+    {
+      "id": "games",
+      "title": "Games",
+      "children": [
+        {
+          "id": "servers",
+          "title": "Game Servers"
         }
       ]
     },
@@ -718,7 +736,7 @@
       "name": "audiobookshelf",
       "file": {
         "path": "templates/audiobookshelf.yaml",
-        "sha256": "0050d99e418680294ef38bb88330b737339b16e11355fc455f4a1eeb5c039f53"
+        "sha256": "9afd0cb1574256b6e98f163c4b3063297234f75990d39ab7b3396d7d52dbd564"
       },
       "icon": {
         "path": "icons/audiobookshelf.svg",
@@ -727,7 +745,7 @@
       "title": "Audiobookshelf",
       "tagline": "Audiobooks and podcasts that remember where you stopped",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -1068,7 +1086,7 @@
       "name": "calibre-web",
       "file": {
         "path": "templates/calibre-web.yaml",
-        "sha256": "10eccb8afaece608a8c6abdc888ec91d8c10f0b0df16b08e96e72fcc81e6c6eb"
+        "sha256": "7bad2ae00d24a089b11421aa77d52fc95a161298a55c4e4e00f10aca97d8b614"
       },
       "icon": {
         "path": "icons/calibre-web.svg",
@@ -1077,7 +1095,7 @@
       "title": "Calibre-Web",
       "tagline": "Browse, read and download a Calibre e-book library from the web",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -3122,7 +3140,7 @@
       "name": "immich",
       "file": {
         "path": "templates/immich.yaml",
-        "sha256": "97487f4aaf8bb73991b95b772b9c5eb0fb427bed8effad9eca36ac35691dc76c"
+        "sha256": "af15001107552b4b135b8cb090aeca1315183cda853868f0fc65010ab74fa1e3"
       },
       "icon": {
         "path": "icons/immich.svg",
@@ -3131,7 +3149,7 @@
       "title": "Immich",
       "tagline": "Your phone's photo library, on your own server",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -3332,7 +3350,7 @@
       "name": "jellyfin",
       "file": {
         "path": "templates/jellyfin.yaml",
-        "sha256": "b2bfab05ad28a2bbdfcc30959671a7ad7a620cde8d2e8ed4c29f3f5a9a366b6b"
+        "sha256": "ae39e507458c0459695e48b5df2ee4523500ba84c69846e63f64bba42c0d16dd"
       },
       "icon": {
         "path": "icons/jellyfin.svg",
@@ -3341,7 +3359,7 @@
       "title": "Jellyfin",
       "tagline": "Your films and series, on your own server, with no account anywhere",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -3371,7 +3389,7 @@
       "name": "jellyseerr",
       "file": {
         "path": "templates/jellyseerr.yaml",
-        "sha256": "9e63076aff47605d90e80f125c1760143dca8257db9d3c75f06c66b99605aa62"
+        "sha256": "caf438ef6aa7083fa5408d4cc939f420d0027ebb63f9e9e77fd7cfe4ed0cb4d9"
       },
       "icon": {
         "path": "icons/jellyseerr.svg",
@@ -3380,7 +3398,7 @@
       "title": "Jellyseerr",
       "tagline": "Let people request films and shows for your Jellyfin, Plex or Emby",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "open-source"
@@ -3696,7 +3714,7 @@
       "name": "kavita",
       "file": {
         "path": "templates/kavita.yaml",
-        "sha256": "1a2da33944d26d9d2004439e6558bde5201a105e732c72227eb1ac73b131c22c"
+        "sha256": "a92fb72676f8fb1a95e5ce7fe0262d4edb2b7a8ea2112492e2e2f27218c7ec8a"
       },
       "icon": {
         "path": "icons/kavita.svg",
@@ -3705,7 +3723,7 @@
       "title": "Kavita",
       "tagline": "Reads your books and comics, and remembers where you stopped",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -3823,7 +3841,7 @@
       "name": "komga",
       "file": {
         "path": "templates/komga.yaml",
-        "sha256": "90cc4d009665ef89ada6429eff238f652f54a07e6eba10959d09504d741126ba"
+        "sha256": "76fdc2ba445295c7e220b105a85dc537c78ee6545a26c186c77b3e3fd23993f2"
       },
       "icon": {
         "path": "icons/komga.svg",
@@ -3832,7 +3850,7 @@
       "title": "Komga",
       "tagline": "A library for comics, manga and magazines, with a reader in the browser",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -5185,7 +5203,7 @@
       "name": "navidrome",
       "file": {
         "path": "templates/navidrome.yaml",
-        "sha256": "893e6c05afeffb02aa53ebdf15090928931ab1e848dc89d7ad05341a7a02d65b"
+        "sha256": "2ac8a35cdd6e63e96bdb216183aaccb61834dac87d7ea26806a4872e27c7c33d"
       },
       "icon": {
         "path": "icons/navidrome.svg",
@@ -5194,7 +5212,7 @@
       "title": "Navidrome",
       "tagline": "Your music collection, streamed to anything that speaks Subsonic",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",
@@ -6107,7 +6125,7 @@
       "name": "photoprism",
       "file": {
         "path": "templates/photoprism.yaml",
-        "sha256": "59d420ed0dc7f94e291eda50ae15666910795538b64096c7c330ae9845fb77f6"
+        "sha256": "282c1cdf85ea94d223a8edbc7ab1be57df4f4a8d4e6255b307279f47f88bc0cd"
       },
       "icon": {
         "path": "icons/photoprism.svg",
@@ -6116,7 +6134,7 @@
       "title": "PhotoPrism",
       "tagline": "Your photo library, indexed and searchable",
       "categories": [
-        "webapps/documents"
+        "webapps/media"
       ],
       "tags": [
         "documents",

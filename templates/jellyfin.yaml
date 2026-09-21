@@ -34,7 +34,7 @@ metadata:
 
     A short wizard: language, the first administrator account, a library, and whether to
     allow remote connections. Nothing is created before you do that.
-  categories: [webapps/documents]
+  categories: [webapps/media]
   tags: [documents, files, open-source]
   aliases: [media-server, movies, tv, plex-alternative, emby]
   icon: icons/jellyfin.svg
