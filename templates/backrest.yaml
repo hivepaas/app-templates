@@ -1,0 +1,119 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: backrest
+  title: Backrest
+  tagline: A web interface for restic - schedule backups, browse and restore them
+  description: |
+    Backrest runs restic for you: repositories on S3, a restic REST server, SFTP or a local
+    path; plans that back up on a schedule and prune by a retention policy; and a web page
+    to browse any snapshot and restore a file or a folder from it. Notifications tell you
+    when a backup fails.
+
+    **This template sets up**
+
+    - Backrest, on a volume for its configuration, operation history and restic cache
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the app: the first page asks for an instance name and an administrator account.
+    Then add a repository - the Restic REST Server template in this store makes one, at
+    `rest:http://<user>:<password>@<its app key>:8000/<name>` - and a plan.
+
+    **Getting at what to back up**
+
+    Backrest backs up paths inside its own container. Add each volume you want protected to
+    this app's storage settings - read-only is enough to back up, writable to restore in
+    place - and redeploy; then point a plan at the path you mounted it on.
+
+    **Keep the repository password**
+
+    restic encrypts every repository with the password you give when adding it, and nothing
+    can be restored without it. Keep a copy outside this app.
+  categories: [storage/backup]
+  tags: [backup, open-source]
+  aliases: [restic, restic ui, backups, snapshots, restore]
+  icon: icons/backrest.svg
+  links:
+    website: https://garethgeorge.github.io/backrest/
+    documentation: https://garethgeorge.github.io/backrest/introduction/getting-started
+    source: https://github.com/garethgeorge/backrest
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: What the schedules are read in. An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: restic runs inside this app, and large backups want more than the interface does.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume Backrest's configuration, history and restic cache are kept on.
+    type: volume
+
+versions:
+  - name: "1.14"
+    release: "1.14.1"
+    default: true
+    image: garethgeorge/backrest:v1.14.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image's entry point is tini, which has to be process 1 to reap the restic
+      # processes Backrest starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:9898/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: backrest
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Everything that has to survive a redeployment goes on the one volume.
+        - {k: BACKREST_DATA, v: /data/data}
+        - {k: BACKREST_CONFIG, v: /data/config/config.json}
+        - {k: XDG_CACHE_HOME, v: /data/cache}
+        - {k: TMPDIR, v: /tmp}
+        - {k: BACKREST_PORT, v: "0.0.0.0:9898"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 9898
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

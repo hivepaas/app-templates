@@ -371,6 +371,22 @@
     {
       "id": "geospatial",
       "title": "Geospatial"
+    },
+    {
+      "id": "secrets",
+      "title": "Secrets Management"
+    },
+    {
+      "id": "feature-flags",
+      "title": "Feature Flags"
+    },
+    {
+      "id": "notes",
+      "title": "Notes"
+    },
+    {
+      "id": "whiteboard",
+      "title": "Whiteboard"
     }
   ],
   "templates": [
@@ -460,6 +476,46 @@
         {
           "name": "26.9",
           "release": "26.9.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "adguard-home",
+      "file": {
+        "path": "templates/adguard-home.yaml",
+        "sha256": "f09943e69721160e1c19ddb812bafa767715949ee04dc6f84eb34473c1c82645"
+      },
+      "icon": {
+        "path": "icons/adguard-home.svg",
+        "sha256": "627cde68db087f38ad16984f5e3ef92742b0d51972b009f046a1918fd6abc3f1"
+      },
+      "title": "AdGuard Home",
+      "tagline": "A DNS server that blocks ads and trackers for every device on the network",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "dns",
+        "networking",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "adguard",
+        "pihole",
+        "pi-hole",
+        "ad blocker",
+        "dns filter"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.107",
+          "release": "0.107.79",
           "default": true
         }
       ],
@@ -750,6 +806,44 @@
       }
     },
     {
+      "name": "backrest",
+      "file": {
+        "path": "templates/backrest.yaml",
+        "sha256": "2cdbc6ec16432935c755e58535f346876995e7357c8308518557dc5fae93cab3"
+      },
+      "icon": {
+        "path": "icons/backrest.svg",
+        "sha256": "67a269a1fc0ed4c75c6c6f5780b3ec3d5813cea8fa2203e5e499eae6335a6863"
+      },
+      "title": "Backrest",
+      "tagline": "A web interface for restic - schedule backups, browse and restore them",
+      "categories": [
+        "storage/backup"
+      ],
+      "tags": [
+        "backup",
+        "open-source"
+      ],
+      "aliases": [
+        "restic",
+        "restic ui",
+        "backups",
+        "snapshots",
+        "restore"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.14",
+          "release": "1.14.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "baserow",
       "file": {
         "path": "templates/baserow.yaml",
@@ -964,6 +1058,44 @@
         {
           "name": "0.60",
           "release": "0.60.7",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "chroma",
+      "file": {
+        "path": "templates/chroma.yaml",
+        "sha256": "41a826020e5d650f6714253316a3301969473246457ab50d2174be8c1d7840f7"
+      },
+      "icon": {
+        "path": "icons/chroma.svg",
+        "sha256": "80113a1b62c0b906210a775db2ffefa7e9e8b1d9fc2542647bfb159098abc795"
+      },
+      "title": "Chroma",
+      "tagline": "The open source embedding database for AI applications",
+      "categories": [
+        "databases/vector"
+      ],
+      "tags": [
+        "vector",
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "chromadb",
+        "embeddings",
+        "rag",
+        "vector store"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.9",
           "default": true
         }
       ],
@@ -1583,6 +1715,85 @@
       }
     },
     {
+      "name": "excalidraw",
+      "file": {
+        "path": "templates/excalidraw.yaml",
+        "sha256": "260374586a980f823732901d3318011147fa204394be01d8beeaa00057a9e410"
+      },
+      "icon": {
+        "path": "icons/excalidraw.svg",
+        "sha256": "d9ebb10b01f9a6698afd10851916a2bfb9c3035a737c2739e67b5c90b830ef80"
+      },
+      "title": "Excalidraw",
+      "tagline": "A virtual whiteboard for sketching diagrams that look hand-drawn",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "whiteboard",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "whiteboard",
+        "diagrams",
+        "sketch",
+        "drawing",
+        "miro alternative"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2026.05",
+          "release": "2026.05.06",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "filebrowser",
+      "file": {
+        "path": "templates/filebrowser.yaml",
+        "sha256": "6595647510034fbc95332998cf18ea0e26910c330a63447fe5a8ffdad699e44a"
+      },
+      "icon": {
+        "path": "icons/filebrowser.svg",
+        "sha256": "6e378aa902a448e614b030109be657abdc4a13004072c42c228da1bddc82efb3"
+      },
+      "title": "File Browser",
+      "tagline": "Browse, upload, share and edit the files on a volume, from a web page",
+      "categories": [
+        "webapps/documents",
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "file-transfer",
+        "open-source"
+      ],
+      "aliases": [
+        "file manager",
+        "web file manager",
+        "upload",
+        "share files"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2.63",
+          "release": "2.63.23",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "firefly-iii",
       "file": {
         "path": "templates/firefly-iii.yaml",
@@ -1838,6 +2049,45 @@
         {
           "name": "1.30",
           "release": "1.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "garage",
+      "file": {
+        "path": "templates/garage.yaml",
+        "sha256": "70a1a54da034a40e0366d65920385a2cd2e5460b62cb55aa53ce89160f665508"
+      },
+      "icon": {
+        "path": "icons/garage.svg",
+        "sha256": "d7290513c2c690ecf96accc464e14542f24696f741390f0d6d8a5b7722ec5f54"
+      },
+      "title": "Garage",
+      "tagline": "S3-compatible object storage, small enough for one node",
+      "categories": [
+        "storage/object-storage"
+      ],
+      "tags": [
+        "object-storage",
+        "s3",
+        "open-source"
+      ],
+      "aliases": [
+        "s3",
+        "minio alternative",
+        "object storage",
+        "buckets",
+        "deuxfleurs"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2.4",
+          "release": "2.4.1",
           "default": true
         }
       ],
@@ -3170,6 +3420,59 @@
         {
           "name": "3.9",
           "release": "3.9.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "librechat",
+      "file": {
+        "path": "templates/librechat.yaml",
+        "sha256": "0ba140ade7948e555b95c4e57a8c9273aa1c64645c0f88898057bb96a714a653"
+      },
+      "icon": {
+        "path": "icons/librechat.svg",
+        "sha256": "18002f6947340357d059553ed5925bcf49de899ad614a1b11cae2bcdf499b8d8"
+      },
+      "title": "LibreChat",
+      "tagline": "One chat interface for Claude, GPT, Gemini and the models you run yourself",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "llm",
+        "ai",
+        "chat",
+        "open-source"
+      ],
+      "aliases": [
+        "chatgpt alternative",
+        "claude",
+        "openai",
+        "gemini",
+        "ai chat",
+        "llm ui"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mongodb"
+        },
+        {
+          "name": "search",
+          "title": "Search index",
+          "template": "meilisearch"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.8",
+          "release": "0.8.7",
           "default": true
         }
       ],
@@ -4739,6 +5042,44 @@
         {
           "name": "0.11",
           "release": "0.11.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "openbao",
+      "file": {
+        "path": "templates/openbao.yaml",
+        "sha256": "4e34889b52346789d4a3de0497012cf1d8e7f046a23ae0d7b379740fe144e876"
+      },
+      "icon": {
+        "path": "icons/openbao.svg",
+        "sha256": "81f589b446ca55d4fd23e6f3679751a01b86c283ce7add11ca27a8a5e9b8c6cb"
+      },
+      "title": "OpenBao",
+      "tagline": "Secrets management under an open license - the community fork of Vault",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "secrets",
+        "open-source"
+      ],
+      "aliases": [
+        "vault",
+        "hashicorp vault",
+        "secrets",
+        "kms",
+        "pki"
+      ],
+      "license": "MPL-2.0",
+      "versions": [
+        {
+          "name": "2.6",
+          "release": "2.6.2",
           "default": true
         }
       ],
@@ -6670,6 +7011,45 @@
       }
     },
     {
+      "name": "trilium",
+      "file": {
+        "path": "templates/trilium.yaml",
+        "sha256": "311ec4707071507ee1b572901fb05224121219d42c2767b0be450c54487db227"
+      },
+      "icon": {
+        "path": "icons/trilium.svg",
+        "sha256": "debd1357d79a980d4a887dfadaee7adf0514aad1a6f8daace30b0b9a58085a2b"
+      },
+      "title": "Trilium Notes",
+      "tagline": "A hierarchical notebook for building a large personal knowledge base",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "wiki",
+        "open-source"
+      ],
+      "aliases": [
+        "triliumnext",
+        "notes",
+        "personal wiki",
+        "second brain",
+        "obsidian alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.105",
+          "release": "0.105.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "typesense",
       "file": {
         "path": "templates/typesense.yaml",
@@ -6747,6 +7127,50 @@
         {
           "name": "3.4",
           "release": "3.4.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "unleash",
+      "file": {
+        "path": "templates/unleash.yaml",
+        "sha256": "0acafe3b80237cfafaa51c37b19f5ac9b83dc179f6ad33c5404b2f5522f36523"
+      },
+      "icon": {
+        "path": "icons/unleash.svg",
+        "sha256": "5800859125e2a0a64b432284246a8f390b9cc05b4930d80c2bde58cf6f83ea82"
+      },
+      "title": "Unleash",
+      "tagline": "Feature flags, so what ships and what is switched on are separate decisions",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "feature-flags",
+        "open-source"
+      ],
+      "aliases": [
+        "feature flags",
+        "feature toggles",
+        "launchdarkly alternative",
+        "ab testing"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "8.2",
+          "release": "8.2.0",
           "default": true
         }
       ],

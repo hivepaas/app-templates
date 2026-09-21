@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: trilium
+  title: Trilium Notes
+  tagline: A hierarchical notebook for building a large personal knowledge base
+  description: |
+    Trilium keeps notes in a tree as deep as you like, and lets one note sit in several
+    places at once. Notes can be rich text, code, canvases, mind maps, diagrams, tables or
+    scripts that automate the rest; each has attributes you can search and query on, and a
+    full revision history. This is TriliumNext, the community continuation of the project.
+
+    **This template sets up**
+
+    - the Trilium server, on a volume for its database, attachments and backups
+    - a health check with the image's own script
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the app and choose "I'm a new user", then set the password - Trilium has one
+    password and no user names. The desktop app can then sync with this server: point it at
+    the address and give it the same password.
+
+    **Backups**
+
+    Trilium writes a daily, weekly and monthly backup of its database into the `backup`
+    folder on the volume. They are on the same volume as what they protect, so back the
+    volume up somewhere else too.
+  categories: [webapps/knowledge]
+  tags: [notes, wiki, open-source]
+  aliases: [triliumnext, notes, personal wiki, second brain, obsidian alternative]
+  icon: icons/trilium.svg
+  links:
+    website: https://triliumnotes.org
+    documentation: https://docs.triliumnotes.org
+    source: https://github.com/TriliumNext/Trilium
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the notes database, attachments and backups are kept on.
+    type: volume
+
+versions:
+  - name: "0.105"
+    release: "0.105.0"
+    default: true
+    image: triliumnext/trilium:v0.105.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/node/trilium-data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check. It reads the port from Trilium's configuration and runs
+        # as the user the server runs as.
+        command: exec gosu node node /usr/src/app/docker_healthcheck.cjs
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: trilium
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # TLS ends at the reverse proxy; this makes it believe the scheme and address the
+        # proxy forwards, which the session cookie and rate limits depend on. It is
+        # Express's trust proxy setting read as a string, so "true" is taken for an IP
+        # address and refuses to start; uniquelocal is the private ranges the proxy is on.
+        - {k: TRILIUM_NETWORK_TRUSTEDREVERSEPROXY, v: uniquelocal}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

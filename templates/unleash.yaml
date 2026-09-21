@@ -1,0 +1,135 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: unleash
+  title: Unleash
+  tagline: Feature flags, so what ships and what is switched on are separate decisions
+  description: |
+    Unleash turns features on and off without a deployment: for everyone, for a percentage
+    of users, for one customer, or for the people on a list - with gradual rollouts,
+    variants for A/B tests and a kill switch for when something goes wrong. SDKs exist for
+    every common language, and they evaluate flags locally, so a flag check never waits on
+    the network.
+
+    **This template creates two apps**
+
+    - **Unleash**, which keeps nothing of its own
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in with the administrator name and password you gave it, then create an API token
+    under Admin - a backend token for your servers, a frontend token for browsers - and point
+    the SDKs at `https://<the domain>/api` with it.
+
+    **Backups are the database**
+
+    Flags, strategies, projects, users and the audit log all live in PostgreSQL, so the
+    database app is what there is to back up.
+  categories: [webapps/dev-tools]
+  tags: [feature-flags, open-source]
+  aliases: [feature flags, feature toggles, launchdarkly alternative, ab testing]
+  icon: icons/unleash.svg
+  links:
+    website: https://www.getunleash.io
+    documentation: https://docs.getunleash.io
+    source: https://github.com/Unleash/unleash
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address you reach it at, scheme and all - https://flags.example.com. Links in
+      emails and the sign-in redirects are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:4242
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator name
+    description: The first account, created on the first start.
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._@-]{1,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: unleash
+      username: unleash
+
+versions:
+  - name: "8.2"
+    release: "8.2.0"
+    default: true
+    image: unleashorg/unleash-server:8.2.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl. /health answers once the migrations have run.
+        command: wget -q -O /dev/null http://127.0.0.1:4242/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: unleash
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: UNLEASH_URL, v: "${{ params.appUrl }}"}
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The database is on the project network, which does not carry TLS.
+        - {k: DATABASE_SSL, v: "false"}
+        # Read on the first start only, while there are no users yet.
+        - {k: UNLEASH_DEFAULT_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: UNLEASH_DEFAULT_ADMIN_PASSWORD, v: "${secrets.UNLEASH_DEFAULT_ADMIN_PASSWORD}"}
+    secrets:
+      UNLEASH_DEFAULT_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 4242
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,199 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: librechat
+  title: LibreChat
+  tagline: One chat interface for Claude, GPT, Gemini and the models you run yourself
+  description: |
+    LibreChat is a chat interface in the style people already know, in front of whichever
+    models you use: Anthropic, OpenAI, Google, and anything that speaks the OpenAI API -
+    Ollama and LiteLLM included. It has conversations you can search and branch, file
+    uploads, agents with tools and MCP servers, presets and prompt libraries, and accounts
+    for everyone on your team.
+
+    **This template creates three apps**
+
+    - **LibreChat**, on a volume for uploaded files and images
+    - **a MongoDB database** for accounts and conversations, named after the app with `-db`
+      added
+    - **a Meilisearch index** for searching conversations, with `-search` added
+
+    **After the first deployment**
+
+    Open the app and register: the first account is the administrator. Registration stays
+    open after that - set `ALLOW_REGISTRATION` to `false` in the app's environment once
+    everyone who should have an account has one.
+
+    **API keys**
+
+    As created, each person enters their own key for Anthropic, OpenAI and Google in the
+    interface, and it is stored encrypted with the app's credentials key. To pay for
+    everyone instead, replace `user_provided` in `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or
+    `GOOGLE_KEY` with a real key and redeploy. Custom endpoints such as Ollama are
+    configured in a `librechat.yaml` - see the documentation.
+
+    **Keep the keys**
+
+    `CREDS_KEY` and `CREDS_IV` encrypt the API keys people save. Changing them makes every
+    saved key unreadable; back them up with the database.
+  categories: [webapps/ai]
+  tags: [llm, ai, chat, open-source]
+  aliases: [chatgpt alternative, claude, openai, gemini, ai chat, llm ui]
+  icon: icons/librechat.svg
+  links:
+    website: https://www.librechat.ai
+    documentation: https://www.librechat.ai/docs
+    source: https://github.com/danny-avila/LibreChat
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://chat.example.com. Sign-in
+      redirects and links in emails are built from it.
+    type: string
+    default: http://${HIVEPAAS_HOST}:3080
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Normally the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: credsKey
+    title: Credentials key
+    description: >-
+      Encrypts the API keys people save - exactly 64 hexadecimal characters. Leave empty to
+      generate one.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: credsIv
+    title: Credentials IV
+    description: >-
+      Goes with the credentials key - exactly 32 hexadecimal characters. Leave empty to
+      generate one.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32, charset: hex}
+  - name: jwtSecret
+    title: Session secret
+    description: Signs sign-in sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: jwtRefreshSecret
+    title: Refresh secret
+    description: Signs the tokens that renew sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Upload volume
+    description: The volume uploaded files and generated images are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mongodb
+    version: "8.0"
+    params:
+      dbName: librechat
+      username: librechat
+  - name: search
+    title: Search index
+    template: meilisearch
+    version: "1.53"
+
+versions:
+  - name: "0.8"
+    release: "0.8.7"
+    default: true
+    image: ghcr.io/danny-avila/librechat:v0.8.7
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/uploads:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: uploads}
+        /app/client/public/images:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: images}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:3080/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: librechat
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: HOST, v: 0.0.0.0}
+        - {k: PORT, v: "3080"}
+        - {k: DOMAIN_CLIENT, v: "${{ params.appUrl }}"}
+        - {k: DOMAIN_SERVER, v: "${{ params.appUrl }}"}
+        # The credentials the mongodb template creates live in the admin database,
+        # which is what authSource says.
+        - {k: MONGO_URI, v: "mongodb://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}?authSource=admin"}
+        - {k: SEARCH, v: "true"}
+        - {k: MEILI_HOST, v: "http://${{ deps.search.ref.HIVEPAAS_HOST }}:${{ deps.search.ref.HIVEPAAS_PORT }}"}
+        - {k: MEILI_MASTER_KEY, v: "${{ deps.search.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: MEILI_NO_ANALYTICS, v: "true"}
+        - {k: CREDS_KEY, v: "${secrets.CREDS_KEY}"}
+        - {k: CREDS_IV, v: "${secrets.CREDS_IV}"}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: JWT_REFRESH_SECRET, v: "${secrets.JWT_REFRESH_SECRET}"}
+        - {k: ALLOW_REGISTRATION, v: "true"}
+        - {k: ALLOW_EMAIL_LOGIN, v: "true"}
+        # Each person enters their own key in the interface until these hold real ones.
+        - {k: ANTHROPIC_API_KEY, v: user_provided}
+        - {k: OPENAI_API_KEY, v: user_provided}
+        - {k: GOOGLE_KEY, v: user_provided}
+        # TLS ends at the reverse proxy, which is one hop in front of the app.
+        - {k: TRUST_PROXY, v: "1"}
+    secrets:
+      CREDS_KEY:
+        value: "${{ params.credsKey }}"
+      CREDS_IV:
+        value: "${{ params.credsIv }}"
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      JWT_REFRESH_SECRET:
+        value: "${{ params.jwtRefreshSecret }}"
+    routing:
+      port: 3080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

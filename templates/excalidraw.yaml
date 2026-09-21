@@ -1,0 +1,88 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: excalidraw
+  title: Excalidraw
+  tagline: A virtual whiteboard for sketching diagrams that look hand-drawn
+  description: |
+    Excalidraw is a whiteboard in the browser for quick diagrams, wireframes and
+    explanations, drawn in a sketchy style that says "this is a draft". It has shape
+    libraries, arrows that stay attached, export to PNG and SVG, and files you can save and
+    open again.
+
+    **This template sets up**
+
+    - the Excalidraw web app, served by nginx
+    - a memory limit you choose
+
+    It keeps nothing: drawings live in each browser's local storage until they are saved to
+    a file, so the app can be deleted and created again without losing anything.
+
+    **What it does not include**
+
+    Live collaboration and share links need Excalidraw's collaboration server and storage
+    backend, which are separate services and not part of this template. The buttons are
+    there, but they talk to excalidraw.com's own servers.
+  categories: [webapps/dev-tools, webapps/knowledge]
+  tags: [whiteboard, collaboration, open-source]
+  aliases: [whiteboard, diagrams, sketch, drawing, miro alternative]
+  icon: icons/excalidraw.svg
+  links:
+    website: https://excalidraw.com
+    documentation: https://docs.excalidraw.com
+    source: https://github.com/excalidraw/excalidraw
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "2026.05"
+    release: "2026.05.06"
+    default: true
+    # The project publishes no version tags for the image, only latest and one sha-
+    # tag per commit - and those are built for amd64 alone. This is latest as it was
+    # built on the date above, pinned by its digest, which covers arm64 too.
+    image: excalidraw/excalidraw:latest@sha256:f7ee194addd607bf831d2af0f0a34463dd4225e426cf35199ef0b12a803398e9
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: excalidraw
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

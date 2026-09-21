@@ -1,0 +1,100 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: chroma
+  title: Chroma
+  tagline: The open source embedding database for AI applications
+  description: |
+    Chroma stores documents with their embeddings and metadata, and finds the ones nearest to
+    a query - the retrieval half of retrieval-augmented generation. Its Python and JavaScript
+    clients are what LangChain, LlamaIndex and most RAG tutorials reach for first.
+
+    ```python
+    import chromadb
+    client = chromadb.HttpClient(host="<the app's key>", port=8000)
+    docs = client.get_or_create_collection("docs")
+    docs.add(ids=["1"], documents=["HivePaaS runs apps on Docker Swarm"])
+    docs.query(query_texts=["what does HivePaaS run on?"], n_results=1)
+    ```
+
+    **This template sets up**
+
+    - the Chroma server, on a volume for its collections
+    - telemetry to Chroma's servers switched off
+    - a health check on its heartbeat endpoint
+    - a memory limit you choose
+
+    **It has no accounts**
+
+    The Chroma server does not authenticate clients, which is why this template gives it no
+    domain: apps in the project reach it by the app's key on port 8000, and nothing outside
+    does. Keep it that way, or put basic authentication in front of it in the app's routing
+    settings before adding a domain.
+
+    **Memory is the index**
+
+    Chroma keeps the index of every collection it is serving in memory. Give it room for the
+    collections you query, not just for the server.
+  categories: [databases/vector]
+  tags: [vector, ai, open-source]
+  aliases: [chromadb, embeddings, rag, vector store]
+  icon: icons/chroma.svg
+  links:
+    website: https://www.trychroma.com
+    documentation: https://docs.trychroma.com
+    source: https://github.com/chroma-core/chroma
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the collections are kept on.
+    type: volume
+
+versions:
+  - name: "1.5"
+    release: "1.5.9"
+    default: true
+    image: chromadb/chroma:1.5.9
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The image's /config.yaml sets persist_path to /data.
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has bash and neither curl nor wget.
+        command: >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000 &&
+          printf "GET /api/v2/heartbeat HTTP/1.0\r\n\r\n" >&3 && head -1 <&3 | grep -q " 200 "'
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: chroma
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        - {k: ANONYMIZED_TELEMETRY, v: "False"}
+    routing:
+      port: 8000

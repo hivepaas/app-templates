@@ -62,3 +62,7 @@ tags:
   - {id: containers, title: Containers}
   - {id: error-tracking, title: Error Tracking}
   - {id: geospatial, title: Geospatial}
+  - {id: secrets, title: Secrets Management}
+  - {id: feature-flags, title: Feature Flags}
+  - {id: notes, title: Notes}
+  - {id: whiteboard, title: Whiteboard}

@@ -1,0 +1,197 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: garage
+  title: Garage
+  tagline: S3-compatible object storage, small enough for one node
+  description: |
+    Garage is an object store that speaks the S3 API, built by Deuxfleurs to run on modest
+    machines. Anything that can write to Amazon S3 - backup tools, media servers, static site
+    hosting, app uploads - can write to it instead, with the data staying on your own
+    volume.
+
+    **This template sets up**
+
+    - one Garage node that lays out its own single-node cluster on the first start
+    - a bucket and an access key for it, ready to use
+    - metadata and data on one volume, with metadata snapshots taken every six hours
+    - a health check with `garage health`
+    - a memory limit you choose
+
+    **Connecting**
+
+    The endpoint is `http://<the app's key>:3900` inside the project, or the domain if you
+    give it one. Use path-style addressing and the region `garage`. The access key ID and
+    secret are under the app's Secrets as `GARAGE_DEFAULT_ACCESS_KEY` and
+    `GARAGE_DEFAULT_SECRET_KEY`.
+
+    Some S3 clients - the AWS CLI and boto3 among them - refuse an endpoint whose host name
+    has an underscore in it, which app keys do. Give those the domain instead.
+
+    **More buckets and keys**
+
+    They are made with the `garage` command in the app's console - `/garage bucket create
+    photos`, `/garage key create photos-app`, `/garage bucket allow --read --write photos
+    --key photos-app`. The bucket and key this template made are only created when missing,
+    so they come back if deleted while the app still has them in its environment.
+
+    **One node is one copy**
+
+    The replication factor is 1: the volume is the only copy of every object. Garage
+    replicates across nodes, but a cluster of several nodes is beyond what this template sets
+    up.
+  categories: [storage/object-storage]
+  tags: [object-storage, s3, open-source]
+  aliases: [s3, minio alternative, object storage, buckets, deuxfleurs]
+  icon: icons/garage.svg
+  links:
+    website: https://garagehq.deuxfleurs.fr
+    documentation: https://garagehq.deuxfleurs.fr/documentation/
+    source: https://git.deuxfleurs.fr/Deuxfleurs/garage
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the S3 API answers at, for clients outside the project. Leave it empty to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: bucket
+    title: Bucket
+    description: The bucket created on the first start, with the access key allowed to use it.
+    type: string
+    default: main
+    pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+  - name: accessKeyId
+    title: Access key ID
+    description: >-
+      Exactly 24 hexadecimal characters; Garage puts GK in front. Leave empty to generate one.
+    type: secret
+    minLength: 24
+    maxLength: 24
+    generate: {length: 24, charset: hex}
+  - name: secretAccessKey
+    title: Secret access key
+    description: Exactly 64 hexadecimal characters. Leave empty to generate one.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: rpcSecret
+    title: RPC secret
+    description: >-
+      What Garage nodes use to trust each other - exactly 64 hexadecimal characters. Leave
+      empty to generate one.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: adminToken
+    title: Admin API token
+    description: Signs requests to the admin API on port 3903. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the objects and their metadata are kept on.
+    type: volume
+
+versions:
+  - name: "2.4"
+    release: "2.4.1"
+    default: true
+    image: dxflrs/garage:v2.4.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # --single-node assigns this node the whole layout, which is otherwise a manual step;
+      # --default-bucket creates the bucket and key from the environment when they are
+      # missing, and leaves them alone when they exist.
+      command: /garage server --single-node --default-bucket
+    storage:
+      mounts:
+        /var/lib/garage/meta:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: meta}
+        /var/lib/garage/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+    container:
+      healthcheck:
+        enabled: true
+        # The image has no shell, so the check is the binary itself.
+        mode: CMD
+        command: /garage health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: garage
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Garage reads these in place of the matching keys in garage.toml.
+        - {k: GARAGE_RPC_SECRET, v: "${secrets.GARAGE_RPC_SECRET}"}
+        - {k: GARAGE_ADMIN_TOKEN, v: "${secrets.GARAGE_ADMIN_TOKEN}"}
+        - {k: GARAGE_DEFAULT_ACCESS_KEY, v: "${secrets.GARAGE_DEFAULT_ACCESS_KEY}"}
+        - {k: GARAGE_DEFAULT_SECRET_KEY, v: "${secrets.GARAGE_DEFAULT_SECRET_KEY}"}
+        - {k: GARAGE_DEFAULT_BUCKET, v: "${{ params.bucket }}"}
+    secrets:
+      GARAGE_RPC_SECRET:
+        value: "${{ params.rpcSecret }}"
+      GARAGE_ADMIN_TOKEN:
+        value: "${{ params.adminToken }}"
+      GARAGE_DEFAULT_ACCESS_KEY:
+        value: "GK${{ params.accessKeyId }}"
+      GARAGE_DEFAULT_SECRET_KEY:
+        value: "${{ params.secretAccessKey }}"
+    configFiles:
+      garage.toml:
+        content: |
+          metadata_dir = "/var/lib/garage/meta"
+          data_dir = "/var/lib/garage/data"
+          db_engine = "lmdb"
+          # A copy of the metadata database to recover from if LMDB is ever left
+          # inconsistent by a hard stop.
+          metadata_auto_snapshot_interval = "6h"
+
+          replication_factor = 1
+
+          rpc_bind_addr = "[::]:3901"
+          rpc_public_addr = "127.0.0.1:3901"
+
+          [s3_api]
+          api_bind_addr = "[::]:3900"
+          s3_region = "garage"
+
+          [admin]
+          api_bind_addr = "[::]:3903"
+        swarmRef:
+          file: {name: /etc/garage.toml, mode: 444}
+    routing:
+      port: 3900
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

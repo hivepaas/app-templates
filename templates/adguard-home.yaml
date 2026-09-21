@@ -1,0 +1,136 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: adguard-home
+  title: AdGuard Home
+  tagline: A DNS server that blocks ads and trackers for every device on the network
+  description: |
+    AdGuard Home answers DNS for your network and refuses to resolve the domains ads,
+    trackers and malware come from, so every device behind it is covered without installing
+    anything. It forwards the rest over encrypted DNS if you want, keeps a query log you can
+    search, and lets you set rules per client.
+
+    **This template sets up**
+
+    - AdGuard Home, on a volume for its configuration, filter lists and query log
+    - DNS published on the node over UDP and TCP, on the port you choose
+    - the web interface on port 3000, through the reverse proxy
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the web interface: the setup wizard runs there. Leave the admin interface on port
+    3000 - the app is started with that address and ignores any other - and keep DNS on 53.
+    Create the administrator account, then choose your filter lists and upstream servers.
+
+    **Pointing devices at it**
+
+    Set the DNS server of your router or your devices to the node's address. The port is
+    published on the node itself rather than through the ingress mesh, so the query log sees
+    which device asked. Only one app on a node can hold port 53.
+
+    **Encrypted DNS**
+
+    DNS-over-HTTPS and DNS-over-TLS need a certificate inside AdGuard Home and ports this
+    template does not publish; plain DNS on your own network is what it sets up.
+  categories: [webapps/networking]
+  tags: [dns, networking, privacy, open-source]
+  aliases: [adguard, pihole, pi-hole, ad blocker, dns filter]
+  icon: icons/adguard-home.svg
+  links:
+    website: https://adguard.com/adguard-home/overview.html
+    documentation: https://github.com/AdguardTeam/AdGuardHome/wiki
+    source: https://github.com/AdguardTeam/AdGuardHome
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web interface answers at. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: dnsPort
+    title: DNS port
+    description: >-
+      The port on the node, published over UDP and TCP. The server itself always listens on
+      53 inside the project, so other apps here reach it by this app's key on the usual
+      port; this is only what the outside connects to. 53 is what clients use without being
+      told otherwise.
+    type: int
+    default: 53
+    min: 1
+    max: 65535
+  - name: memoryLimit
+    title: Memory limit
+    description: Filter lists are held in memory; large ones need more.
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration, filter lists and query log are kept on.
+    type: volume
+
+versions:
+  - name: "0.107"
+    release: "0.107.79"
+    default: true
+    image: adguard/adguardhome:v0.107.79
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own arguments, and --web-addr: without it the setup wizard listens on
+      # 3000 and the interface moves to whatever port the wizard was given, which the
+      # routing would not follow.
+      command: >-
+        --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml
+        -w /opt/adguardhome/work --web-addr 0.0.0.0:3000
+    storage:
+      mounts:
+        /opt/adguardhome/conf:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: conf}
+        /opt/adguardhome/work:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: work}
+    networks:
+      endpointSpec:
+        ports:
+          # Published on the node rather than through the ingress mesh: a resolver
+          # wants to see which client asked, and the mesh would rewrite that address.
+          - {target: 53, published: "${{ params.dnsPort }}", protocol: udp, publishMode: host}
+          - {target: 53, published: "${{ params.dnsPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Before setup this redirects to the wizard and after it to the sign-in page;
+        # wget follows either. The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:3000/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: adguard-home
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
