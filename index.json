@@ -4852,6 +4852,44 @@
       }
     },
     {
+      "name": "plone",
+      "file": {
+        "path": "templates/plone.yaml",
+        "sha256": "de57c244b2cc6f07a5400ed6796ecbd13283c9cc1211c6268ae1f3f0217e1de8"
+      },
+      "icon": {
+        "path": "icons/plone.svg",
+        "sha256": "d06982389b074644c0c3de4107c747faa421fc4065e8a0a059711b2e4933fbc3"
+      },
+      "title": "Plone",
+      "tagline": "A content management system with a REST API and twenty years of permissions",
+      "categories": [
+        "webapps/cms"
+      ],
+      "tags": [
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "headless-cms",
+        "zope",
+        "volto",
+        "enterprise-cms",
+        "restapi"
+      ],
+      "license": "GPL-2.0",
+      "versions": [
+        {
+          "name": "6.2",
+          "release": "6.2.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "pocketbase",
       "file": {
         "path": "templates/pocketbase.yaml",

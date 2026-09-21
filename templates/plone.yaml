@@ -1,0 +1,151 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: plone
+  title: Plone
+  tagline: A content management system with a REST API and twenty years of permissions
+  description: |
+    Plone stores structured content - pages, folders, images, files, anything you define -
+    with workflow, versioning, translations and a permission model fine enough to say who
+    may see a draft of one document. Every bit of it is reachable over a REST API, which is
+    what makes it a headless CMS as well as a website: the editors work in Plone, your own
+    front end reads JSON.
+
+    **Where things are**
+
+    The content lives under the site id, not at the root of the domain: the interface is at
+    `/Plone` and the API is the same address asked for JSON.
+
+        curl -H 'Accept: application/json' https://<domain>/Plone
+        curl -H 'Accept: application/json' https://<domain>/Plone/@search?portal_type=Document
+
+    Token authentication, batching, workflow transitions and everything else are documented
+    under plone.restapi.
+
+    **Two interfaces, and this one is Classic**
+
+    Plone 6 ships two front ends: Volto, a React application that talks to this API, and
+    Classic, the server-rendered interface that comes with the backend. This template runs
+    the backend with Classic, so it is complete on its own. Volto is a second app pointed at
+    this one's API; the same backend serves both.
+
+    **The administrator**
+
+    Zope reads its first account from a file, which this template writes from the parameters
+    below before anything starts - so the account exists with your password rather than the
+    `admin`/`admin` the image ships. Use it to sign in at `/Plone/login`, then make real
+    accounts and stop using it.
+
+    **Where the content is kept**
+
+    The object database is a file on the volume, with binaries beside it in a blob store -
+    no database app to run. It is compact and it never forgets: Plone keeps history, so the
+    file grows until it is packed, under *Site Setup - Maintenance*.
+
+    **Add-ons**
+
+    The `ADDONS` variable installs Python packages at start, which the Plone documentation
+    is explicit about not doing in production: the install runs on every start, needs the
+    network, and is not reproducible. For a real site, build an image with the add-ons in it.
+  categories: [webapps/cms]
+  tags: [cms, open-source]
+  aliases: [headless-cms, zope, volto, enterprise-cms, restapi]
+  icon: icons/plone.svg
+  links:
+    website: https://plone.org
+    documentation: https://6.docs.plone.org/
+    source: https://github.com/plone/plone.volto
+  license: GPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Plone answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: siteId
+    title: Site id
+    description: >-
+      The path the content sits under, and the first part of every URL: /Plone by default.
+    type: string
+    default: "Plone"
+    pattern: "^[A-Za-z][A-Za-z0-9_-]{0,30}$"
+  - name: adminUsername
+    title: Administrator's username
+    description: The Zope account, created before the site is.
+    type: string
+    default: admin
+  - name: adminPassword
+    title: Administrator's password
+    description: Leave it empty and one is generated.
+    type: secret
+    generate: {length: 24}
+  - name: dataVolume
+    title: Data volume
+    description: The object database and the blob store - all of the content.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      Zope keeps a large object cache; this is the setting to raise on a site with a lot of
+      content.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "6.2"
+    release: "6.2.2"
+    default: true
+    image: plone/plone-backend:6.2.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Zope's own readiness endpoint, which answers before the site exists and
+        # after. The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/ok
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: plone
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Creates the site on the first start, in the Classic flavour - the backend
+        # then serves a complete website as well as the API.
+        - {k: SITE, v: "${{ params.siteId }}"}
+        - {k: TYPE, v: classic}
+    secrets:
+      # Zope reads its first account from this file, one line of `user:password`.
+      # It is a secret rather than a config file because it is a password.
+      PLONE_INITUSER:
+        value: "${{ params.adminUsername }}:${{ params.adminPassword }}"
+        swarmRef:
+          file: {name: /app/inituser, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
