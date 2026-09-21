@@ -1497,6 +1497,47 @@
       }
     },
     {
+      "name": "cratedb",
+      "file": {
+        "path": "templates/cratedb.yaml",
+        "sha256": "1e11be45bd91fd77a915e1183f94bc532cf8e40daf444e4389160117a10f99d9"
+      },
+      "icon": {
+        "path": "icons/cratedb.svg",
+        "sha256": "4cc74e7396ea0175afc8942c1dc7710fde27d730589c27e6efe2713fcf917534"
+      },
+      "title": "CrateDB",
+      "tagline": "Distributed SQL for time series, logs and anything else that arrives fast",
+      "categories": [
+        "databases/analytics",
+        "databases/sql",
+        "databases/time-series"
+      ],
+      "tags": [
+        "sql",
+        "analytics",
+        "time-series",
+        "open-source"
+      ],
+      "aliases": [
+        "crate",
+        "distributed sql",
+        "iot database",
+        "elasticsearch sql"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "6.4",
+          "release": "6.4.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "cyberchef",
       "file": {
         "path": "templates/cyberchef.yaml",
@@ -1565,6 +1606,53 @@
         {
           "name": "1.2",
           "release": "1.2.947",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "dependency-track",
+      "file": {
+        "path": "templates/dependency-track.yaml",
+        "sha256": "8e0a9217a32e439b5b5bb3238217182094031d3acd225c8bfd74b40b5d4a291d"
+      },
+      "icon": {
+        "path": "icons/dependency-track.svg",
+        "sha256": "236ed8013e315e3d7d7ae55b934d200c2e186b5cc25da31d236b553412ace9d1"
+      },
+      "title": "Dependency-Track",
+      "tagline": "Track what your software is made of, and what is wrong with it today",
+      "categories": [
+        "webapps/security",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "testing",
+        "containers",
+        "open-source"
+      ],
+      "aliases": [
+        "sbom",
+        "cyclonedx",
+        "vulnerability",
+        "supply chain",
+        "owasp"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.14",
+          "release": "4.14.4",
           "default": true
         }
       ],
@@ -1700,6 +1788,54 @@
         {
           "name": "2.3",
           "release": "2.3.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "dolibarr",
+      "file": {
+        "path": "templates/dolibarr.yaml",
+        "sha256": "2b12c1690275b02835637a8dec9a740ae885f5d1d973e8799b0b143627cc1da0"
+      },
+      "icon": {
+        "path": "icons/dolibarr.svg",
+        "sha256": "9bae66e9a28188ae34d5b2e9ef9ecaa93424d256e9ead5caee5a4edeb3e071c9"
+      },
+      "title": "Dolibarr",
+      "tagline": "ERP and CRM for a small company - quotes, invoices, stock, payroll",
+      "categories": [
+        "webapps/business",
+        "webapps/ecommerce"
+      ],
+      "tags": [
+        "ecommerce",
+        "business-intelligence",
+        "open-source"
+      ],
+      "aliases": [
+        "erp",
+        "crm",
+        "invoicing",
+        "accounting",
+        "stock",
+        "point of sale"
+      ],
+      "license": "GPL-3.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "22",
+          "release": "22.0.5",
           "default": true
         }
       ],
@@ -2107,6 +2243,43 @@
         {
           "name": "2026.05",
           "release": "2026.05.06",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "factorio",
+      "file": {
+        "path": "templates/factorio.yaml",
+        "sha256": "6eee9cc3181bc443646a726e9981d376980b06b0ee0560ab2539c1e578056171"
+      },
+      "icon": {
+        "path": "icons/factorio.svg",
+        "sha256": "7c69aec0f9709577fea4bed0840ad10043c67f7fef68e80e47a93c7fb476612d"
+      },
+      "title": "Factorio Server",
+      "tagline": "A headless Factorio server for a factory that keeps running",
+      "categories": [
+        "games/servers"
+      ],
+      "tags": [
+        "game-server",
+        "open-source"
+      ],
+      "aliases": [
+        "factory",
+        "game server",
+        "multiplayer",
+        "headless"
+      ],
+      "license": "Proprietary",
+      "versions": [
+        {
+          "name": "2.1",
+          "release": "2.1.19",
           "default": true
         }
       ],
@@ -4337,6 +4510,47 @@
       }
     },
     {
+      "name": "kiwix",
+      "file": {
+        "path": "templates/kiwix.yaml",
+        "sha256": "3243eb12e09781728308eb3b7b5b31132eb7f21f9c3b71d4bc5fc4765a5a9fa5"
+      },
+      "icon": {
+        "path": "icons/kiwix.svg",
+        "sha256": "3bcac12e51a638ada44693dffd16dd1b4c7e974ccddbd6b878deb9546c1009ce"
+      },
+      "title": "Kiwix",
+      "tagline": "Wikipedia and the rest of the web's libraries, served from your own disk",
+      "categories": [
+        "webapps/knowledge",
+        "webapps/media"
+      ],
+      "tags": [
+        "search",
+        "full-text",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "wikipedia offline",
+        "zim",
+        "offline wiki",
+        "kiwix-serve",
+        "library"
+      ],
+      "license": "GPL-3.0-or-later",
+      "versions": [
+        {
+          "name": "3.8",
+          "release": "3.8.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "komga",
       "file": {
         "path": "templates/komga.yaml",
@@ -5536,6 +5750,44 @@
         {
           "name": "2026.9",
           "release": "2026.9.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "minecraft-bedrock",
+      "file": {
+        "path": "templates/minecraft-bedrock.yaml",
+        "sha256": "7f3697be6d64397b12e4ab148761314c28a2726ebae7834098776eaf80f212a1"
+      },
+      "icon": {
+        "path": "icons/minecraft-bedrock.svg",
+        "sha256": "b78801273d099ef8505210dc2eb774344c806a38e772edfb0ec061bb3652ed6f"
+      },
+      "title": "Minecraft Bedrock Server",
+      "tagline": "A Bedrock Edition server - phones, consoles, tablets and Windows",
+      "categories": [
+        "games/servers"
+      ],
+      "tags": [
+        "game-server",
+        "open-source"
+      ],
+      "aliases": [
+        "minecraft bedrock",
+        "pocket edition",
+        "mcpe",
+        "console",
+        "game server"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.0",
           "default": true
         }
       ],
@@ -8016,6 +8268,53 @@
       }
     },
     {
+      "name": "rallly",
+      "file": {
+        "path": "templates/rallly.yaml",
+        "sha256": "2d806a03120ce2a3b99eb261fa2224921c8bb085e1bfc507c03ca0556e4915e6"
+      },
+      "icon": {
+        "path": "icons/rallly.svg",
+        "sha256": "1b904d106bf6198f20aa3399728678413031d4da98fba31ace284058957f25c0"
+      },
+      "title": "Rallly",
+      "tagline": "Find a time everyone can make, without a poll on someone else's server",
+      "categories": [
+        "webapps/scheduling",
+        "webapps/business"
+      ],
+      "tags": [
+        "scheduling",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "doodle alternative",
+        "when2meet",
+        "scheduling",
+        "poll",
+        "meeting"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.15",
+          "release": "4.15.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "readeck",
       "file": {
         "path": "templates/readeck.yaml",
@@ -8557,6 +8856,53 @@
       }
     },
     {
+      "name": "semaphore",
+      "file": {
+        "path": "templates/semaphore.yaml",
+        "sha256": "ef8b71a43608d362048f39d5278893758244b4e58b24e6d5f8deebc03a8c4fb6"
+      },
+      "icon": {
+        "path": "icons/semaphore.svg",
+        "sha256": "c2cbd5f22ada0d84d3952f4f1307b84d3df147b15df6b65c32ad93a5b326b5a3"
+      },
+      "title": "Semaphore UI",
+      "tagline": "Run Ansible, Terraform and scripts from a web interface, on a schedule",
+      "categories": [
+        "webapps/automation",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "automation",
+        "containers",
+        "open-source"
+      ],
+      "aliases": [
+        "ansible",
+        "ansible semaphore",
+        "terraform",
+        "opentofu",
+        "playbook"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.19",
+          "release": "2.19.14",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "sftpgo",
       "file": {
         "path": "templates/sftpgo.yaml",
@@ -8881,6 +9227,47 @@
         {
           "name": "0.13",
           "release": "0.13.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "step-ca",
+      "file": {
+        "path": "templates/step-ca.yaml",
+        "sha256": "4d1d0f8f5dbfb7570500f3c602239c4211e1ad48e176c2fde61fc571140e4866"
+      },
+      "icon": {
+        "path": "icons/step-ca.svg",
+        "sha256": "409c00614903a31bcd7aeb4eadd3efe11a33c4be213856e84a1a6c84a56afc77"
+      },
+      "title": "step-ca",
+      "tagline": "Your own certificate authority, with ACME for everything inside",
+      "categories": [
+        "webapps/security",
+        "webapps/networking"
+      ],
+      "tags": [
+        "identity",
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "certificate authority",
+        "ca",
+        "acme",
+        "pki",
+        "x509",
+        "mtls"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.30",
+          "release": "0.30.2",
           "default": true
         }
       ],
@@ -9426,6 +9813,46 @@
         {
           "name": "0.105",
           "release": "0.105.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "trino",
+      "file": {
+        "path": "templates/trino.yaml",
+        "sha256": "88aed19f5889bc93a22ca0af5d4351fb56da47229ea364f8b5d242f760fb5978"
+      },
+      "icon": {
+        "path": "icons/trino.svg",
+        "sha256": "10a1bf3b226b2c746dcb640c59f135fbbb7827375492e26f0dd41b5bbced9a6c"
+      },
+      "title": "Trino",
+      "tagline": "One SQL engine over the databases and object stores you already have",
+      "categories": [
+        "databases/analytics",
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "presto",
+        "query engine",
+        "federated sql",
+        "lakehouse",
+        "data lake"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "483",
+          "release": "483",
           "default": true
         }
       ],

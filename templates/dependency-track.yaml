@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dependency-track
+  title: Dependency-Track
+  tagline: Track what your software is made of, and what is wrong with it today
+  description: |
+    Dependency-Track takes the bill of materials your build produces - an SBOM in
+    CycloneDX form - and keeps watching it. A vulnerability published next month against a
+    library you shipped last year shows up against that release, with the projects
+    affected, rather than waiting for the next scan. It also tracks licences, outdated
+    components and its own policy rules, and it has an API your pipeline can upload to.
+
+    **This template creates two apps**
+
+    - **Dependency-Track**, API and web interface in one, on a volume
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password `admin`; it asks you to change it at once. Then
+    make a team, give it an API key, and have your build upload with it:
+
+    ```sh
+    curl -X POST https://<address>/api/v1/bom \
+      -H "X-Api-Key: <key>" -F project=<uuid> -F bom=@bom.json
+    ```
+
+    **The first start takes a while**
+
+    It downloads the National Vulnerability Database, the GitHub advisories and the OSV
+    feeds before anything is analysed - tens of minutes, and the web interface is up long
+    before that finishes.
+
+    **Memory**
+
+    It is a Java service with a large cache of every advisory it knows. Four gigabytes is
+    the floor the project gives; the heap takes 80% of whatever limit you set.
+  categories: [webapps/security, webapps/dev-tools]
+  tags: [testing, containers, open-source]
+  aliases: [sbom, cyclonedx, vulnerability, supply chain, owasp]
+  icon: icons/dependency-track.svg
+  links:
+    website: https://dependencytrack.org
+    documentation: https://docs.dependencytrack.org
+    source: https://github.com/DependencyTrack/dependency-track
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: The heap takes 80% of it. Four gigabytes is the project's own floor.
+    type: size
+    default: 4GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the vulnerability feeds, the search index and the uploaded bills of
+      materials are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: dtrack
+      username: dtrack
+
+versions:
+  - name: "4.14"
+    release: "4.14.4"
+    default: true
+    # The bundled image: the API server and the web interface in one container.
+    image: dependencytrack/bundled:4.14.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8080/health
+        interval: 30s
+        timeout: 5s
+        # It migrates the database and opens its indexes before it answers.
+        startPeriod: 240s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: dependency-track
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Its own embedded database is the default; this points it at the app beside it.
+        - {k: ALPINE_DATABASE_MODE, v: external}
+        - {k: ALPINE_DATABASE_DRIVER, v: org.postgresql.Driver}
+        - k: ALPINE_DATABASE_URL
+          v: >-
+            jdbc:postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{
+            deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: ALPINE_DATABASE_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: ALPINE_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Everything it keeps - feeds, index, uploads - under the volume.
+        - {k: ALPINE_DATA_DIRECTORY, v: /data}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

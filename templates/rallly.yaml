@@ -1,0 +1,180 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rallly
+  title: Rallly
+  tagline: Find a time everyone can make, without a poll on someone else's server
+  description: |
+    Rallly settles the "when are we all free" thread: propose a handful of dates and times,
+    send one link, and everyone marks what suits them on a grid. No account is needed to
+    answer, comments hang off the poll, and the organiser closes it on the option that
+    wins.
+
+    **This template creates two apps**
+
+    - **Rallly**, with its own address
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **It sends mail to let people in**
+
+    Signing in is a code sent by e-mail, and every participant gets the invitation that
+    way, so Rallly is not usable without an SMTP server. Fill in the mail settings below
+    with what your provider gives you.
+
+    **It needs a domain**
+
+    The address goes into every invitation and into the links people answer at, and it is
+    also what the sign-in flow checks the request against. Give it its domain when you
+    create it.
+
+    **After the first deployment**
+
+    Open the address, sign in with your own e-mail, and the first account is yours. To keep
+    the instance to yourself and your colleagues, set `ALLOWED_EMAILS` in the app's
+    environment variables to a pattern such as `*@example.com`.
+  categories: [webapps/scheduling, webapps/business]
+  tags: [scheduling, collaboration, open-source]
+  aliases: [doodle alternative, when2meet, scheduling, poll, meeting]
+  icon: icons/rallly.svg
+  links:
+    website: https://rallly.co
+    documentation: https://support.rallly.co/self-hosting
+    source: https://github.com/lukevella/rallly
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people answer polls at, scheme and all - https://when.example.com. It is
+      written into every invitation.
+    type: string
+    default: https://when.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: smtpHost
+    title: Mail server
+    description: The SMTP host invitations and sign-in codes are sent through.
+    type: string
+    default: smtp.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    description: 587 for STARTTLS, 465 for TLS from the first byte, 25 for a relay nearby.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: TLS from the first byte
+    description: On for port 465. Leave it off for 587, which starts plain and upgrades.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: Mail user name
+    description: What Rallly signs in to the mail server as. Leave empty for a relay that asks for nothing.
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    description: The password for that account.
+    type: secret
+    optional: true
+  - name: fromEmail
+    title: From address
+    description: What invitations and sign-in codes are sent from.
+    type: string
+    default: rallly@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: secretPassword
+    title: Session secret
+    description: Signs the sessions and the sign-in codes. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: rallly
+      username: rallly
+
+versions:
+  - name: "4.15"
+    release: "4.15.2"
+    default: true
+    image: lukevella/rallly:4.15.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/api/status
+        interval: 20s
+        timeout: 10s
+        # Every start runs the database migrations before the server listens.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: rallly
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NEXT_PUBLIC_BASE_URL, v: "${{ params.appUrl }}"}
+        - {k: PORT, v: "3000"}
+        # Prisma takes one connection string and nothing else. The password it carries is
+        # generated by the database app beside this one, which keeps it to letters and
+        # digits, so there is nothing in it to escape.
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{
+            deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{
+            deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: SECRET_PASSWORD, v: "${secrets.SECRET_PASSWORD}"}
+        - {k: NOREPLY_EMAIL, v: "${{ params.fromEmail }}"}
+        - {k: SUPPORT_EMAIL, v: "${{ params.fromEmail }}"}
+        - {k: SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+        - {k: SMTP_USER, v: "${{ params.smtpUser }}"}
+        - {k: SMTP_PWD, v: "${secrets.SMTP_PWD}"}
+    secrets:
+      SECRET_PASSWORD:
+        value: "${{ params.secretPassword }}"
+      SMTP_PWD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

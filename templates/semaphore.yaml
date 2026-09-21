@@ -1,0 +1,175 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: semaphore
+  title: Semaphore UI
+  tagline: Run Ansible, Terraform and scripts from a web interface, on a schedule
+  description: |
+    Semaphore UI puts a web interface in front of the automation you already write: it
+    clones your repository, keeps the keys and passwords the playbooks need, and runs
+    Ansible, OpenTofu, Terraform, Pulumi or a plain script on demand, on a schedule, or
+    from a webhook. Every run is logged, so what changed and who asked for it is a matter
+    of record rather than of shell history.
+
+    **This template creates two apps**
+
+    - **Semaphore UI**, on a volume for the repositories it clones and the keys it holds
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in as `admin` with the password below, then add a key store entry, a repository
+    and an inventory, and the first template to run.
+
+    **The keys are encrypted with the key below**
+
+    Everything in the key store - SSH keys, passwords, cloud credentials - is encrypted
+    with the encryption key, which is a parameter here rather than something on the volume.
+    Losing it means losing the key store; keep it with your backup, and do not change it
+    once anything has been stored.
+
+    **What it can reach**
+
+    Playbooks run inside this app, so they reach what the app reaches: the project network,
+    and whatever the node can route to. Ansible, OpenTofu and Terraform are in the image
+    already.
+  categories: [webapps/automation, webapps/dev-tools]
+  tags: [automation, containers, open-source]
+  aliases: [ansible, ansible semaphore, terraform, opentofu, playbook]
+  icon: icons/semaphore.svg
+  links:
+    website: https://semaphoreui.com
+    documentation: https://docs.semaphoreui.com
+    source: https://github.com/semaphoreui/semaphore
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address it is reached at, scheme and all - https://semaphore.example.com. It is
+      what the links in alerts and webhooks point at.
+    type: string
+    default: https://semaphore.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[a-z0-9._-]{2,32}$'
+  - name: adminEmail
+    title: Administrator e-mail
+    description: Where alerts about failed runs are addressed.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: adminPassword
+    title: Administrator password
+    description: What that account signs in with. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: encryptionKey
+    title: Key store encryption key
+    description: >-
+      Encrypts everything in the key store. It is base64 of 16, 24 or 32 bytes - what
+      `openssl rand -base64 32` prints. Leave empty to generate one, and never change it
+      afterwards.
+    type: secret
+    minLength: 24
+    maxLength: 44
+    # 32 characters of letters and digits is base64 of 24 bytes, which is one of the
+    # three lengths AES takes.
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: A run forks Ansible beside the server; a gigabyte covers both comfortably.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the cloned repositories and the key store files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: semaphore
+      username: semaphore
+
+versions:
+  - name: "2.19"
+    release: "2.19.14"
+    default: true
+    image: semaphoreui/semaphore:v2.19.14
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/semaphore: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has busybox wget and no curl.
+        command: wget -qO- http://127.0.0.1:3000/api/ping | grep -q pong
+        interval: 20s
+        timeout: 10s
+        # The first start writes its configuration and runs the migrations.
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: semaphore
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SEMAPHORE_DB_DIALECT, v: postgres}
+        - {k: SEMAPHORE_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: SEMAPHORE_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: SEMAPHORE_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: SEMAPHORE_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: SEMAPHORE_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SEMAPHORE_ADMIN, v: "${{ params.adminUser }}"}
+        - {k: SEMAPHORE_ADMIN_NAME, v: "${{ params.adminUser }}"}
+        - {k: SEMAPHORE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: SEMAPHORE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: SEMAPHORE_ACCESS_KEY_ENCRYPTION, v: "${secrets.ENCRYPTION_KEY}"}
+        # What the setup calls the public URL: the address links in alerts point at.
+        - {k: SEMAPHORE_WEB_ROOT, v: "${{ params.appUrl }}"}
+        # Where repositories are cloned and playbooks run from, on the volume rather than
+        # in the container's own writable layer.
+        - {k: SEMAPHORE_TMP_PATH, v: /var/lib/semaphore/tmp}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

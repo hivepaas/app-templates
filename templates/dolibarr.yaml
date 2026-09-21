@@ -1,0 +1,170 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dolibarr
+  title: Dolibarr
+  tagline: ERP and CRM for a small company - quotes, invoices, stock, payroll
+  description: |
+    Dolibarr is the back office of a small company in one application: customers and
+    prospects, quotes that become orders and orders that become invoices, products and
+    stock, purchasing, projects and time, and a point of sale. Everything is a module you
+    switch on, so it starts small and grows into the parts you actually use.
+
+    **This template creates two apps**
+
+    - **Dolibarr**, with a volume for the documents it generates and stores
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in with the administrator account below. Then open Setup, Modules, and turn on
+    what you need - invoices, stock, projects - and Setup, Company, to enter your own
+    details, which is what appears on every document.
+
+    **It needs a domain**
+
+    The address ends up in the documents it generates and in the links it mails, and its
+    session cookie expects it. Give it its domain when you create it.
+
+    **Backups are two things**
+
+    The database holds the records and the volume holds the files - invoices as PDFs,
+    attachments, the generated documents. Keep both.
+  categories: [webapps/business, webapps/ecommerce]
+  tags: [ecommerce, business-intelligence, open-source]
+  aliases: [erp, crm, invoicing, accounting, stock, point of sale]
+  icon: icons/dolibarr.svg
+  links:
+    website: https://www.dolibarr.org
+    documentation: https://wiki.dolibarr.org
+    source: https://github.com/Dolibarr/dolibarr
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://erp.example.com.
+    type: string
+    default: https://erp.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[a-z0-9._-]{2,32}$'
+  - name: adminPassword
+    title: Administrator password
+    description: What that account signs in with. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: uniqueId
+    title: Instance key
+    description: >-
+      Salts the links Dolibarr sends out - public quotes, payment pages, the ticket forms.
+      Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: uploadLimit
+    title: Largest attachment
+    description: The size of one uploaded file, as PHP writes it - 16M, 64M.
+    type: string
+    default: 32M
+    pattern: '^[1-9][0-9]*M$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Documents volume
+    description: The volume the generated documents and attachments are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: dolibarr
+      username: dolibarr
+
+versions:
+  - name: "22"
+    release: "22.0.5"
+    default: true
+    image: dolibarr/dolibarr:22.0.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/documents: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The sign-in page, which only answers once the installer has finished and the
+        # tables are there.
+        command: curl -fsS -o /dev/null http://127.0.0.1/index.php
+        interval: 20s
+        timeout: 10s
+        # The first start installs the schema and the modules.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: dolibarr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DOLI_DB_TYPE, v: mysqli}
+        - {k: DOLI_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DOLI_DB_HOST_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DOLI_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DOLI_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DOLI_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DOLI_ADMIN_LOGIN, v: "${{ params.adminUser }}"}
+        - {k: DOLI_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: DOLI_INSTANCE_UNIQUE_ID, v: "${secrets.INSTANCE_ID}"}
+        - {k: DOLI_URL_ROOT, v: "${{ params.appUrl }}"}
+        # Run the installer on the first start rather than waiting for someone to walk
+        # through it in a browser, and keep the installer closed afterwards.
+        - {k: DOLI_INSTALL_AUTO, v: "1"}
+        - {k: DOLI_PROD, v: "1"}
+        - {k: DOLI_INIT_DEMO, v: "0"}
+        - {k: PHP_INI_MEMORY_LIMIT, v: 512M}
+        - {k: PHP_INI_UPLOAD_MAX_FILESIZE, v: "${{ params.uploadLimit }}"}
+        - {k: PHP_INI_POST_MAX_SIZE, v: "${{ params.uploadLimit }}"}
+        - {k: PHP_INI_DATE_TIMEZONE, v: UTC}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      INSTANCE_ID:
+        value: "${{ params.uniqueId }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

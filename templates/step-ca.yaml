@@ -1,0 +1,174 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: step-ca
+  title: step-ca
+  tagline: Your own certificate authority, with ACME for everything inside
+  description: |
+    step-ca issues the certificates your own machines and services use. It is a private
+    certificate authority with ACME built in, so the same clients that talk to Let's
+    Encrypt - certbot, Caddy, Traefik, acme.sh, cert-manager - get certificates from it for
+    names that will never exist on the public internet. It also signs SSH certificates,
+    which replaces spreading `authorized_keys` around.
+
+    **This template sets up**
+
+    - the CA, on a volume for its root key, its database and its configuration
+    - an ACME provisioner, so clients can get certificates without a token
+    - the CA's port published on the node
+    - a password that encrypts the keys, generated unless you give one
+
+    **After the first deployment**
+
+    Read the fingerprint of the root certificate from the app's console:
+
+    ```sh
+    step certificate fingerprint /home/step/certs/root_ca.crt
+    ```
+
+    Then, on each machine, trust the CA and point ACME at it:
+
+    ```sh
+    step ca bootstrap --ca-url https://ca.example.com:9000 --fingerprint <fingerprint>
+    certbot ... --server https://ca.example.com:9000/acme/acme/directory
+    ```
+
+    **The CA's own name has to be right from the start**
+
+    The names below go into the CA's certificate, and clients check what they connect to
+    against them. Changing them later means issuing a new CA certificate and trusting it
+    everywhere again.
+
+    **It speaks HTTPS itself**
+
+    So it is published on the node's port rather than routed through a domain: the whole
+    point is the certificate it presents. Nothing in front of it may terminate TLS.
+
+    **Keep the password**
+
+    The root and intermediate keys on the volume are encrypted with it. Without it the CA
+    cannot start, and nothing can rebuild it.
+  categories: [webapps/security, webapps/networking]
+  tags: [identity, networking, open-source]
+  aliases: [certificate authority, ca, acme, pki, x509, mtls]
+  icon: icons/step-ca.svg
+  links:
+    website: https://smallstep.com/certificates/
+    documentation: https://smallstep.com/docs/step-ca/
+    source: https://github.com/smallstep/certificates
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: caName
+    title: Authority name
+    description: What the root certificate is named - what people see when they inspect it.
+    type: string
+    default: Example Internal CA
+    pattern: '^[^\n]{1,64}$'
+  - name: dnsNames
+    title: Addresses it answers on
+    description: >-
+      The names and addresses clients reach the CA at, separated by commas - they go into
+      its own certificate. Include the node's name if clients use it.
+    type: string
+    default: ca.example.com
+    pattern: '^[A-Za-z0-9*.:_-]+(,[A-Za-z0-9*.:_-]+)*$'
+    maxLength: 500
+  - name: provisionerName
+    title: Provisioner name
+    description: >-
+      The name of the first provisioner, which issues certificates to whoever knows its
+      password. An e-mail address is the convention.
+    type: string
+    default: admin@example.com
+    pattern: '^[^\s,]{1,64}$'
+  - name: acme
+    title: ACME provisioner
+    description: >-
+      Add a provisioner that speaks ACME, so certbot, Caddy and the rest can get
+      certificates without a token.
+    type: bool
+    default: true
+  - name: caPort
+    title: Port
+    description: The port on the node clients reach the CA at.
+    type: int
+    default: 9000
+    min: 1
+    max: 65535
+  - name: caPassword
+    title: Key password
+    description: >-
+      Encrypts the root and intermediate keys, and the first provisioner. Leave empty to
+      generate one - and then keep it, because the CA cannot start without it.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the keys, the certificate database and the configuration are kept on.
+    type: volume
+
+versions:
+  - name: "0.30"
+    release: "0.30.2"
+    default: true
+    image: smallstep/step-ca:0.30.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/step: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # The CA presents its own certificate, so nothing may terminate TLS in front of
+          # it: clients come to this port directly.
+          - {target: 9000, published: "${{ params.caPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own health endpoint, over the certificate it issued itself - which curl is
+        # told not to verify, since verifying it is the client's business, not ours.
+        command: curl -fsSk https://127.0.0.1:9000/health | grep -q ok
+        interval: 20s
+        timeout: 5s
+        # An empty volume generates the root and intermediate keys first.
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: step-ca
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The image runs `step ca init` from these on an empty volume, and ignores them
+        # afterwards.
+        - {k: DOCKER_STEPCA_INIT_NAME, v: "${{ params.caName }}"}
+        - {k: DOCKER_STEPCA_INIT_DNS_NAMES, v: "${{ params.dnsNames }}"}
+        - {k: DOCKER_STEPCA_INIT_PROVISIONER_NAME, v: "${{ params.provisionerName }}"}
+        - {k: DOCKER_STEPCA_INIT_ACME, v: "${{ params.acme }}"}
+        - {k: DOCKER_STEPCA_INIT_ADDRESS, v: ":9000"}
+        # Administrators are managed through the API rather than by editing ca.json.
+        - {k: DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT, v: "true"}
+        - {k: DOCKER_STEPCA_INIT_PASSWORD, v: "${secrets.CA_PASSWORD}"}
+    secrets:
+      CA_PASSWORD:
+        value: "${{ params.caPassword }}"

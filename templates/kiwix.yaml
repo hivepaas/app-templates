@@ -1,0 +1,134 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kiwix
+  title: Kiwix
+  tagline: Wikipedia and the rest of the web's libraries, served from your own disk
+  description: |
+    Kiwix serves ZIM files: whole websites packed into one compressed, searchable archive.
+    The usual one is Wikipedia - all of it, with pictures, around 100 GB, or a text-only
+    version at a tenth of that - but the library also has Stack Exchange, Project
+    Gutenberg, WikiHow, Khan Academy, the Arch and Gentoo wikis and hundreds more. Once the
+    file is on the volume nothing goes out to the internet, which is the point on a boat, a
+    school network or an unreliable line.
+
+    **This template sets up**
+
+    - kiwix-serve, reading every `.zim` file on its volume
+    - full-text search and the reader, at the app's address
+    - a memory limit you choose
+
+    **You have to put a ZIM file on the volume first**
+
+    Without one the app has nothing to serve and will not start. Either give a download
+    address below, or open the app's console and fetch one yourself:
+
+    ```sh
+    cd /data && wget https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_maxi.zim
+    ```
+
+    The catalogue is at https://library.kiwix.org, and every file there has a download
+    link. Restart the app after adding or removing files - it reads the volume at start.
+
+    **The download address is for the first start**
+
+    It is fetched at every start, over the file already there, so clear it once the file
+    has arrived.
+
+    **Memory**
+
+    Serving is cheap; the file is read from disk rather than loaded. The volume is what has
+    to be large.
+
+    **It has no accounts**
+
+    Anyone who reaches it can read everything on it. Put HTTP basic authentication in front
+    of the domain if that is not what you want.
+  categories: [webapps/knowledge, webapps/media]
+  tags: [search, full-text, documents, open-source]
+  aliases: [wikipedia offline, zim, offline wiki, kiwix-serve, library]
+  icon: icons/kiwix.svg
+  links:
+    website: https://kiwix.org
+    documentation: https://kiwix.github.io/kiwix-tools/
+    source: https://github.com/kiwix/kiwix-tools
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: downloadUrl
+    title: ZIM file to download
+    description: >-
+      Fetched into the volume at start, if you give one. It is fetched again at every
+      start, so clear it once the file is there.
+    type: string
+    optional: true
+    pattern: '^https?://[^\s]+\.zim$'
+    maxLength: 500
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Library volume
+    description: >-
+      The volume the ZIM files are kept on. Wikipedia in full is around 100 GB; the
+      text-only version is around 10 GB.
+    type: volume
+
+versions:
+  - name: "3.8"
+    release: "3.8.2"
+    default: true
+    image: ghcr.io/kiwix/kiwix-serve:3.8.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's script appends this to kiwix-serve unquoted, so the pattern is
+      # expanded inside the container: every ZIM file on the volume is served.
+      command: /data/*.zim
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The catalogue: static, and only answered once the ZIM files are opened. The
+        # image has busybox wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/catalog/searchdescription.xml
+        interval: 20s
+        timeout: 10s
+        # A download, when one is asked for, happens before the server starts.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kiwix
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PORT, v: "8080"}
+        - {k: DOWNLOAD, v: "${{ params.downloadUrl }}"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

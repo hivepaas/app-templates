@@ -1,0 +1,161 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: factorio
+  title: Factorio Server
+  tagline: A headless Factorio server for a factory that keeps running
+  description: |
+    A headless Factorio server: the map runs whether or not anyone is playing, so the
+    factory keeps growing between sessions and players join and leave as they like. Mods,
+    saves and settings all live on the volume.
+
+    **This template sets up**
+
+    - the server, on a volume for the saves, mods and settings
+    - the game port published on the node over UDP
+    - an RCON password for the console, generated unless you give one
+    - a memory limit you choose
+
+    **Connecting**
+
+    Players add the node's address and the game port in Multiplayer, Connect to address -
+    `factory.example.com:34197`. Nothing here speaks HTTP, so the app takes no domain.
+
+    **The first start makes a map**
+
+    An empty volume gets a new map, generated with the preset you choose. To play an
+    existing one instead, put the save in `/factorio/saves` through the app's console
+    before the first start and give its name below.
+
+    **Mods**
+
+    Drop them in `/factorio/mods` from the console and restart. Turn on "Update mods at
+    start" to have the server keep them current, which needs a factorio.com account: add
+    `UPDATE_MODS_ON_START`'s companions `USERNAME` and `TOKEN` as environment variables in
+    the app's settings.
+
+    **Who may join**
+
+    The server is public on the node's port with no password. Set `GAME_PASSWORD` as an
+    environment variable to ask for one.
+  categories: [games/servers]
+  tags: [game-server, open-source]
+  aliases: [factory, game server, multiplayer, headless]
+  icon: icons/factorio.svg
+  links:
+    website: https://factorio.com
+    documentation: https://github.com/factoriotools/factorio-docker#readme
+    source: https://github.com/factoriotools/factorio-docker
+  license: Proprietary
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: saveName
+    title: Save name
+    description: The save the server loads, and creates on an empty volume.
+    type: string
+    default: _autosave1
+    pattern: '^[A-Za-z0-9._-]{1,64}$'
+  - name: mapPreset
+    title: Map preset
+    description: What the map is generated from, when there is none to load.
+    type: select
+    default: default
+    options:
+      - {value: default, title: Default}
+      - {value: rich-resources, title: "Rich resources"}
+      - {value: marathon, title: "Marathon (slower recipes)"}
+      - {value: death-world, title: "Death world (relentless biters)"}
+      - {value: rail-world, title: "Rail world (far-apart ore, few biters)"}
+  - name: spaceAge
+    title: Space Age
+    description: >-
+      Load the Space Age expansion. Everyone who joins has to own it; turn it off for a
+      base-game server.
+    type: bool
+    default: false
+  - name: updateMods
+    title: Update mods at start
+    description: >-
+      Fetch newer versions of the installed mods at every start. It needs a factorio.com
+      account - add USERNAME and TOKEN in the app's environment variables.
+    type: bool
+    default: false
+  - name: gamePort
+    title: Game port
+    description: The UDP port on the node players connect to.
+    type: int
+    default: 34197
+    min: 1
+    max: 65535
+  - name: rconPassword
+    title: RCON password
+    description: For the server console. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: A large map with many players is what uses it.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the saves, mods, settings and logs are kept on.
+    type: volume
+
+versions:
+  - name: "2.1"
+    release: "2.1.19"
+    default: true
+    image: factoriotools/factorio:2.1.19
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /factorio: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # Factorio is UDP only; the client sends to this port and nothing else.
+          - {target: 34197, published: "${{ params.gamePort }}", protocol: udp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # There is nothing to ask over UDP without speaking the game's protocol, so this
+        # asks the console port instead: RCON listens once the map is loaded.
+        command: bash -c 'exec 3<>/dev/tcp/127.0.0.1/27015'
+        interval: 30s
+        timeout: 5s
+        # An empty volume generates a map first, which takes a while.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: factorio
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SAVE_NAME, v: "${{ params.saveName }}"}
+        - {k: GENERATE_NEW_SAVE, v: "true"}
+        - {k: PRESET, v: "${{ params.mapPreset }}"}
+        - {k: DLC_SPACE_AGE, v: "${{ params.spaceAge }}"}
+        - {k: UPDATE_MODS_ON_START, v: "${{ params.updateMods }}"}
+        # What the server tells clients its port is, and what it binds.
+        - {k: PORT, v: "34197"}
+        - {k: RCON_PASSWORD, v: "${secrets.RCON_PASSWORD}"}
+    secrets:
+      RCON_PASSWORD:
+        value: "${{ params.rconPassword }}"

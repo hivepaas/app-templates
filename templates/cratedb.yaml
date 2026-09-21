@@ -1,0 +1,126 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cratedb
+  title: CrateDB
+  tagline: Distributed SQL for time series, logs and anything else that arrives fast
+  description: |
+    CrateDB takes SQL and puts a search engine underneath it: tables are sharded and
+    indexed like documents, so it swallows machine data, logs and time series at a rate a
+    row store would not keep up with, and still answers ordinary SQL with joins and
+    aggregates. It speaks the PostgreSQL wire protocol, so psql, JDBC and most drivers
+    connect to it unchanged, and it ships with an admin interface of its own.
+
+    **This template sets up**
+
+    - CrateDB as a single node that is its own cluster
+    - a volume for the tables and their indexes
+    - the admin interface, and the PostgreSQL protocol on 5432
+    - a heap and a memory limit you choose
+
+    **Connecting**
+
+    Other apps use `<the app's key>:5432` with the user `crate` and no password, or the
+    HTTP endpoint on 4200. Grafana, Superset and Metabase in this store all read it through
+    their PostgreSQL data source.
+
+    **It starts with no password**
+
+    The `crate` user has none, and turning authentication on means writing a host-based
+    configuration this template cannot seed. Keep it on the project network; if you publish
+    the admin interface, put HTTP basic authentication in front of the domain.
+
+    **Memory**
+
+    The heap is what CrateDB gets, and the limit has to leave room above it - keep the
+    limit about twice the heap. Half the machine as heap is CrateDB's own advice.
+
+    **It is one node**
+
+    Replicas need more of them: tables are created with `number_of_replicas = 0` here, and
+    the volume is the only copy of the data.
+  categories: [databases/analytics, databases/sql, databases/time-series]
+  tags: [sql, analytics, time-series, open-source]
+  aliases: [crate, distributed sql, iot database, elasticsearch sql]
+  icon: icons/cratedb.svg
+  links:
+    website: https://cratedb.com
+    documentation: https://cratedb.com/docs/
+    source: https://github.com/crate/crate
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: heapSize
+    title: Heap size
+    description: Memory for CrateDB itself, as Java writes it - 1g, 2g, 512m.
+    type: string
+    default: 1g
+    pattern: '^[1-9][0-9]*[mg]$'
+  - name: domain
+    title: Domain
+    description: >-
+      A domain for the admin interface. Leave it empty to keep CrateDB on the project
+      network, which is the usual place for it.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: About twice the heap, which leaves room for the index caches beside it.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the tables, their indexes and the translog are kept on.
+    type: volume
+
+versions:
+  - name: "6.4"
+    release: "6.4.4"
+    default: true
+    image: crate:6.4.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # One node that is its own cluster manager, rather than one waiting for peers.
+      command: >-
+        crate
+        -Cdiscovery.type=single-node
+        -Cnetwork.host=0.0.0.0
+        -Cpath.data=/data
+        -Cstats.enabled=true
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The HTTP endpoint answers with the node's name and version once it has joined
+        # itself and the tables are readable.
+        command: curl -fsS -o /dev/null http://127.0.0.1:4200/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: cratedb
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        - {k: CRATE_HEAP_SIZE, v: "${{ params.heapSize }}"}
+    routing:
+      port: 4200
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

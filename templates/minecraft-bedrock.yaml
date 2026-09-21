@@ -1,0 +1,189 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: minecraft-bedrock
+  title: Minecraft Bedrock Server
+  tagline: A Bedrock Edition server - phones, consoles, tablets and Windows
+  description: |
+    A Minecraft Bedrock Edition server, from the widely used itzg image: it downloads the
+    server Mojang publishes, keeps the world on a volume, and stops cleanly so nothing is
+    lost. Bedrock is what phones, tablets, consoles and the Windows edition play; the Java
+    Edition is a separate template in this store.
+
+    **This template sets up**
+
+    - the server, on a volume for the world, settings and behaviour packs
+    - the game port published on the node over UDP
+    - a memory limit you choose
+
+    **You have to accept the EULA**
+
+    Running a Minecraft server means agreeing to Mojang's EULA,
+    https://aka.ms/MinecraftEULA. The server does not start until "Accept the EULA" is on.
+
+    **Connecting**
+
+    Players add a server in game with the node's address and the game port -
+    `play.example.com`, port 19132. Bedrock speaks UDP only, so the app takes no domain.
+
+    **Who may join**
+
+    Leave "Require a Microsoft account" on, which is what stops anyone from joining as
+    anyone. The allow list, when it is on, is `allowlist.json` on the volume; add players
+    from the app's console with `send-command allowlist add <name>`.
+
+    **On an arm64 node**
+
+    Mojang publishes the server for x86 only, so on arm64 the image runs it under box64.
+    That works on some machines and not on others - where it does not, the server says it
+    started and never opens its port. An x86 node is the safe place for it.
+
+    **Consoles need more than a port**
+
+    Xbox and PlayStation only offer the Featured Servers list, and joining another server
+    from them takes a DNS trick outside HivePaaS. Phones, tablets and Windows connect
+    directly.
+  categories: [games/servers]
+  tags: [game-server, open-source]
+  aliases: [minecraft bedrock, pocket edition, mcpe, console, game server]
+  icon: icons/minecraft-bedrock.svg
+  links:
+    website: https://www.minecraft.net
+    documentation: https://docker-minecraft-server.readthedocs.io/en/latest/variants/bedrock/
+    source: https://github.com/itzg/docker-minecraft-bedrock-server
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: eula
+    title: Accept the EULA
+    description: I agree to the Minecraft EULA at https://aka.ms/MinecraftEULA.
+    type: bool
+    default: false
+  - name: serverName
+    title: Server name
+    description: What the server list shows.
+    type: string
+    default: A Bedrock server on HivePaaS
+    pattern: '^[^\n]{1,100}$'
+  - name: mcVersion
+    title: Server version
+    description: A release such as 1.21.130.4, or LATEST for the newest one at each start.
+    type: string
+    default: LATEST
+    pattern: '^(LATEST|PREVIEW|[0-9]+(\.[0-9]+){1,3})$'
+  - name: gameMode
+    title: Game mode
+    type: select
+    default: survival
+    options:
+      - {value: survival, title: Survival}
+      - {value: creative, title: Creative}
+      - {value: adventure, title: Adventure}
+  - name: difficulty
+    title: Difficulty
+    type: select
+    default: easy
+    options:
+      - {value: peaceful, title: Peaceful}
+      - {value: easy, title: Easy}
+      - {value: normal, title: Normal}
+      - {value: hard, title: Hard}
+  - name: levelName
+    title: World name
+    description: The folder the world is kept in, under `worlds` on the volume.
+    type: string
+    default: Bedrock level
+    pattern: '^[^\n/]{1,64}$'
+  - name: maxPlayers
+    title: Player limit
+    type: int
+    default: 10
+    min: 1
+    max: 100
+  - name: onlineMode
+    title: Require a Microsoft account
+    description: >-
+      Check every player against Xbox Live. Turning it off lets anyone join as any name.
+    type: bool
+    default: true
+  - name: allowList
+    title: Allow list
+    description: >-
+      Only let players on `allowlist.json` join. Add them from the app's console with
+      `send-command allowlist add <name>`.
+    type: bool
+    default: false
+  - name: gamePort
+    title: Game port
+    description: The UDP port on the node players connect to.
+    type: int
+    default: 19132
+    min: 1
+    max: 65535
+  - name: memoryLimit
+    title: Memory limit
+    description: The world's loaded area and the player count are what use it.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the world, settings and packs are kept on.
+    type: volume
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.0"
+    default: true
+    image: itzg/minecraft-bedrock-server:2026.9.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    networks:
+      endpointSpec:
+        ports:
+          # Bedrock is UDP; 19132 is IPv4 and the client expects it by default.
+          - {target: 19132, published: "${{ params.gamePort }}", protocol: udp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: a Bedrock server ping, as a client would send.
+        command: /usr/local/bin/bds-healthcheck
+        interval: 30s
+        timeout: 10s
+        # The first start downloads the server and generates the world. On arm64 the
+        # server runs under box64, which is slower still.
+        startPeriod: 600s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: minecraft-bedrock
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: EULA, v: "${{ params.eula }}"}
+        - {k: VERSION, v: "${{ params.mcVersion }}"}
+        - {k: SERVER_NAME, v: "${{ params.serverName }}"}
+        - {k: GAMEMODE, v: "${{ params.gameMode }}"}
+        - {k: DIFFICULTY, v: "${{ params.difficulty }}"}
+        - {k: LEVEL_NAME, v: "${{ params.levelName }}"}
+        - {k: MAX_PLAYERS, v: "${{ params.maxPlayers }}"}
+        - {k: ONLINE_MODE, v: "${{ params.onlineMode }}"}
+        - {k: ALLOW_LIST, v: "${{ params.allowList }}"}
+        # What the server binds inside the container; the node's port is set above.
+        - {k: SERVER_PORT, v: "19132"}
+        - {k: TZ, v: UTC}

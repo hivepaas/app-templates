@@ -1,0 +1,126 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: trino
+  title: Trino
+  tagline: One SQL engine over the databases and object stores you already have
+  description: |
+    Trino queries data where it lives. It stores nothing itself: you point it at a
+    PostgreSQL, a MySQL, a ClickHouse, Parquet files in S3, a Kafka topic, and then write
+    one SQL statement that joins across them. It is what Presto grew into, and it is fast
+    because it streams results through memory rather than writing intermediate tables.
+
+    **This template sets up**
+
+    - Trino with the coordinator and a worker in one process, which suits one node
+    - a volume for its spill and query history
+    - the built-in `tpch`, `tpcds`, `memory` and `jmx` catalogs, to try it with
+    - a memory limit you choose
+
+    **Connecting a data source**
+
+    A data source is a catalog, and a catalog is a small properties file. Add one under
+    Settings, Config Files, at `/etc/trino/catalog/<name>.properties`, and restart:
+
+    ```properties
+    connector.name=postgresql
+    connection-url=jdbc:postgresql://<the database app's key>:5432/<database>
+    connection-user=<user>
+    connection-password=<password>
+    ```
+
+    Then query it as `<name>.<schema>.<table>`. The connectors are listed in the
+    documentation; the same file shape works for all of them.
+
+    **Querying it**
+
+    The web interface at the app's address shows running queries. Clients - the `trino`
+    CLI, DBeaver, the Python and JDBC drivers, Superset and Metabase in this store -
+    connect to the same address, with any user name and no password.
+
+    **It has no accounts**
+
+    Trino's password authentication needs TLS, which ends at the reverse proxy here, so
+    this template leaves it off: anything that reaches it can query every catalog. Keep
+    it on the project network, and put HTTP basic authentication in front of the domain if
+    you publish it.
+
+    **Memory**
+
+    The Java heap takes 80% of the limit by itself. Two gigabytes is a floor; a query over
+    a large table wants far more, and the limit is what stops it taking the node down.
+  categories: [databases/analytics, databases/sql]
+  tags: [sql, analytics, open-source]
+  aliases: [presto, query engine, federated sql, lakehouse, data lake]
+  icon: icons/trino.svg
+  links:
+    website: https://trino.io
+    documentation: https://trino.io/docs/current/
+    source: https://github.com/trinodb/trino
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      A domain for the web interface. Leave it empty to keep Trino on the project network,
+      which is the usual place for it.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: The heap takes 80% of it. Two gigabytes is a floor, not a recommendation.
+    type: size
+    default: 2GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the spill files and the query history are kept on.
+    type: volume
+
+versions:
+  - name: "483"
+    release: "483"
+    default: true
+    # Trino releases are one number, which a tag cannot be pinned to here, so the
+    # release 483 is named by the digest it published.
+    image: trinodb/trino@sha256:fca43d1fdfdcd45f36b791f7117a47f8ce69c58232e5398bfdb8539cd28e778b
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # node.data-dir in the image's configuration: /data/trino.
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /v1/info answers while Trino is still starting, and says so in the answer.
+        command: curl -fsS http://127.0.0.1:8080/v1/info | grep -q '"starting":false'
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: trino
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # Catalogs come from the files in /etc/trino/catalog and are read at start.
+        - {k: CATALOG_MANAGEMENT, v: static}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
