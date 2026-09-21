@@ -1,0 +1,151 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: leantime
+  title: Leantime
+  tagline: Goals, projects and tasks for people who do not like project software
+  description: |
+    Leantime puts a small team's work in one place and asks for as little ceremony as it
+    can: a goal board for what you are trying to achieve, projects under it, tasks as a
+    list, kanban or a timeline, plus time tracking, a simple wiki and a place for ideas.
+    It is built for people who find a full project tool heavier than the work itself.
+
+    **What is left of the wizard**
+
+    The database this template creates is filled in already, so the installer only asks for
+    the first account and the company name. Open the app as soon as it is deployed and
+    complete it - whoever gets there first becomes the administrator.
+
+    **Where it fits beside the others here**
+
+    Planka and WeKan are boards. Vikunja is lists and dates. OpenProject is the formal
+    one. Leantime is the one that starts from *why* - a goal, then the work under it - and
+    it suits a team of a few people rather than a department.
+
+    **What the volume holds**
+
+    Files people attach to tasks and the company logo. Everything else is in the database
+    app.
+
+    **Mail**
+
+    Invitations and notifications need an SMTP server; without one, invite links have to be
+    copied by hand. It is configured with the SMTP parameters of this app, or afterwards in
+    the settings.
+  categories: [webapps/project-management]
+  tags: [project-management, tasks, open-source]
+  aliases: [tasks, goals, okr, kanban, small-team]
+  icon: icons/leantime.svg
+  links:
+    website: https://leantime.io
+    documentation: https://docs.leantime.io
+    source: https://github.com/Leantime/leantime
+  license: AGPL-3.0
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: leantime
+      username: leantime
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Leantime answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: appUrl
+    title: Application URL
+    description: >-
+      What Leantime believes its own address is, with the scheme - it goes into invitation
+      and notification mail. It follows the app's domain.
+    type: string
+    default: "https://${HIVEPAAS_DOMAIN}"
+  - name: sessionPassword
+    title: Session key
+    description: >-
+      Encrypts session data. Leave it empty and one is generated; Leantime wants at least
+      32 characters.
+    type: secret
+    generate: {length: 48}
+  - name: dataVolume
+    title: Data volume
+    description: Files attached to tasks, and the company logo.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: PHP behind nginx, both in this container.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "3.9"
+    release: "3.9.8"
+    default: true
+    image: leantime/leantime:3.9.8
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html/userfiles:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: userfiles}
+        /var/www/html/public/userfiles:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: public-userfiles}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Redirects are NOT followed. The root answers 303 to /install before the
+        # installer has been completed and to the login page afterwards, and that
+        # redirect points at the application URL - a public address that does not
+        # resolve inside the container, so following it would fail a healthy app.
+        # curl without -L treats a 303 as success.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/
+        interval: 30s
+        timeout: 10s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: leantime
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LEAN_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: LEAN_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: LEAN_DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: LEAN_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: LEAN_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: LEAN_APP_URL, v: "${{ params.appUrl }}"}
+        - {k: LEAN_SESSION_PASSWORD, v: "${secrets.LEANTIME_SESSION_PASSWORD}"}
+        # It sits behind the reverse proxy, which terminates TLS.
+        - {k: LEAN_USE_REDIS, v: "false"}
+    secrets:
+      LEANTIME_SESSION_PASSWORD:
+        value: "${{ params.sessionPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

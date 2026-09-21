@@ -1,0 +1,195 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: openproject
+  title: OpenProject
+  tagline: Work packages, Gantt charts and the paperwork a real project needs
+  description: |
+    OpenProject is project management rather than a task list: work packages with types,
+    statuses, custom fields and a workflow per type; a Gantt chart where dependencies and
+    baselines mean something; agile boards over the same data; time and cost tracking against
+    budgets; a wiki, meetings and documents per project; and permissions given by role,
+    per project, to people who may see one project and not another.
+
+    **It is the heavy end of what this category holds**
+
+    Planka and Vikunja are for a team that wants a board or a list. This is for the project
+    that has to be reported on - which is also why it takes longer to start, uses more
+    memory and asks you to decide more before it is useful.
+
+    **Nothing to install by hand**
+
+    The database created alongside is migrated and seeded on the first start, and the
+    administrator below is created with it. Sign in at the app's address; the seed data
+    includes a demo project you can delete.
+
+    **The first start is slow**
+
+    Migrations and seeding take a few minutes, and the health check waits ten. Later starts
+    run the migrations again - they are a no-op once the database is current - and are much
+    quicker.
+
+    **The address it thinks it has**
+
+    OpenProject writes absolute URLs into mail and into some of its own links, built from
+    the host name below. It follows the app's domain, so give the app one; without it the
+    links point at nothing.
+
+    **What the volume holds**
+
+    Attachments and exports. Everything else - projects, work packages, time entries,
+    wiki - is in the database app.
+
+    **Mail**
+
+    Notifications need an SMTP server, configured in *Administration - Emails and
+    notifications* after the first sign-in. Nothing here sends mail until that is done.
+  categories: [webapps/project-management]
+  tags: [project-management, tasks, open-source]
+  aliases: [jira-alternative, gantt, scrum, redmine-alternative, work-packages]
+  icon: icons/openproject.svg
+  links:
+    website: https://www.openproject.org
+    documentation: https://www.openproject.org/docs/installation-and-operations/installation/docker/
+    source: https://github.com/opf/openproject
+  license: GPL-3.0
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: openproject
+      username: openproject
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address OpenProject answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: hostName
+    title: Host name
+    description: >-
+      What OpenProject believes its own address is, used in mail and in generated links. It
+      follows the app's domain.
+    type: string
+    default: "${HIVEPAAS_DOMAIN}"
+  - name: adminName
+    title: Administrator's name
+    type: string
+    default: "OpenProject Admin"
+  - name: adminEmail
+    title: Administrator's email
+    description: Also the account's username.
+    type: string
+    default: "admin@example.com"
+  - name: adminPassword
+    title: Administrator's password
+    description: >-
+      Leave it empty and one is generated. It is set when the database is seeded, and not
+      changed by later starts.
+    type: secret
+    generate: {length: 24}
+  - name: secretKeyBase
+    title: Secret key base
+    description: >-
+      Signs sessions and cookies. Leave it empty and one is generated; changing it signs
+      everybody out.
+    type: secret
+    generate: {length: 64}
+  - name: dataVolume
+    title: Data volume
+    description: Attachments and exports; the work itself is in the database.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      A Rails application that wants room while it migrates and seeds. Two gigabytes is
+      comfortable for a small installation.
+    type: size
+    default: 2GB
+    min: 1GB
+
+versions:
+  - name: "17"
+    release: "17.8.0"
+    default: true
+    image: openproject/openproject:17.8.0-slim
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point ends in `exec "$@"`. The seeder migrates the database
+      # and seeds it - including the administrator - and does nothing the second time;
+      # then the web process takes over in the same container.
+      command: bash -c './docker/prod/seeder && ./docker/prod/web'
+    storage:
+      mounts:
+        /var/openproject/assets: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # OpenProject's own health check. The image has curl and no wget.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/health_checks/default
+        interval: 30s
+        timeout: 15s
+        # Migrating and seeding an empty database takes minutes.
+        startPeriod: 600s
+        retries: 6
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: openproject
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Not DATABASE_URL. An app's key here contains an underscore - the database
+        # created with this one is reached at a name like `openproject_db` - and Rails
+        # parses DATABASE_URL with the strict RFC 2396 parser, which refuses an
+        # underscore in a host name: "the scheme postgres does not accept registry
+        # part". These say the same thing without a URL. PGHOST and PGPORT are read by
+        # libpq, which is also what carries the host to the seeder's psql call, and
+        # the OPENPROJECT_DB_* names are what its own database.yml reads.
+        - {k: PGHOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: PGPORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: PGUSER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PGPASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: PGDATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: OPENPROJECT_DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: OPENPROJECT_DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: OPENPROJECT_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SECRET_KEY_BASE, v: "${secrets.OPENPROJECT_SECRET_KEY_BASE}"}
+        - {k: OPENPROJECT_HOST__NAME, v: "${{ params.hostName }}"}
+        # The reverse proxy terminates TLS, so the links it writes must say https.
+        - {k: OPENPROJECT_HTTPS, v: "true"}
+        # Read once, when the database is seeded.
+        - {k: OPENPROJECT_SEED_ADMIN_USER_NAME, v: "${{ params.adminName }}"}
+        - {k: OPENPROJECT_SEED_ADMIN_USER_MAIL, v: "${{ params.adminEmail }}"}
+        - {k: OPENPROJECT_SEED_ADMIN_USER_PASSWORD, v: "${secrets.OPENPROJECT_ADMIN_PASSWORD}"}
+        # Without this the first sign-in is a forced password change.
+        - {k: OPENPROJECT_SEED_ADMIN_USER_PASSWORD_RESET, v: "false"}
+        - {k: RAILS_MIN_THREADS, v: "4"}
+        - {k: RAILS_MAX_THREADS, v: "8"}
+    secrets:
+      OPENPROJECT_SECRET_KEY_BASE:
+        value: "${{ params.secretKeyBase }}"
+      OPENPROJECT_ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

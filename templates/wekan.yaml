@@ -1,0 +1,135 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wekan
+  title: WeKan
+  tagline: Kanban boards with swimlanes, checklists and rules that act for you
+  description: |
+    WeKan is a kanban board in the Trello shape, with the parts Trello charges for: swimlanes
+    across a board, checklists that can be saved as templates, card templates, per-board
+    rules that move or label a card when something happens to it, subtasks, time tracking
+    and a REST API over all of it.
+
+    **Compared with the other board here**
+
+    Planka is lighter and quicker to learn. WeKan has more in it - rules, swimlanes,
+    templates, per-board permissions - and is the one to choose when a board has to encode
+    a process rather than just hold cards.
+
+    **The first person to sign up owns it**
+
+    There is no administrator to create here: whoever opens the app first registers, and that
+    account gets the admin panel. Do it as soon as it is deployed, then close registration
+    in *Admin Panel - Settings - Registration* if the address is public.
+
+    **This image is x86-64 only**
+
+    The project publishes no arm64 build, so this template will not deploy on an ARM node -
+    a Raspberry Pi, or an Ampere or Graviton server. It is fine on an ordinary x86-64
+    machine.
+
+    **What is stored where**
+
+    Boards, cards, attachments and users are in the MongoDB created alongside this app; the
+    app's own volume holds what it writes to disk while exporting or importing. A standalone
+    MongoDB is enough - WeKan does not need a replica set.
+  categories: [webapps/project-management]
+  tags: [project-management, tasks, open-source]
+  aliases: [kanban, trello-alternative, boards, planka-alternative, scrum]
+  icon: icons/wekan.svg
+  links:
+    website: https://wekan.fi
+    documentation: https://github.com/wekan/wekan/wiki
+    source: https://github.com/wekan/wekan
+  license: MIT
+  requires:
+    versionCode: v000001
+
+dependencies:
+  - name: db
+    title: Database
+    template: mongodb
+    version: "8.0"
+    params:
+      dbName: wekan
+      username: wekan
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address WeKan answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: rootUrl
+    title: Root URL
+    description: >-
+      The address WeKan believes it has, with its scheme - it goes into the links it builds
+      and into mail. It follows the app's domain.
+    type: string
+    default: "https://${HIVEPAAS_DOMAIN}"
+  - name: dataVolume
+    title: Data volume
+    description: What it writes to disk while importing and exporting; the boards are in the database.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: A Meteor application; it is the largest thing in this category after OpenProject.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "7.97"
+    release: "7.97"
+    default: true
+    image: ghcr.io/wekan/wekan:v7.97
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has neither curl nor wget, but it is a Node application, so node
+        # itself makes the request: the page is served only once Meteor has finished
+        # its migrations and connected to MongoDB.
+        command: >-
+          node -e "require('http').get('http://127.0.0.1:8080/',
+          r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        # Migrations on a first start take a while.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: wekan
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The credentials the mongodb template creates live in the admin database,
+        # which is what authSource says.
+        - {k: MONGO_URL, v: "mongodb://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}?authSource=admin"}
+        - {k: ROOT_URL, v: "${{ params.rootUrl }}"}
+        - {k: PORT, v: "8080"}
+        # The REST API, which the rules and any integration use.
+        - {k: WITH_API, v: "true"}
+        - {k: WRITABLE_PATH, v: "/data"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

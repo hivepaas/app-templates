@@ -2904,6 +2904,52 @@
       }
     },
     {
+      "name": "leantime",
+      "file": {
+        "path": "templates/leantime.yaml",
+        "sha256": "551a0afb5654bd54e374c9244cba508904916fe37d29204d4544110e508ebda5"
+      },
+      "icon": {
+        "path": "icons/leantime.svg",
+        "sha256": "6d3278b8f0eab02c35701fcb56bbd46fb8b49bd96bd6218ac9c6055bc8d7921f"
+      },
+      "title": "Leantime",
+      "tagline": "Goals, projects and tasks for people who do not like project software",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "project-management",
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "tasks",
+        "goals",
+        "okr",
+        "kanban",
+        "small-team"
+      ],
+      "license": "AGPL-3.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.9",
+          "release": "3.9.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "linkding",
       "file": {
         "path": "templates/linkding.yaml",
@@ -4465,6 +4511,52 @@
         {
           "name": "0.11",
           "release": "0.11.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "openproject",
+      "file": {
+        "path": "templates/openproject.yaml",
+        "sha256": "9852d37921a5788e9e4fea8cc88e4edfd672eaaf1c1b8d86b98a4ae6c50f811d"
+      },
+      "icon": {
+        "path": "icons/openproject.svg",
+        "sha256": "80c257564ed9bf8288bd900d3a7defd86441db510fc912207e0e4fa5c47a106f"
+      },
+      "title": "OpenProject",
+      "tagline": "Work packages, Gantt charts and the paperwork a real project needs",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "project-management",
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "jira-alternative",
+        "gantt",
+        "scrum",
+        "redmine-alternative",
+        "work-packages"
+      ],
+      "license": "GPL-3.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "17",
+          "release": "17.8.0",
           "default": true
         }
       ],
@@ -6582,6 +6674,52 @@
         {
           "name": "1.38",
           "release": "1.38.16",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "wekan",
+      "file": {
+        "path": "templates/wekan.yaml",
+        "sha256": "9e8e76731c5eda9a43598c3095cd65b622b73926caaae9cf1b666e08f3830641"
+      },
+      "icon": {
+        "path": "icons/wekan.svg",
+        "sha256": "4edc8b4359dea2331e0056c1a0ff454821859ec99a2fe074d15c4f4116800b44"
+      },
+      "title": "WeKan",
+      "tagline": "Kanban boards with swimlanes, checklists and rules that act for you",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "project-management",
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "kanban",
+        "trello-alternative",
+        "boards",
+        "planka-alternative",
+        "scrum"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mongodb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "7.97",
+          "release": "7.97",
           "default": true
         }
       ],
