@@ -24,6 +24,15 @@ metadata:
     Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (6379)
     and `HIVEPAAS_PASSWORD`: `redis://default:PASSWORD@HOST:6379`.
 
+    **Changing it afterwards**
+
+    The memory ceiling, the eviction rule and the persistence mode live under
+    Settings > App Kind once the app exists, and Dragonfly is restarted with whatever they
+    say. It has one eviction behaviour rather than Redis's list, so anything but
+    `noeviction` there means the same thing: evict the least recently used key when the
+    ceiling is reached. Setting persistence to `none` stops the snapshots; the schedule
+    itself is an environment variable, `SNAPSHOT_CRON`.
+
     **Threads and memory**
 
     Dragonfly refuses to start unless the memory ceiling covers 256MB for every thread it
@@ -109,12 +118,27 @@ app:
     source:
       activeMethod: image
       imageSource: {image: "${{ image }}"}
-      # Arguments that start with a dash are appended to the image's own
-      # `dragonfly --logtostderr`. The password is not among them: every flag can also
-      # be given as DFLY_<flag>, so it stays out of the stored command and out of `ps`.
+      # The image runs `dragonfly --logtostderr` with whatever arguments start with a
+      # dash, so a shell here has to name the binary itself. That shell is what lets the
+      # ceiling, the eviction rule and the persistence mode be read from the variables
+      # the app's kind settings publish: edit them under Settings > App Kind and the
+      # server is restarted with the new ones. The password stays out of the command and
+      # out of `ps` by going in as DFLY_requirepass instead.
+      #
+      # Dragonfly has one eviction behaviour rather than a list, so the rule is read as
+      # the yes-or-no it can answer: anything but `noeviction` means evict.
       command: >-
-        --maxmemory=${{ params.maxMemory }} --proactor_threads=${{ params.threads }} --cache_mode=true
-        --dir=/data --dbfilename=dump --snapshot_cron="${{ params.snapshotCron }}"
+        sh -c 'set -- --maxmemory="${HIVEPAAS_MAX_MEMORY:-0}"
+        --proactor_threads=${{ params.threads }} --dir=/data --dbfilename=dump;
+        case "$HIVEPAAS_EVICTION_RULE" in
+        noeviction) set -- "$@" --cache_mode=false;;
+        *) set -- "$@" --cache_mode=true;;
+        esac;
+        case "$HIVEPAAS_PERSISTENCE_MODE" in
+        none) ;;
+        *) set -- "$@" --snapshot_cron="$SNAPSHOT_CRON";;
+        esac;
+        exec dragonfly --logtostderr "$@"'
     storage:
       mounts:
         /data: {type: volume, source: "${{ params.dataVolume }}"}
@@ -138,11 +162,16 @@ app:
       cache:
         password: "${{ params.password }}"
         maxMemory: "${{ params.maxMemory }}"
-        evictionRule: cache_mode
-        persistenceMode: snapshot
+        # Named as the App Kind screen names them: Dragonfly's cache mode is an
+        # approximation of allkeys-lru, and its snapshots are point-in-time dumps.
+        evictionRule: allkeys-lru
+        persistenceMode: rdb
     envVars:
       data:
         - {k: DFLY_requirepass, v: "${HIVEPAAS_PASSWORD}"}
         - {k: HEALTHCHECK_PORT, v: "6379"}
+        # The schedule has no field of its own in the kind settings, so it lives here,
+        # where it can still be changed without rebuilding the app.
+        - {k: SNAPSHOT_CRON, v: "${{ params.snapshotCron }}"}
     routing:
       port: 6379

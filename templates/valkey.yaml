@@ -14,12 +14,33 @@ metadata:
 
     - a generated password, required on every connection
     - a memory ceiling and an eviction policy you choose
-    - append-only persistence on a volume, so the data survives a restart
+    - the persistence you pick: every write, periodic snapshots, or nothing
     - a health check that authenticates and sends `PING`
 
     Other apps in the same environment reach it with `HIVEPAAS_HOST`, `HIVEPAAS_PORT` (6379)
     and `HIVEPAAS_PASSWORD`: `redis://default:PASSWORD@HOST:6379`. There is no user name to
     set - Valkey authenticates as its built-in `default` user.
+
+    **Persistence**
+
+    Valkey answers from memory whatever you choose here; persistence only decides what it
+    finds on disk when it starts again.
+
+    *Append-only file* writes every change to `/data` and replays it on start, so a restart
+    loses at most the last second. It is the safe answer, and the one to keep for a queue,
+    a session store or a rate limiter - anything whose loss is felt by a user.
+
+    *Snapshots* dump the whole dataset every few minutes instead. The file is smaller and
+    the writing cheaper, but a crash loses everything since the last dump.
+
+    *Nothing* keeps no file at all: the fastest, and empty after every restart. That is the
+    right answer for a pure cache, whose contents can be built again from the database - and
+    the wrong one for anything that is the only copy. The volume is still asked for either
+    way; with this setting nothing is written to it.
+
+    The mode, the memory ceiling and the eviction policy all live under Settings > App Kind
+    once the app exists. Changing one there restarts Valkey with it - they are the server's
+    configuration, not a note about it.
 
     **Memory**
 
@@ -67,6 +88,18 @@ parameters:
       - {value: volatile-lru, title: "Evict the least recently used key that has a TTL"}
       - {value: volatile-ttl, title: "Evict the key closest to expiry"}
       - {value: noeviction, title: "Refuse writes (queue, session store)"}
+  - name: persistence
+    title: Persistence
+    description: >-
+      What Valkey keeps on disk, and so what it still has after a restart. It can be changed
+      later under Settings > App Kind, which restarts the server with the new mode.
+    type: select
+    default: aof
+    options:
+      - {value: aof, title: "Append-only file: every write, at most a second lost"}
+      - {value: rdb, title: "Snapshots: a dump every few minutes, cheaper to write"}
+      - {value: rdb+aof, title: "Both: the append-only file, and a snapshot to keep"}
+      - {value: none, title: "Nothing: memory only, empty after a restart (pure cache)"}
   - name: memoryLimit
     title: Memory limit
     description: The container's hard limit. Keep it above the memory ceiling.
@@ -75,7 +108,7 @@ parameters:
     min: 64MB
   - name: dataVolume
     title: Data volume
-    description: The volume the append-only file is kept on.
+    description: The volume any persistence file is kept on.
     type: volume
 
 versions:
@@ -95,11 +128,22 @@ app:
       # The password reaches the server through the environment rather than the command
       # line: the command is stored in plain text on the app, the variable is not, and
       # `ps` inside the container would show the argument to every process.
+      # The ceiling, the eviction policy and the persistence mode are read at start from
+      # the variables the app's kind settings publish, not written into the command. That
+      # is what makes Settings > App Kind the one place they live: edit them there and the
+      # server is restarted with the new ones. An empty value means the engine's own
+      # default - no ceiling, and no eviction.
       command: >-
-        sh -c 'exec valkey-server --requirepass "$HIVEPAAS_PASSWORD"
-        --maxmemory ${{ params.maxMemory }}
-        --maxmemory-policy ${{ params.evictionPolicy }}
-        --appendonly yes --dir /data'
+        sh -c 'case "$HIVEPAAS_PERSISTENCE_MODE" in
+        none) set -- --appendonly no --save "";;
+        rdb) set -- --appendonly no --save 3600 1 --save 300 100 --save 60 10000;;
+        rdb+aof) set -- --appendonly yes --save 3600 1 --save 300 100 --save 60 10000;;
+        *) set -- --appendonly yes --save "";;
+        esac;
+        exec valkey-server --requirepass "$HIVEPAAS_PASSWORD"
+        --maxmemory "${HIVEPAAS_MAX_MEMORY:-0}"
+        --maxmemory-policy "${HIVEPAAS_EVICTION_RULE:-noeviction}"
+        --dir /data "$@"'
     storage:
       mounts:
         /data: {type: volume, source: "${{ params.dataVolume }}"}
@@ -123,6 +167,6 @@ app:
         password: "${{ params.password }}"
         maxMemory: "${{ params.maxMemory }}"
         evictionRule: "${{ params.evictionPolicy }}"
-        persistenceMode: aof
+        persistenceMode: "${{ params.persistence }}"
     routing:
       port: 6379

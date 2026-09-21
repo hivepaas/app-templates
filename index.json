@@ -1627,7 +1627,7 @@
       "name": "dragonfly",
       "file": {
         "path": "templates/dragonfly.yaml",
-        "sha256": "37e00720732e012e890d41b37f36777bca1fd0a134190075675d1b19730ce06e"
+        "sha256": "d2115677b6c5c61250772b3f3705f4da5ae210ed95014270fc16f10983414be9"
       },
       "icon": {
         "path": "icons/dragonfly.svg",
@@ -4621,7 +4621,7 @@
       "name": "memcached",
       "file": {
         "path": "templates/memcached.yaml",
-        "sha256": "8e6c5667054104979cb27c2ff229f783da76e87dc8e621bcbb3b25f474b8228d"
+        "sha256": "e3b018e98a257b1446d2dc69f85ebf1e48fa646029dbf43877f2aa4366692f48"
       },
       "icon": {
         "path": "icons/memcached.svg",
@@ -6976,7 +6976,7 @@
       "name": "redis",
       "file": {
         "path": "templates/redis.yaml",
-        "sha256": "e8a88f2a1e2659e5ae045d7537823f5b0c2460678c4beec66a796a92fbd01b04"
+        "sha256": "ee17c061a875904a6c69bdcdff01716b3c43f493b0194b49de7f5f6cb28e0816"
       },
       "icon": {
         "path": "icons/redis.svg",
@@ -8296,7 +8296,7 @@
       "name": "valkey",
       "file": {
         "path": "templates/valkey.yaml",
-        "sha256": "9baf2fb44697928d197c3d6e5f3671b0e2998810edc95fe921038d0e72b09624"
+        "sha256": "fe1b35fde8f913ac2874a7036961f60dbfbc61f1fdbb6dee2f59c7194a796993"
       },
       "icon": {
         "path": "icons/valkey.svg",

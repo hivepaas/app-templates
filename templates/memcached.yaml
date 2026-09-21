@@ -22,6 +22,11 @@ metadata:
     Other apps in the same environment reach it with `HIVEPAAS_HOST` and `HIVEPAAS_PORT`
     (11211).
 
+    The cache size lives under Settings > App Kind once the app exists, and the server is
+    restarted with it when you change it there. The connection limit is fixed at creation.
+    The eviction rule and the persistence mode on that screen are Memcached's own and not
+    a choice: it evicts the least recently used item, and it keeps nothing on disk.
+
     **There is no authentication.** The official image is built without SASL support, so
     anything that can open a connection can read and write every key. HivePaaS keeps the
     app on the project's private network and does not publish the port, which is what
@@ -77,7 +82,15 @@ app:
     source:
       activeMethod: image
       imageSource: {image: "${{ image }}"}
-      command: memcached -m ${{ params.cacheSizeMB }} -c ${{ params.maxConnections }}
+      # The cache size is read from the variable the app's kind settings publish, so
+      # changing it under Settings > App Kind restarts the server with the new size.
+      # That variable is a byte count and memcached counts in megabytes, hence the
+      # division; the floor keeps a ceiling typed in bytes-shy-of-a-megabyte from
+      # becoming `-m 0`, which memcached refuses to start with.
+      command: >-
+        sh -c 'mb=$(( ${HIVEPAAS_MAX_MEMORY:-268435456} / 1048576 ));
+        [ "$mb" -lt 16 ] && mb=16;
+        exec memcached -m "$mb" -c ${{ params.maxConnections }}'
     container:
       healthcheck:
         enabled: true
@@ -98,7 +111,10 @@ app:
       version: "${{ version.name }}"
       cache:
         maxMemory: "${{ params.cacheSizeMB }}MB"
-        evictionRule: lru
+        # Memcached evicts the least recently used item across the whole cache and keeps
+        # nothing on disk. Neither is a choice, and both are named as the App Kind screen
+        # names them so that what it shows is true rather than blank.
+        evictionRule: allkeys-lru
         persistenceMode: none
     routing:
       port: 11211
