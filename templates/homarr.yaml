@@ -1,0 +1,129 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: homarr
+  title: Homarr
+  tagline: A dashboard for everything you host, arranged in the browser
+  description: |
+    Homarr is the front page of a self-hosted setup: tiles for each application, arranged by
+    dragging them, with widgets that show what those applications are doing - what is
+    downloading, what is playing, what the disks look like, what the calendar says. It
+    integrates with dozens of applications by API rather than only linking to them, and
+    everything is configured in the interface rather than in a file.
+
+    **This template sets up**
+
+    - Homarr, on a volume for its database, its icons and its uploads
+    - an encryption key for the API tokens it stores
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the address and create the first account, which is the administrator. Then add
+    boards and tiles, and connect the applications you want widgets for - each integration
+    asks for that application's address and its API key.
+
+    **Reaching your other apps**
+
+    Use each app's key on the project network - `http://jellyfin:8096` rather than a public
+    address - and the traffic never leaves the node. Apps in other projects are not
+    reachable; use their public addresses for those.
+
+    **Keep the encryption key**
+
+    The API tokens of every integration are encrypted with it. Restoring the volume without
+    it means adding every integration again.
+
+    **The other dashboards here**
+
+    - **Homarr** - configured in the browser, widgets that talk to your apps. Take it if
+      you want to click rather than edit YAML.
+    - **Homepage** - a YAML file you keep in version control, very fast, very plain.
+    - **Glance** - YAML as well, built around feeds and system panels.
+  categories: [webapps/dev-tools, webapps/knowledge]
+  tags: [dashboards, monitoring, open-source]
+  aliases: [dashboard, start page, homepage alternative, homelab, launcher]
+  icon: icons/homarr.svg
+  links:
+    website: https://homarr.dev
+    documentation: https://homarr.dev/docs/getting-started/
+    source: https://github.com/homarr-labs/homarr
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      Encrypts the API tokens of the integrations you add. It is 64 hexadecimal characters
+      - leave empty to generate one, and keep it with your backup.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the boards, the integrations and the uploaded icons are kept on.
+    type: volume
+
+versions:
+  - name: "1.32"
+    release: "1.32.0"
+    default: true
+    image: ghcr.io/homarr-labs/homarr:v1.32.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /appdata: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own nginx is what answers on 7575, in front of the application.
+        command: wget -q -O /dev/null http://127.0.0.1:7575/
+        interval: 20s
+        timeout: 10s
+        # The first start migrates its database.
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: homarr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SECRET_ENCRYPTION_KEY, v: "${secrets.SECRET_ENCRYPTION_KEY}"}
+        # Behind HivePaaS' reverse proxy, which is what terminates TLS.
+        - {k: AUTH_PROVIDERS, v: credentials}
+        - {k: TRUSTED_HOSTS, v: "${HIVEPAAS_DOMAIN}"}
+    secrets:
+      SECRET_ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+    routing:
+      port: 7575
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

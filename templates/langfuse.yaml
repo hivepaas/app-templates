@@ -1,0 +1,276 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: langfuse
+  title: Langfuse
+  tagline: See what your LLM application actually did, call by call
+  description: |
+    Langfuse traces what an LLM application does: every call with its prompt, its answer,
+    its tokens and its cost, nested under the request that caused them, so a slow or
+    expensive or wrong answer can be opened and read. It also keeps prompts as versioned
+    objects your code fetches, scores traces by rule or by hand or by another model, and
+    runs datasets against a new prompt to see what changed.
+
+    **This template creates four apps**
+
+    - **Langfuse**, the interface and the ingestion API
+    - **a PostgreSQL database** for the projects, prompts and scores, named after the app
+      with `-db` added
+    - **a ClickHouse** for the traces themselves, with `-analytics` added
+    - **a Redis** for the ingestion queue, with `-cache` added
+
+    **It needs two more things you set up first**
+
+    - **S3 storage.** Langfuse writes every ingested event to object storage before
+      processing it, and it will not start without somewhere to put them. Deploy a
+      **Garage**, **RustFS** or **SeaweedFS** app from this store first, make a bucket, and
+      fill in its address and keys below.
+    - **A worker.** The interface queues events; a **Langfuse Worker** is what writes them
+      into ClickHouse. Deploy one after this app - nothing appears in the traces until you
+      do.
+
+    **After the first deployment**
+
+    Open the address and register; the first account is yours. Make a project, take its
+    keys, and point your application at them:
+
+    ```python
+    from langfuse import Langfuse
+    langfuse = Langfuse(
+        public_key="pk-lf-...", secret_key="sk-lf-...",
+        host="https://langfuse.example.com",
+    )
+    ```
+
+    The LiteLLM, Flowise, Langflow and Open WebUI apps in this store all have a Langfuse
+    integration that wants the same three values.
+
+    **Keep the encryption key**
+
+    API keys and integration credentials in the database are encrypted with it. A restored
+    backup without it is unusable.
+
+    **Memory**
+
+    Two gigabytes for this app, and ClickHouse beside it wants its own - budget for the
+    four apps together rather than for this one.
+  categories: [webapps/ai, observability/monitoring]
+  tags: [ai, llm, monitoring, analytics, open-source]
+  aliases: [llm observability, tracing, prompt management, evals, langsmith alternative]
+  icon: icons/langfuse.svg
+  links:
+    website: https://langfuse.com
+    documentation: https://langfuse.com/self-hosting
+    source: https://github.com/langfuse/langfuse
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address the interface and the SDKs use, scheme and all -
+      https://langfuse.example.com.
+    type: string
+    default: https://langfuse.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: s3Endpoint
+    title: S3 address
+    description: >-
+      The S3 app's address on the project network - http://garage:3900 for a Garage app
+      called `garage`, http://rustfs:9000 for a RustFS one.
+    type: string
+    default: http://garage:3900
+    pattern: '^https?://[^\s/?#]+$'
+  - name: s3Bucket
+    title: S3 bucket
+    description: The bucket Langfuse writes events and media into. Create it there first.
+    type: string
+    default: langfuse
+    pattern: '^[a-z0-9][a-z0-9.-]{2,62}$'
+  - name: s3AccessKey
+    title: S3 access key
+    type: string
+    default: langfuse
+    maxLength: 128
+  - name: s3SecretKey
+    title: S3 secret key
+    type: secret
+    minLength: 8
+  - name: s3Region
+    title: S3 region
+    description: What the bucket's region is called. `auto` suits Garage and RustFS.
+    type: string
+    default: auto
+    pattern: '^[A-Za-z0-9-]{1,32}$'
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      Encrypts the API keys and integration credentials in the database. It is 64
+      hexadecimal characters - leave empty to generate one, and keep it with your backup.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: authSecret
+    title: Session secret
+    description: Signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: salt
+    title: Password salt
+    description: Salts the stored passwords. Leave empty to generate one, and never change it.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: openRegistration
+    title: Anyone may register
+    description: Leave it on until your own account exists, then turn it off.
+    type: bool
+    default: true
+  - name: telemetry
+    title: Send usage telemetry
+    description: >-
+      Langfuse reports anonymous usage to its own project by default. This turns that off.
+    type: bool
+    default: false
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: langfuse
+      username: langfuse
+  - name: analytics
+    title: ClickHouse
+    template: clickhouse
+    version: "26.3"
+    params:
+      dbName: default
+      username: langfuse
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the ingestion queue, so evicting a key would lose traces rather than a
+      # cached value.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "4.41"
+    release: "4.41.0"
+    default: true
+    image: langfuse/langfuse:4.41.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own entrypoint runs its ClickHouse migrations once and exits if they
+      # fail, rather than retrying - which loses the race against the ClickHouse
+      # dependency's DNS record not being registered yet when both apps are created
+      # together. This waits for the name to resolve before running the entrypoint.
+      command: >-
+        sh -c 'for i in $(seq 1 30); do getent hosts "$LANGFUSE_CH_HOST" >/dev/null 2>&1 && break; sleep 2; done;
+        exec dumb-init -- ./web/entrypoint.sh node ./web/server.js --keepAliveTimeout 110000'
+      # HOSTNAME below overrides the container's own hostname, which Next.js standalone
+      # otherwise reads to decide what address to bind - and Docker always sets it to the
+      # container id, so without this the server listens only on its own IP and every
+      # loopback request, including the health check, is refused.
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own endpoint, which answers once the migrations are done.
+        command: >-
+          node -e "fetch('http://127.0.0.1:3000/api/public/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        # The first start migrates PostgreSQL and ClickHouse both.
+        startPeriod: 240s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: langfuse
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: HOSTNAME, v: "0.0.0.0"}
+        - {k: NEXTAUTH_URL, v: "${{ params.appUrl }}"}
+        - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
+        - {k: SALT, v: "${secrets.SALT}"}
+        - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{
+            deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{
+            deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: LANGFUSE_CH_HOST, v: "${{ deps.analytics.ref.HIVEPAAS_HOST }}"}
+        - {k: CLICKHOUSE_URL, v: "http://${{ deps.analytics.ref.HIVEPAAS_HOST }}:8123"}
+        # The migrations use the native protocol rather than HTTP.
+        - {k: CLICKHOUSE_MIGRATION_URL, v: "clickhouse://${{ deps.analytics.ref.HIVEPAAS_HOST }}:9000"}
+        - {k: CLICKHOUSE_USER, v: "${{ deps.analytics.ref.HIVEPAAS_USER }}"}
+        - {k: CLICKHOUSE_PASSWORD, v: "${{ deps.analytics.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: CLICKHOUSE_CLUSTER_ENABLED, v: "false"}
+        - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_AUTH, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        # Every ingested event is written here before it is processed, which is why this
+        # is not optional.
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_BUCKET, v: "${{ params.s3Bucket }}"}
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT, v: "${{ params.s3Endpoint }}"}
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_REGION, v: "${{ params.s3Region }}"}
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID, v: "${{ params.s3AccessKey }}"}
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY, v: "${secrets.S3_SECRET_KEY}"}
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_PREFIX, v: "events/"}
+        # Path-style addressing: a bucket as a path rather than as a subdomain, which is
+        # what these S3 servers do without a wildcard domain.
+        - {k: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE, v: "true"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_BUCKET, v: "${{ params.s3Bucket }}"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT, v: "${{ params.s3Endpoint }}"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_REGION, v: "${{ params.s3Region }}"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID, v: "${{ params.s3AccessKey }}"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY, v: "${secrets.S3_SECRET_KEY}"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_PREFIX, v: "media/"}
+        - {k: LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE, v: "true"}
+        - {k: AUTH_DISABLE_SIGNUP, v: "false"}
+        - {k: TELEMETRY_ENABLED, v: "${{ params.telemetry }}"}
+        - {k: LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES, v: "false"}
+    secrets:
+      NEXTAUTH_SECRET:
+        value: "${{ params.authSecret }}"
+      SALT:
+        value: "${{ params.salt }}"
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      S3_SECRET_KEY:
+        value: "${{ params.s3SecretKey }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

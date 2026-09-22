@@ -1,0 +1,171 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: n8n-queue
+  title: n8n (queue mode)
+  tagline: n8n with its executions handed to workers you can add and scale
+  description: |
+    The same n8n as the plain template - the workflow automation with hundreds of
+    integrations - but running in queue mode: the editor hands each execution to a queue in
+    Redis, and worker apps take them off it. That is what n8n itself recommends once
+    workflows are more than occasional: a long execution no longer blocks the editor, a
+    restart of the main app does not lose what is running, and capacity grows by adding
+    workers rather than by making one container bigger.
+
+    **This template creates three apps**
+
+    - **n8n**, the editor and the webhook endpoint
+    - **a PostgreSQL database** for the workflows and their history, named after the app
+      with `-db` added
+    - **a Redis** for the execution queue, with `-cache` added
+
+    **The workers are separate apps**
+
+    This app on its own runs nothing: in queue mode the main process only queues. Deploy at
+    least one **n8n Worker** from this store, point it at the two apps created here, and
+    give it the same encryption key - it is on this app's environment variables, as
+    `N8N_ENCRYPTION_KEY`. Scale that worker app's replicas for more throughput.
+
+    **Which n8n to take**
+
+    - **n8n** - one container and a database. Right for a handful of workflows.
+    - **n8n (SQLite)** - one container and nothing else. Right for trying it out.
+    - **this one** - for workflows that matter, that run long, or that run often.
+
+    **The encryption key is the credentials**
+
+    Every credential stored in n8n is encrypted with it. Keep it: without it a restored
+    database is a list of unreadable secrets, and a worker with a different one cannot run
+    anything.
+  categories: [webapps/automation, webapps/low-code]
+  tags: [automation, low-code, open-source]
+  aliases: [n8n, workflow, zapier alternative, integrations, queue mode]
+  icon: icons/n8n.svg
+  links:
+    website: https://n8n.io
+    documentation: https://docs.n8n.io/hosting/scaling/queue-mode/
+    source: https://github.com/n8n-io/n8n
+  license: LicenseRef-n8n-Sustainable-Use
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Webhooks are called at it, so set it before
+      you build workflows that use them.
+    type: domain
+    optional: true
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      Encrypts the stored credentials, and has to be the same on every worker. Leave empty
+      to generate one, and keep it with your backup.
+    type: secret
+    minLength: 24
+    generate: {length: 48}
+  - name: timezone
+    title: Time zone
+    description: What the schedule trigger takes its times to mean.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: executionRetention
+    title: Keep executions for
+    description: How long a finished execution's data is kept before it is pruned.
+    type: select
+    default: "336"
+    options:
+      - {value: "168", title: A week}
+      - {value: "336", title: Two weeks}
+      - {value: "720", title: A month}
+      - {value: "8760", title: A year}
+  - name: memoryLimit
+    title: Memory limit
+    description: The editor and the webhook endpoint; the executions run in the workers.
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: n8n
+      username: n8n
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the execution queue, so evicting a key would lose a run rather than a
+      # cached value.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "2.40"
+    release: "2.40.2"
+    default: true
+    image: n8nio/n8n:2.40.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # n8n's own endpoint, which answers once the database is migrated.
+        command: >-
+          node -e "fetch('http://127.0.0.1:5678/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: n8n
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Queue mode: this process queues executions instead of running them.
+        - {k: EXECUTIONS_MODE, v: queue}
+        - {k: QUEUE_BULL_REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: QUEUE_BULL_REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: QUEUE_BULL_REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DB_TYPE, v: postgresdb}
+        - {k: DB_POSTGRESDB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_POSTGRESDB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_POSTGRESDB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_POSTGRESDB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_POSTGRESDB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Read by every worker as well; they must match.
+        - {k: N8N_ENCRYPTION_KEY, v: "${secrets.N8N_ENCRYPTION_KEY}"}
+        - {k: GENERIC_TIMEZONE, v: "${{ params.timezone }}"}
+        - {k: EXECUTIONS_DATA_PRUNE, v: "true"}
+        - {k: EXECUTIONS_DATA_MAX_AGE, v: "${{ params.executionRetention }}"}
+        # The address the outside world uses, once a domain is set on the app. It is what
+        # n8n prints as the webhook URL; the editor works without it.
+        - {k: N8N_HOST, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: N8N_PROTOCOL, v: https}
+        # Workers report back to this address, which is the app's own name on the project
+        # network.
+        - {k: N8N_RUNNERS_ENABLED, v: "true"}
+    secrets:
+      N8N_ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+    routing:
+      port: 5678
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

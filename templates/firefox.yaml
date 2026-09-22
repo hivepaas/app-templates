@@ -1,0 +1,169 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: firefox
+  title: Firefox
+  tagline: A browser running on the server, used from a browser tab
+  description: |
+    Firefox in a container, with its window streamed to a browser tab. It is useful when the
+    browsing has to happen somewhere other than your laptop: reaching an appliance that only
+    listens on the project network, using a site that geoblocks everywhere but this server,
+    keeping a logged-in session away from your own machine, or opening a link nobody wants
+    on their own computer.
+
+    **This template sets up**
+
+    - Firefox, with its profile and downloads on a volume
+    - the web interface at the app's address, behind a password
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the address, give the password below, and the browser is there. It is one shared
+    session: two people opening it see the same window and the same cursor.
+
+    **It is not a private browser for other people**
+
+    Anyone who signs in gets a browser running inside your project, on your network, with
+    whatever sessions the profile holds. Treat the password as access to the project rather
+    than as access to a web page.
+
+    **Memory, and a warning about shared memory**
+
+    Firefox wants a gigabyte before it is comfortable and more with several tabs. The
+    container's `/dev/shm` is small by default, which is what makes pages die with "tab
+    crashed" - if that happens, raise the shared memory size in the app's container
+    settings.
+
+    **Downloads land on the volume**
+
+    Under `/config/Downloads`, which is where to fetch them from with the app's console.
+  categories: [webapps/networking, webapps/dev-tools]
+  tags: [networking, privacy, open-source]
+  aliases: [browser, remote browser, kasm, vnc, web browser]
+  icon: icons/firefox.svg
+  links:
+    website: https://github.com/jlesage/docker-firefox
+    documentation: https://github.com/jlesage/docker-firefox#readme
+    source: https://github.com/jlesage/docker-firefox
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: password
+    title: Password
+    description: Asked for before the browser is shown. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: displayWidth
+    title: Window width
+    type: int
+    default: 1920
+    min: 640
+    max: 3840
+  - name: displayHeight
+    title: Window height
+    type: int
+    default: 1080
+    min: 480
+    max: 2160
+  - name: cjkFont
+    title: CJK font
+    description: >-
+      Installs a Chinese/Japanese/Korean font at every start, which is a live package
+      download and adds a minute or more to it. Leave it off unless pages in those
+      languages render as boxes.
+    type: bool
+    default: false
+  - name: language
+    title: Language
+    description: What Firefox's own interface is in, as a locale - en-US, vi-VN, de-DE.
+    type: string
+    default: en-US
+    pattern: '^[a-z]{2}(-[A-Z]{2})?$'
+  - name: timezone
+    title: Time zone
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to keep it on the project
+      network.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: A gigabyte is the floor; a few tabs want two.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Profile volume
+    description: >-
+      The volume the Firefox profile, its extensions, its history and the downloads are
+      kept on.
+    type: volume
+
+versions:
+  - name: "26.08"
+    release: "26.08.3"
+    default: true
+    image: jlesage/firefox:v26.08.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries no check of its own, and has busybox wget and no curl. The
+        # web interface answers while it is still asking for the password, which is what
+        # makes this usable as a check.
+        command: wget -q -O /dev/null http://127.0.0.1:5800/
+        interval: 30s
+        timeout: 10s
+        # Starting the desktop and the browser under it takes longer than most web apps.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: firefox
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: WEB_LISTENING_PORT, v: "5800"}
+        # The password the web interface asks for. The image calls it a VNC password
+        # because the same one guards the VNC port, which this app does not publish.
+        - {k: VNC_PASSWORD, v: "${secrets.VNC_PASSWORD}"}
+        - {k: DISPLAY_WIDTH, v: "${{ params.displayWidth }}"}
+        - {k: DISPLAY_HEIGHT, v: "${{ params.displayHeight }}"}
+        - {k: LANG, v: "${{ params.language }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        # TLS ends at HivePaaS' reverse proxy, so the container serves plain HTTP.
+        - {k: SECURE_CONNECTION, v: "0"}
+        - {k: ENABLE_CJK_FONT, v: "${{ params.cjkFont }}"}
+    secrets:
+      VNC_PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 5800
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,153 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mage-ai
+  title: Mage
+  tagline: Data pipelines written in Python or SQL, with the run history to match
+  description: |
+    Mage builds and runs data pipelines: each step is a block of Python, SQL or R with its
+    inputs and outputs declared, the pipeline is the graph of those blocks, and every block
+    can be run on its own while you write it. Pipelines run on a schedule, on an event or
+    on demand, and the interface shows what ran, what it produced and where it failed.
+
+    **This template creates two apps**
+
+    - **Mage**, on a volume for the pipelines you write and the files they produce
+    - **a PostgreSQL database** for the run history, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Open the address and sign in as `admin@admin.com` with the password `admin`, then
+    change it under Settings - that pair is the same on every installation until you do.
+    Then make a pipeline; the examples in the interface are a reasonable way in.
+
+    **The pipelines are files on the volume**
+
+    Under `/home/src/default_repo`, as Python and YAML. They can be edited in the browser,
+    or kept in Git and pulled in - Mage has a Git integration for exactly that, which is
+    how a pipeline gets reviewed before it runs on real data.
+
+    **Connecting to data**
+
+    Sources and destinations are entries in `io_config.yaml`, next to the pipelines. The
+    databases in this project are reachable by their keys - `postgres`, `clickhouse`,
+    `mysql` - and anything with an address works the same way.
+
+    **Where it fits**
+
+    Airflow schedules tasks and leaves the code to you; Mage is the code and the schedule
+    together, which suits a small team without a data platform group. For workflows that
+    are mostly API calls rather than data, n8n or Windmill in this store are lighter.
+  categories: [webapps/automation, webapps/ai]
+  tags: [automation, analytics, low-code, open-source]
+  aliases: [airflow alternative, etl, elt, data pipeline, dagster alternative]
+  icon: icons/mage-ai.svg
+  links:
+    website: https://www.mage.ai
+    documentation: https://docs.mage.ai
+    source: https://github.com/mage-ai/mage-ai
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: projectName
+    title: Project name
+    description: The directory the pipelines live in, under `/home/src`.
+    type: string
+    default: default_repo
+    pattern: '^[a-z][a-z0-9_]{0,40}$'
+  - name: requireAuth
+    title: Ask for a sign-in
+    description: >-
+      Leave it on. With it off, anyone who reaches the address can run a pipeline - and a
+      pipeline is code on your server.
+    type: bool
+    default: true
+  - name: timezone
+    title: Time zone
+    description: What the schedules are timed by.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      The pipelines run inside this app, so this is what a block loading a large frame has
+      to fit in.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the pipelines, their configuration and their output are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: mage
+      username: mage
+
+versions:
+  - name: "0.9"
+    release: "0.9.79"
+    default: true
+    image: mageai/mageai:0.9.79
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/src: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own endpoint, which answers once the project is set up.
+        command: curl -fsS -o /dev/null http://127.0.0.1:6789/api/status
+        interval: 20s
+        timeout: 10s
+        # The first start creates the project directory and migrates the database.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mage-ai
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: USER_CODE_PATH, v: "/home/src/${{ params.projectName }}"}
+        - {k: PROJECT_TYPE, v: standalone}
+        # The run history and the schedules, in the database app beside this one rather
+        # than in a SQLite file on the volume.
+        - k: MAGE_DATABASE_CONNECTION_URL
+          v: >-
+            postgresql+psycopg2://${{ deps.db.ref.HIVEPAAS_USER }}:${{
+            deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{
+            deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: REQUIRE_USER_AUTHENTICATION, v: "${{ params.requireAuth }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 6789
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

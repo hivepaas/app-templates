@@ -2544,6 +2544,46 @@
       }
     },
     {
+      "name": "firefox",
+      "file": {
+        "path": "templates/firefox.yaml",
+        "sha256": "349201f87326414aba5df757255f40c01d8d059ac33582e96ef911fd99d8419d"
+      },
+      "icon": {
+        "path": "icons/firefox.svg",
+        "sha256": "379a581d9dcd0acb90b3a05bc157dbb42be1723cf4ca1428b3ddf89be0187a26"
+      },
+      "title": "Firefox",
+      "tagline": "A browser running on the server, used from a browser tab",
+      "categories": [
+        "webapps/networking",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "networking",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "browser",
+        "remote browser",
+        "kasm",
+        "vnc",
+        "web browser"
+      ],
+      "license": "GPL-3.0-or-later",
+      "versions": [
+        {
+          "name": "26.08",
+          "release": "26.08.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "fizzy",
       "file": {
         "path": "templates/fizzy.yaml",
@@ -4139,6 +4179,46 @@
       }
     },
     {
+      "name": "homarr",
+      "file": {
+        "path": "templates/homarr.yaml",
+        "sha256": "9459a23bebf98357b406fe7569dece9286c0536899cfe5784bb4a54521385efd"
+      },
+      "icon": {
+        "path": "icons/homarr.svg",
+        "sha256": "a9f380a0aab3a5dc330bdc02d4106f08fb28ff7ac548886260a7b5a500efbd56"
+      },
+      "title": "Homarr",
+      "tagline": "A dashboard for everything you host, arranged in the browser",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "dashboards",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "dashboard",
+        "start page",
+        "homepage alternative",
+        "homelab",
+        "launcher"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.32",
+          "release": "1.32.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "home-assistant",
       "file": {
         "path": "templates/home-assistant.yaml",
@@ -5262,6 +5342,106 @@
       }
     },
     {
+      "name": "langfuse",
+      "file": {
+        "path": "templates/langfuse.yaml",
+        "sha256": "5af0ff3aab4b63888ddc592591a8ce9c25a925e11cb9ca964ecce1ca198df33d"
+      },
+      "icon": {
+        "path": "icons/langfuse.svg",
+        "sha256": "fdd14f6a3eff01145b5dd5d70e22e78e65720475f2baf6368ff747659a8ae966"
+      },
+      "title": "Langfuse",
+      "tagline": "See what your LLM application actually did, call by call",
+      "categories": [
+        "webapps/ai",
+        "observability/monitoring"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "monitoring",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "llm observability",
+        "tracing",
+        "prompt management",
+        "evals",
+        "langsmith alternative"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "analytics",
+          "title": "ClickHouse",
+          "template": "clickhouse"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.41",
+          "release": "4.41.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "langfuse-worker",
+      "file": {
+        "path": "templates/langfuse-worker.yaml",
+        "sha256": "47e70f4715a60f869465a4393b692e1a423581f6356d5e371fd237cb87ab7fc2"
+      },
+      "icon": {
+        "path": "icons/langfuse.svg",
+        "sha256": "fdd14f6a3eff01145b5dd5d70e22e78e65720475f2baf6368ff747659a8ae966"
+      },
+      "title": "Langfuse Worker",
+      "tagline": "The process that turns queued Langfuse events into readable traces",
+      "categories": [
+        "webapps/ai",
+        "observability/monitoring"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "langfuse worker",
+        "tracing",
+        "ingestion",
+        "background jobs",
+        "evals"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "4.41",
+          "release": "4.41.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "leantime",
       "file": {
         "path": "templates/leantime.yaml",
@@ -5694,6 +5874,54 @@
       }
     },
     {
+      "name": "mage-ai",
+      "file": {
+        "path": "templates/mage-ai.yaml",
+        "sha256": "c871265a11bed0b5af2837afd44af34925ab4a72673f422466f28933ceca1541"
+      },
+      "icon": {
+        "path": "icons/mage-ai.svg",
+        "sha256": "9864f18045fa76f534f0e225a72305e7f2c383094f32eddb9c6f1fad7d3ef104"
+      },
+      "title": "Mage",
+      "tagline": "Data pipelines written in Python or SQL, with the run history to match",
+      "categories": [
+        "webapps/automation",
+        "webapps/ai"
+      ],
+      "tags": [
+        "automation",
+        "analytics",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "airflow alternative",
+        "etl",
+        "elt",
+        "data pipeline",
+        "dagster alternative"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.9",
+          "release": "0.9.79",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mailpit",
       "file": {
         "path": "templates/mailpit.yaml",
@@ -5975,6 +6203,54 @@
         {
           "name": "3.27",
           "release": "3.27.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "mediawiki",
+      "file": {
+        "path": "templates/mediawiki.yaml",
+        "sha256": "e614b6ded7066b2abae7628220d702f3e0bd1d0b400e7b2165e7bccd431cc30b"
+      },
+      "icon": {
+        "path": "icons/mediawiki.svg",
+        "sha256": "280f29bb6b712a01c638566acb4d0c701e96aaa2a989f6d3ee2a7ad52facd0ca"
+      },
+      "title": "MediaWiki",
+      "tagline": "The wiki Wikipedia runs on, for your own encyclopaedia",
+      "categories": [
+        "webapps/knowledge",
+        "webapps/cms"
+      ],
+      "tags": [
+        "wiki",
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "wikipedia",
+        "wiki",
+        "encyclopedia",
+        "knowledge base",
+        "wikitext"
+      ],
+      "license": "GPL-2.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.46",
+          "release": "1.46.0",
           "default": true
         }
       ],
@@ -6718,6 +6994,58 @@
       }
     },
     {
+      "name": "n8n-queue",
+      "file": {
+        "path": "templates/n8n-queue.yaml",
+        "sha256": "2e5d3cdb05580288d07a5c4137128a29d4dd6994701e3d78d48833a374924256"
+      },
+      "icon": {
+        "path": "icons/n8n.svg",
+        "sha256": "2a415d5d2dea1903450d0df1b2b76866948d12a704e13378e54ed6896830c2e9"
+      },
+      "title": "n8n (queue mode)",
+      "tagline": "n8n with its executions handed to workers you can add and scale",
+      "categories": [
+        "webapps/automation",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "automation",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "n8n",
+        "workflow",
+        "zapier alternative",
+        "integrations",
+        "queue mode"
+      ],
+      "license": "LicenseRef-n8n-Sustainable-Use",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.40",
+          "release": "2.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "n8n-sqlite",
       "file": {
         "path": "templates/n8n-sqlite.yaml",
@@ -6740,6 +7068,46 @@
         "n8n sqlite"
       ],
       "license": "Sustainable-Use-License",
+      "versions": [
+        {
+          "name": "2.40",
+          "release": "2.40.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "n8n-worker",
+      "file": {
+        "path": "templates/n8n-worker.yaml",
+        "sha256": "d8b23168073a60bc7faff47b7b05bf5df0514380d36ffe63866c96ec3867197d"
+      },
+      "icon": {
+        "path": "icons/n8n.svg",
+        "sha256": "2a415d5d2dea1903450d0df1b2b76866948d12a704e13378e54ed6896830c2e9"
+      },
+      "title": "n8n Worker",
+      "tagline": "The process that actually runs the workflows of an n8n in queue mode",
+      "categories": [
+        "webapps/automation",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "automation",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "n8n worker",
+        "queue",
+        "executions",
+        "scaling",
+        "background jobs"
+      ],
+      "license": "LicenseRef-n8n-Sustainable-Use",
       "versions": [
         {
           "name": "2.40",

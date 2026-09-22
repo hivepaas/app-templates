@@ -1,0 +1,141 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: n8n-worker
+  title: n8n Worker
+  tagline: The process that actually runs the workflows of an n8n in queue mode
+  description: |
+    A worker for an n8n running in queue mode. It takes executions off the Redis queue, runs
+    them, and writes the results to the same database the editor uses. It serves no
+    interface and takes no domain - it only works.
+
+    **Deploy the editor first**
+
+    This app attaches to an **n8n (queue mode)** that already exists. Create that first; it
+    brings its own PostgreSQL and Redis, and those two are what you choose below.
+
+    **What to fill in**
+
+    - **Database app** and **Redis app** - the `-db` and `-cache` apps created beside your
+      n8n. Their addresses and passwords are read from them, so nothing has to be copied.
+    - **Encryption key** - this one does have to be copied, exactly: it is
+      `N8N_ENCRYPTION_KEY` on the n8n app's environment variables. A worker with a
+      different key cannot decrypt any credential, and every workflow that uses one fails.
+
+    **Adding capacity**
+
+    One worker runs ten executions at once by default. For more, raise the concurrency
+    below, or raise this app's replica count, or deploy a second worker app - they all take
+    from the same queue.
+
+    **Its own logs are where executions are debugged**
+
+    The editor shows what an execution did, but when a worker dies - out of memory, most
+    likely - only this app's logs say so.
+  categories: [webapps/automation, webapps/low-code]
+  tags: [automation, low-code, open-source]
+  aliases: [n8n worker, queue, executions, scaling, background jobs]
+  icon: icons/n8n.svg
+  links:
+    website: https://n8n.io
+    documentation: https://docs.n8n.io/hosting/scaling/queue-mode/
+    source: https://github.com/n8n-io/n8n
+  license: LicenseRef-n8n-Sustainable-Use
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbApp
+    title: Database app
+    description: >-
+      The PostgreSQL app your n8n uses - the one named after it with `-db` added. What is
+      stored is its key, and its address, user and password are read from it.
+    type: app
+  - name: redisApp
+    title: Redis app
+    description: >-
+      The Redis app your n8n queues into - the one named after it with `-cache` added.
+    type: app
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      The same value as `N8N_ENCRYPTION_KEY` on the n8n app. Copy it exactly; a worker with
+      a different key cannot read any stored credential.
+    type: secret
+    minLength: 16
+  - name: concurrency
+    title: Executions at once
+    description: How many executions this worker runs in parallel.
+    type: int
+    default: 10
+    min: 1
+    max: 100
+  - name: timezone
+    title: Time zone
+    description: Match the editor's, or dates in executions will not agree with it.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      This is where the workflows actually run, so it is the limit that matters. Raise it
+      for workflows that move large files.
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "2.40"
+    release: "2.40.2"
+    default: true
+    image: n8nio/n8n:2.40.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The same image as the editor, told to be a worker instead.
+      command: worker --concurrency=${{ params.concurrency }}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The worker serves nothing but this, and only when N8N_ENABLE_METRICS-free
+        # health endpoints are on, which they are by default for workers.
+        command: >-
+          node -e "fetch('http://127.0.0.1:5678/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: n8n
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: EXECUTIONS_MODE, v: queue}
+        # Read from the two apps chosen above, rather than typed in again here.
+        - {k: QUEUE_BULL_REDIS_HOST, v: "${${{ params.redisApp }}.HIVEPAAS_HOST}"}
+        - {k: QUEUE_BULL_REDIS_PORT, v: "${${{ params.redisApp }}.HIVEPAAS_PORT}"}
+        - {k: QUEUE_BULL_REDIS_PASSWORD, v: "${${{ params.redisApp }}.HIVEPAAS_PASSWORD}"}
+        - {k: DB_TYPE, v: postgresdb}
+        - {k: DB_POSTGRESDB_HOST, v: "${${{ params.dbApp }}.HIVEPAAS_HOST}"}
+        - {k: DB_POSTGRESDB_PORT, v: "${${{ params.dbApp }}.HIVEPAAS_PORT}"}
+        - {k: DB_POSTGRESDB_DATABASE, v: "${${{ params.dbApp }}.HIVEPAAS_DATABASE_NAME}"}
+        - {k: DB_POSTGRESDB_USER, v: "${${{ params.dbApp }}.HIVEPAAS_USER}"}
+        - {k: DB_POSTGRESDB_PASSWORD, v: "${${{ params.dbApp }}.HIVEPAAS_PASSWORD}"}
+        - {k: N8N_ENCRYPTION_KEY, v: "${secrets.N8N_ENCRYPTION_KEY}"}
+        - {k: GENERIC_TIMEZONE, v: "${{ params.timezone }}"}
+        # Health endpoints, which is what the check above asks.
+        - {k: QUEUE_HEALTH_CHECK_ACTIVE, v: "true"}
+    secrets:
+      N8N_ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"

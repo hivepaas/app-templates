@@ -1,0 +1,213 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mediawiki
+  title: MediaWiki
+  tagline: The wiki Wikipedia runs on, for your own encyclopaedia
+  description: |
+    MediaWiki is what Wikipedia and thousands of other wikis run on: wikitext, templates,
+    categories, a full revision history of every page, discussion pages, and an extension
+    for anything else. It is the right choice when the content matters more than the
+    editor - when pages will be linked, cited and argued over for years.
+
+    **This template creates two apps**
+
+    - **MediaWiki**, on a volume for its configuration and the uploaded files
+    - **a MariaDB database** for the pages and their history, named after the app with
+      `-db` added
+
+    **The installer runs itself**
+
+    A normal MediaWiki installation means walking through a web installer and downloading
+    the `LocalSettings.php` it produces. This template runs the same installer from the
+    command line on the first start and keeps that file on the volume, so the wiki is ready
+    when the app is.
+
+    **It needs its address from the start**
+
+    The address goes into `LocalSettings.php`, and MediaWiki builds every link from it. Set
+    it before the first start; changing it afterwards means editing `$wgServer` in that
+    file, which is on the volume.
+
+    **After the first deployment**
+
+    Sign in with the administrator account below. Then edit `LocalSettings.php` from the
+    app's console to change permissions - by default anyone may read and registered users
+    may edit - or to add extensions, which go in `/var/www/html/extensions`.
+
+    **Wikitext is not Markdown**
+
+    People used to Markdown wikis find it strange for a week. In exchange there are
+    templates, transclusion, categories and citations, which is why reference works are
+    written in it.
+  categories: [webapps/knowledge, webapps/cms]
+  tags: [wiki, documents, collaboration, open-source]
+  aliases: [wikipedia, wiki, encyclopedia, knowledge base, wikitext]
+  icon: icons/mediawiki.svg
+  links:
+    website: https://www.mediawiki.org
+    documentation: https://www.mediawiki.org/wiki/Manual:Contents
+    source: https://gerrit.wikimedia.org/g/mediawiki/core
+  license: GPL-2.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: wikiName
+    title: Wiki name
+    description: What it is called on every page and in the page titles.
+    type: string
+    default: My Wiki
+    pattern: '^[^\n]{1,64}$'
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address the wiki is reached at, scheme and all - https://wiki.example.com. It is
+      written into its configuration on the first start.
+    type: string
+    default: https://wiki.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator name
+    description: The first account's name, as it appears on pages it edits.
+    type: string
+    default: Admin
+    pattern: '^[A-Za-z0-9][A-Za-z0-9 _-]{0,60}$'
+  - name: adminPassword
+    title: Administrator password
+    description: MediaWiki asks for at least ten characters. Leave empty to generate one.
+    type: secret
+    minLength: 10
+    generate: {length: 24}
+  - name: language
+    title: Language
+    description: The wiki's own language, as a code - en, vi, de, fr.
+    type: string
+    default: en
+    pattern: '^[a-z]{2,3}(-[a-z]{2,4})?$'
+  - name: uploadLimit
+    title: Largest upload
+    description: The size of one uploaded file, as PHP writes it - 16M, 100M.
+    type: string
+    default: 32M
+    pattern: '^[1-9][0-9]*M$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the configuration and the uploaded images and files are kept on. The pages
+      themselves are in the database.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: mediawiki
+      username: mediawiki
+
+versions:
+  - name: "1.46"
+    release: "1.46.0"
+    default: true
+    image: mediawiki:1.46.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # MediaWiki is configured by a LocalSettings.php that its installer writes. The
+      # installer is normally a web wizard; this runs its command-line twin on the first
+      # start, onto the volume, and then runs the schema update that every upgrade needs.
+      # MW_CONFIG_FILE below is what tells MediaWiki to read the file from there.
+      #
+      # The wait is for the database app's DNS record, which is not registered yet when
+      # both apps are created together - and the installer is a one-shot command that
+      # would otherwise fail and leave the wiki showing its setup page.
+      command: >-
+        sh -c 'for i in $(seq 1 30); do getent hosts "$MW_DB_HOST" >/dev/null 2>&1 && break; sleep 2; done;
+        if [ ! -f /var/lib/mediawiki/LocalSettings.php ]; then
+        php maintenance/run.php install
+        --dbtype=mysql --dbserver="$MW_DB_HOST:$MW_DB_PORT" --dbname="$MW_DB_NAME"
+        --dbuser="$MW_DB_USER" --dbpass="$MW_DB_PASSWORD"
+        --installdbuser="$MW_DB_USER" --installdbpass="$MW_DB_PASSWORD"
+        --server="$MW_SERVER" --scriptpath="" --lang="$MW_LANG"
+        --pass="$MW_ADMIN_PASSWORD" --confpath=/var/lib/mediawiki
+        "$MW_SITE_NAME" "$MW_ADMIN_USER"; fi;
+        php maintenance/run.php update --quick;
+        exec apache2-foreground'
+    storage:
+      mounts:
+        # LocalSettings.php, written by the installer above.
+        /var/lib/mediawiki:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+        # Everything anyone uploads.
+        /var/www/html/images:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: images}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The setup page answers 200 as well, so the check asks for the file the
+        # installer writes before it asks the wiki anything.
+        command: >-
+          test -f /var/lib/mediawiki/LocalSettings.php &&
+          curl -fsS -o /dev/null http://127.0.0.1/index.php
+        interval: 20s
+        timeout: 10s
+        # The first start installs the schema.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mediawiki
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Where MediaWiki reads its settings from, rather than the installation directory.
+        - {k: MW_CONFIG_FILE, v: /var/lib/mediawiki/LocalSettings.php}
+        # Read by the installer in the command above, on the first start only.
+        - {k: MW_SITE_NAME, v: "${{ params.wikiName }}"}
+        - {k: MW_SERVER, v: "${{ params.appUrl }}"}
+        - {k: MW_LANG, v: "${{ params.language }}"}
+        - {k: MW_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: MW_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: MW_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: MW_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: MW_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: MW_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: MW_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: PHP_UPLOAD_MAX_FILESIZE, v: "${{ params.uploadLimit }}"}
+        - {k: PHP_POST_MAX_SIZE, v: "${{ params.uploadLimit }}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
