@@ -10457,6 +10457,117 @@
       }
     },
     {
+      "name": "supabase",
+      "file": {
+        "path": "templates/supabase.yaml",
+        "sha256": "10a5d96e3f3d29e0b80a3deb1dca129f26eb2d3d9933f33f1bd93aa8d65d8dca"
+      },
+      "icon": {
+        "path": "icons/supabase.svg",
+        "sha256": "61bf16d93be418f723ae1e137e57afdad4f185352fbc6dea9482af1e0a89ccf7"
+      },
+      "title": "Supabase",
+      "tagline": "PostgreSQL with a REST API, auth, storage and realtime in front of it",
+      "categories": [
+        "databases/sql",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "firebase alternative",
+        "baas",
+        "backend as a service",
+        "postgrest",
+        "row level security"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "supabase-postgres"
+        }
+      ],
+      "components": [
+        {
+          "name": "gw",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "auth",
+          "title": "Auth"
+        },
+        {
+          "name": "rest",
+          "title": "REST"
+        },
+        {
+          "name": "realtime",
+          "title": "Realtime"
+        },
+        {
+          "name": "storage",
+          "title": "Storage"
+        },
+        {
+          "name": "meta",
+          "title": "Meta"
+        },
+        {
+          "name": "studio",
+          "title": "Studio"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.09",
+          "release": "2026.09.07",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "supabase-postgres",
+      "file": {
+        "path": "templates/supabase-postgres.yaml",
+        "sha256": "b1c55544fbded11954d6e6f9cf40c9684cf91cca3fc07a38c2dc3aa5103f988c"
+      },
+      "icon": {
+        "path": "icons/postgres.svg",
+        "sha256": "bc45b1c56d0b1501dea387dbec4fda450d2ebc35244a620791815509d8c41dba"
+      },
+      "title": "PostgreSQL (Supabase)",
+      "tagline": "PostgreSQL, built by Supabase for their own stack",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "license": "Apache-2.0",
+      "internal": true,
+      "versions": [
+        {
+          "name": "17",
+          "release": "17.6.1.136",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "superset",
       "file": {
         "path": "templates/superset.yaml",

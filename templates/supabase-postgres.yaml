@@ -1,0 +1,276 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: supabase-postgres
+  title: PostgreSQL (Supabase)
+  tagline: PostgreSQL, built by Supabase for their own stack
+  description: |
+    This is `supabase/postgres`: an ordinary PostgreSQL with the roles, the schemas and the
+    extensions the rest of Supabase expects already there, so Auth, PostgREST, Storage and
+    Realtime start against a database shaped the way they need it. It is not meant to be
+    picked on its own - it is what the **Supabase** template uses as its database.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source]
+  icon: icons/postgres.svg
+  links:
+    website: https://supabase.com
+    documentation: https://supabase.com/docs/guides/self-hosting/docker
+    source: https://github.com/supabase/postgres
+  license: Apache-2.0
+  # Not offered on its own: it exists for the Supabase template to depend on. See
+  # docs/superpowers/specs/2026-09-22-app-template-components-design.md §7 in the hivepaas
+  # repository.
+  internal: true
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: password
+    title: Password
+    description: >-
+      Shared by every role the database bootstraps with - supabase_admin, postgres,
+      authenticator, and the rest. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: jwtExpiry
+    title: Token lifetime
+    description: >-
+      How many seconds a token is valid for, read into the database as a setting Auth
+      consults. The Supabase template asks for this once and passes it here.
+    type: int
+    default: 3600
+    min: 60
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    type: volume
+
+versions:
+  - name: "17"
+    release: "17.6.1.136"
+    default: true
+    image: supabase/postgres:17.6.1.136
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/postgresql/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: pg_isready -U supabase_admin -h localhost
+        interval: 10s
+        timeout: 5s
+        # The image runs its own first-start migration - about fifty files, all of
+        # Supabase's own schema plus the four below - before it accepts connections.
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: supabase-postgres
+      version: "${{ version.name }}"
+      database:
+        # The image's own bootstrap superuser, baked in at build time - not a choice a
+        # database name or user name parameter would change anything about, since it is
+        # what the image's own migration runner connects as.
+        dbName: postgres
+        username: supabase_admin
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        # Every role the SQL below touches - supabase_admin, postgres, authenticator,
+        # supabase_auth_admin, supabase_storage_admin, supabase_functions_admin, pgbouncer -
+        # ends up with this same password. It is one password for the whole database
+        # from the outside, which is what every Supabase service is written to expect.
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: JWT_EXP, v: "${{ params.jwtExpiry }}"}
+    configFiles:
+      # The image's own entrypoint runs everything under init-scripts/ as the postgres
+      # user, then everything under migrations/ as supabase_admin, both after the fifty
+      # or so files already baked into the image - the ordering below (98, 99) is what
+      # keeps that true. Neither file embeds a secret: both read POSTGRES_PASSWORD from
+      # the environment through psql's own \set, at the container's own start.
+      WEBHOOKS_SQL:
+        # Static and unmodified: pg_net and the supabase_functions schema that
+        # database webhooks use. No environment substitution in this one.
+        content: |
+          BEGIN;
+            -- Create pg_net extension
+            CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA extensions;
+            -- Create supabase_functions schema
+            CREATE SCHEMA supabase_functions AUTHORIZATION supabase_admin;
+            GRANT USAGE ON SCHEMA supabase_functions TO postgres, anon, authenticated, service_role;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA supabase_functions GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA supabase_functions GRANT ALL ON FUNCTIONS TO postgres, anon, authenticated, service_role;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA supabase_functions GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+            -- supabase_functions.migrations definition
+            CREATE TABLE supabase_functions.migrations (
+              version text PRIMARY KEY,
+              inserted_at timestamptz NOT NULL DEFAULT NOW()
+            );
+            -- Initial supabase_functions migration
+            INSERT INTO supabase_functions.migrations (version) VALUES ('initial');
+            -- supabase_functions.hooks definition
+            CREATE TABLE supabase_functions.hooks (
+              id bigserial PRIMARY KEY,
+              hook_table_id integer NOT NULL,
+              hook_name text NOT NULL,
+              created_at timestamptz NOT NULL DEFAULT NOW(),
+              request_id bigint
+            );
+            CREATE INDEX supabase_functions_hooks_request_id_idx ON supabase_functions.hooks USING btree (request_id);
+            CREATE INDEX supabase_functions_hooks_h_table_id_h_name_idx ON supabase_functions.hooks USING btree (hook_table_id, hook_name);
+            COMMENT ON TABLE supabase_functions.hooks IS 'Supabase Functions Hooks: Audit trail for triggered hooks.';
+            CREATE FUNCTION supabase_functions.http_request()
+              RETURNS trigger
+              LANGUAGE plpgsql
+              AS $function$
+              DECLARE
+                request_id bigint;
+                payload jsonb;
+                url text := TG_ARGV[0]::text;
+                method text := TG_ARGV[1]::text;
+                headers jsonb DEFAULT '{}'::jsonb;
+                params jsonb DEFAULT '{}'::jsonb;
+                timeout_ms integer DEFAULT 1000;
+              BEGIN
+                IF url IS NULL OR url = 'null' THEN
+                  RAISE EXCEPTION 'url argument is missing';
+                END IF;
+                IF method IS NULL OR method = 'null' THEN
+                  RAISE EXCEPTION 'method argument is missing';
+                END IF;
+                IF TG_ARGV[2] IS NULL OR TG_ARGV[2] = 'null' THEN
+                  headers = '{"Content-Type": "application/json"}'::jsonb;
+                ELSE
+                  headers = TG_ARGV[2]::jsonb;
+                END IF;
+                IF TG_ARGV[3] IS NULL OR TG_ARGV[3] = 'null' THEN
+                  params = '{}'::jsonb;
+                ELSE
+                  params = TG_ARGV[3]::jsonb;
+                END IF;
+                IF TG_ARGV[4] IS NULL OR TG_ARGV[4] = 'null' THEN
+                  timeout_ms = 1000;
+                ELSE
+                  timeout_ms = TG_ARGV[4]::integer;
+                END IF;
+                CASE
+                  WHEN method = 'GET' THEN
+                    SELECT http_get INTO request_id FROM net.http_get(url, params, headers, timeout_ms);
+                  WHEN method = 'POST' THEN
+                    payload = jsonb_build_object('old_record', OLD, 'record', NEW, 'type', TG_OP, 'table', TG_TABLE_NAME, 'schema', TG_TABLE_SCHEMA);
+                    SELECT http_post INTO request_id FROM net.http_post(url, payload, params, headers, timeout_ms);
+                  ELSE
+                    RAISE EXCEPTION 'method argument % is invalid', method;
+                END CASE;
+                INSERT INTO supabase_functions.hooks (hook_table_id, hook_name, request_id) VALUES (TG_RELID, TG_NAME, request_id);
+                RETURN NEW;
+              END
+            $function$;
+            DO $$ BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_functions_admin') THEN
+                CREATE USER supabase_functions_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;
+              END IF;
+            END $$;
+            GRANT ALL PRIVILEGES ON SCHEMA supabase_functions TO supabase_functions_admin;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA supabase_functions TO supabase_functions_admin;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA supabase_functions TO supabase_functions_admin;
+            ALTER USER supabase_functions_admin SET search_path = "supabase_functions";
+            ALTER table "supabase_functions".migrations OWNER TO supabase_functions_admin;
+            ALTER table "supabase_functions".hooks OWNER TO supabase_functions_admin;
+            ALTER function "supabase_functions".http_request() OWNER TO supabase_functions_admin;
+            GRANT supabase_functions_admin TO postgres;
+            DO $$ BEGIN
+              IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_pg_net_admin') THEN
+                REASSIGN OWNED BY supabase_pg_net_admin TO supabase_admin;
+                DROP OWNED BY supabase_pg_net_admin;
+                DROP ROLE supabase_pg_net_admin;
+              END IF;
+            END $$;
+            DO $$ BEGIN
+              IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') THEN
+                GRANT USAGE ON SCHEMA net TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+                ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
+                ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
+                ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
+                ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
+                REVOKE ALL ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
+                REVOKE ALL ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
+                GRANT EXECUTE ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+                GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+              END IF;
+            END $$;
+            CREATE OR REPLACE FUNCTION extensions.grant_pg_net_access()
+            RETURNS event_trigger LANGUAGE plpgsql AS $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM pg_event_trigger_ddl_commands() AS ev
+                JOIN pg_extension AS ext ON ev.objid = ext.oid WHERE ext.extname = 'pg_net'
+              ) THEN
+                GRANT USAGE ON SCHEMA net TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+                ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
+                ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
+                ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
+                ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
+                REVOKE ALL ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
+                REVOKE ALL ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
+                GRANT EXECUTE ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+                GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+              END IF;
+            END;
+            $$;
+            COMMENT ON FUNCTION extensions.grant_pg_net_access IS 'Grants access to pg_net';
+            DO $$ BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_event_trigger WHERE evtname = 'issue_pg_net_access') THEN
+                CREATE EVENT TRIGGER issue_pg_net_access ON ddl_command_end WHEN TAG IN ('CREATE EXTENSION')
+                EXECUTE PROCEDURE extensions.grant_pg_net_access();
+              END IF;
+            END $$;
+            INSERT INTO supabase_functions.migrations (version) VALUES ('20210809183423_update_grants');
+            ALTER function supabase_functions.http_request() SECURITY DEFINER;
+            ALTER function supabase_functions.http_request() SET search_path = supabase_functions;
+            REVOKE ALL ON FUNCTION supabase_functions.http_request() FROM PUBLIC;
+            GRANT EXECUTE ON FUNCTION supabase_functions.http_request() TO postgres, anon, authenticated, service_role;
+          COMMIT;
+        swarmRef:
+          file: {name: /docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql, mode: 444}
+      JWT_SQL:
+        content: |
+          \set jwt_exp `echo "$JWT_EXP"`
+          ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
+        swarmRef:
+          file: {name: /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql, mode: 444}
+      ROLES_SQL:
+        content: |
+          \set pgpass `echo "$POSTGRES_PASSWORD"`
+          ALTER USER authenticator WITH PASSWORD :'pgpass';
+          ALTER USER pgbouncer WITH PASSWORD :'pgpass';
+          ALTER USER supabase_auth_admin WITH PASSWORD :'pgpass';
+          ALTER USER supabase_functions_admin WITH PASSWORD :'pgpass';
+          ALTER USER supabase_storage_admin WITH PASSWORD :'pgpass';
+        swarmRef:
+          file: {name: /docker-entrypoint-initdb.d/init-scripts/99-roles.sql, mode: 444}
+      REALTIME_SQL:
+        content: |
+          \set pguser `echo "$POSTGRES_USER"`
+          create schema if not exists _realtime;
+          alter schema _realtime owner to :pguser;
+        swarmRef:
+          file: {name: /docker-entrypoint-initdb.d/migrations/99-realtime.sql, mode: 444}
+    routing:
+      port: 5432

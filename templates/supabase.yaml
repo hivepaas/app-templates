@@ -1,0 +1,799 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: supabase
+  title: Supabase
+  tagline: PostgreSQL with a REST API, auth, storage and realtime in front of it
+  description: |
+    Supabase is a PostgreSQL database with the pieces an application wants around it: a
+    REST and GraphQL API generated straight from your schema, sign-up and sign-in with row
+    level security to back it, a file store, realtime subscriptions over Postgres changes,
+    and a studio to look at all of it in a browser.
+
+    **This template creates seven apps and a database**
+
+    - **Gateway** (`kong`) - the address you give your application, routing to the rest
+    - **Auth** - accounts, sessions, magic links, OAuth
+    - **REST** - the PostgREST API generated from your schema
+    - **Realtime** - subscriptions over database changes and presence
+    - **Storage** - files, in buckets, with row level security same as any other table
+    - **Meta** - what Studio uses to read and change your schema
+    - **Studio** - the browser dashboard
+    - **a PostgreSQL database**, `supabase/postgres`, shaped the way the six above expect
+
+    **What is not included**
+
+    Edge Functions (a Deno runtime for your own serverless code), the image-transformation
+    proxy Storage can use for on-the-fly resizing, the analytics pipeline (Logflare and
+    Vector - off by default even in Supabase's own compose), and Supavisor's connection
+    pooling - the six services above reach Postgres directly, which is what a single-node
+    install wants. Nothing here stops you from adding one of these as an application
+    yourself, exactly as you would beside any other database.
+
+    **Three keys have to be generated before you start**
+
+    `JWT_SECRET`, `ANON_KEY` and `SERVICE_ROLE_KEY` are not something this template can
+    generate for you: the last two are JSON Web Tokens signed with the first, and making
+    them takes a signature, not a random string. Run this once, with only `openssl`:
+
+    ```sh
+    jwt_secret=$(openssl rand -base64 40)
+    header=$(printf '{"alg":"HS256","typ":"JWT"}' | openssl enc -base64 -A | tr '+/' '-_' | tr -d '=')
+    iat=$(date +%s); exp=$((iat + 157680000))  # 5 years
+    sign() {
+      payload=$(printf '{"role":"%s","iss":"supabase","iat":%s,"exp":%s}' "$1" "$iat" "$exp" \
+        | openssl enc -base64 -A | tr '+/' '-_' | tr -d '=')
+      sig=$(printf '%s.%s' "$header" "$payload" \
+        | openssl dgst -binary -sha256 -hmac "$jwt_secret" | openssl enc -base64 -A | tr '+/' '-_' | tr -d '=')
+      printf '%s.%s.%s\n' "$header" "$payload" "$sig"
+    }
+    echo "JWT_SECRET=$jwt_secret"
+    echo "ANON_KEY=$(sign anon)"
+    echo "SERVICE_ROLE_KEY=$(sign service_role)"
+    ```
+
+    (Adapted from Supabase's own `utils/generate-keys.sh`, Apache-2.0.) Paste the three
+    lines it prints into the matching parameters below - all three, from the same run,
+    every time you create or restore this stack.
+
+    **It needs a domain**
+
+    The gateway is what the address goes on; every other app stays on the project network,
+    reached by Studio, by Kong's own routes, and by each other.
+
+    **After the first deployment**
+
+    Open the address; Kong asks for the dashboard user and password below before it lets
+    you into Studio. Studio itself has no accounts of its own to sign into - anyone who has
+    that password administers the whole project. From there, run SQL, add tables, and the
+    REST and GraphQL APIs update to match without anything to restart.
+
+    **Backups are the database, plus the buckets**
+
+    Everything Auth, REST, Realtime and Studio know is in the database. Storage's files are
+    on the volume the gateway app was given - back up both.
+  categories: [databases/sql, webapps/dev-tools]
+  tags: [sql, relational, open-source]
+  aliases: [firebase alternative, baas, backend as a service, postgrest, row level security]
+  icon: icons/supabase.svg
+  links:
+    website: https://supabase.com
+    documentation: https://supabase.com/docs/guides/self-hosting/docker
+    source: https://github.com/supabase/supabase
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The gateway's own address, scheme and all - https://supabase.example.com. Every
+      client library is pointed at this.
+    type: string
+    default: https://supabase.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to the gateway - the host part of the address above.
+      Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: siteUrl
+    title: Your application's address
+    description: >-
+      Where Auth sends people back to after a magic link or an OAuth sign-in - your own
+      application, not this one. Change it later in the app's environment variables once
+      you know it.
+    type: string
+    default: https://app.example.com
+    pattern: '^https?://[^\s/?#]+$'
+  - name: jwtSecret
+    title: JWT secret
+    description: >-
+      Generated in the description above. Every service verifies tokens with it; it is not
+      generated here because ANON_KEY and SERVICE_ROLE_KEY have to be signed with the same
+      value.
+    type: secret
+    minLength: 16
+  - name: anonKey
+    title: Anonymous key
+    description: The JWT with role "anon", signed with the secret above - well over 100 characters.
+    type: secret
+    minLength: 16
+  - name: serviceRoleKey
+    title: Service role key
+    description: >-
+      The JWT with role "service_role", signed with the secret above - well over 100
+      characters. It bypasses row level security - keep it out of anything that ships to
+      a browser.
+    type: secret
+    minLength: 16
+  - name: jwtExpiry
+    title: Token lifetime
+    description: How many seconds a session token is valid for.
+    type: int
+    default: 3600
+    min: 300
+  - name: dashboardUsername
+    title: Dashboard user name
+    description: What the gateway asks for before letting anyone into Studio.
+    type: string
+    default: supabase
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: dashboardPassword
+    title: Dashboard password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: disableSignup
+    title: Close sign-ups
+    description: >-
+      Turn on once the accounts you want exist, unless this project is meant to take
+      strangers. Leave it off for the first deployment - there is no other account to
+      create one with.
+    type: bool
+    default: false
+  - name: autoconfirmEmail
+    title: Skip e-mail confirmation
+    description: >-
+      Without a mail server below, this is the only way anyone can finish signing up - a
+      new account is confirmed immediately instead of being sent a link. Turn it off once
+      the mail settings are filled in.
+    type: bool
+    default: true
+  - name: smtpHost
+    title: Mail server
+    description: The SMTP host Auth sends confirmation and recovery mail through.
+    type: string
+    optional: true
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: Mail user name
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: From address
+    type: string
+    default: auth@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: secretKeyBase
+    title: Realtime encryption base
+    description: Signs and encrypts what Realtime and its clients exchange. Leave empty to generate one.
+    type: secret
+    minLength: 64
+    generate: {length: 64}
+  - name: realtimeEncKey
+    title: Realtime field encryption key
+    description: >-
+      Encrypts a few sensitive fields Realtime keeps about itself. Exactly 16 characters -
+      leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16}
+  - name: metaCryptoKey
+    title: Studio-Meta encryption key
+    description: Encrypts the connection strings Studio hands to Meta. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    description: Applied to every service app of the stack.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: File storage volume
+    description: The volume uploaded files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: supabase-postgres
+    params:
+      jwtExpiry: "${{ params.jwtExpiry }}"
+
+versions:
+  - name: "2026.09"
+    release: "2026.09.07"
+    default: true
+    components:
+      gw: {image: "kong/kong:3.9.3"}
+      auth: {image: "supabase/gotrue:v2.196.0"}
+      rest: {image: "postgrest/postgrest:v14.17"}
+      realtime: {image: "supabase/realtime:v2.134.10"}
+      storage: {image: "supabase/storage-api:v1.74.0"}
+      meta: {image: "supabase/postgres-meta:v0.99.0"}
+      studio: {image: "supabase/studio:2026.09.07-sha-7996410"}
+
+components:
+  # ── Gateway ──────────────────────────────────────────────────────────────
+  - name: gw
+    title: Gateway
+    primary: true
+    needs: [auth, rest, realtime, storage, meta, studio]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: /bin/sh /tmp/kong-entrypoint.sh
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            - {k: KONG_DATABASE, v: "off"}
+            - {k: KONG_DECLARATIVE_CONFIG, v: /usr/local/kong/kong.yml}
+            - {k: KONG_ROUTER_FLAVOR, v: expressions}
+            - {k: KONG_DNS_ORDER, v: "LAST,A,CNAME"}
+            - {k: KONG_DNS_NOT_FOUND_TTL, v: "1"}
+            - {k: KONG_DNS_VALID_TTL, v: "5"}
+            - {k: KONG_PLUGINS, v: "request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction,post-function"}
+            - {k: KONG_NGINX_PROXY_PROXY_BUFFER_SIZE, v: 160k}
+            - {k: KONG_NGINX_PROXY_PROXY_BUFFERS, v: "64 160k"}
+            - {k: KONG_PROXY_ACCESS_LOG, v: /dev/stdout combined}
+            - {k: SUPABASE_ANON_KEY, v: "${secrets.ANON_KEY}"}
+            - {k: SUPABASE_SERVICE_KEY, v: "${secrets.SERVICE_ROLE_KEY}"}
+            - {k: DASHBOARD_USERNAME, v: "${{ params.dashboardUsername }}"}
+            - {k: DASHBOARD_PASSWORD, v: "${secrets.DASHBOARD_PASSWORD}"}
+            # Read by kong-entrypoint.sh below. Every downstream app is reached by its
+            # HivePaaS key - the same value a sibling would use to reach it.
+            - {k: AUTH_KEY, v: "${{ comp.auth.key }}"}
+            - {k: REST_KEY, v: "${{ comp.rest.key }}"}
+            - {k: REALTIME_KEY, v: "${{ comp.realtime.key }}"}
+            - {k: STORAGE_KEY, v: "${{ comp.storage.key }}"}
+            - {k: META_KEY, v: "${{ comp.meta.key }}"}
+            - {k: STUDIO_KEY, v: "${{ comp.studio.key }}"}
+        secrets:
+          ANON_KEY:
+            value: "${{ params.anonKey }}"
+          SERVICE_ROLE_KEY:
+            value: "${{ params.serviceRoleKey }}"
+          DASHBOARD_PASSWORD:
+            value: "${{ params.dashboardPassword }}"
+          # Upstream's own kong.yml and kong-entrypoint.sh, unmodified except for the
+          # upstream addresses: theirs are literal compose service names, and these are
+          # the app keys of the six components above, substituted in ahead of Kong's own
+          # substitution pass. Neither leaves an anon key, a service key or a dashboard
+          # password in the file - kong-entrypoint.sh reads all three from its own
+          # environment, set above, at every start.
+          KONG_ENTRYPOINT:
+            value: |
+              #!/bin/sh
+              if [ -n "$SUPABASE_SECRET_KEY" ] && [ -n "$SUPABASE_PUBLISHABLE_KEY" ]; then
+                  export LUA_AUTH_EXPR="\$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= 'Bearer sb_' and headers.authorization) or (headers.apikey == '$SUPABASE_SECRET_KEY' and 'Bearer $SERVICE_ROLE_KEY_ASYMMETRIC') or (headers.apikey == '$SUPABASE_PUBLISHABLE_KEY' and 'Bearer $ANON_KEY_ASYMMETRIC') or headers.apikey)"
+                  export LUA_RT_WS_EXPR="\$((query_params.apikey == '$SUPABASE_SECRET_KEY' and '$SERVICE_ROLE_KEY_ASYMMETRIC') or (query_params.apikey == '$SUPABASE_PUBLISHABLE_KEY' and '$ANON_KEY_ASYMMETRIC') or query_params.apikey)"
+              else
+                  export LUA_AUTH_EXPR="\$((headers.authorization ~= nil and headers.authorization:sub(1, 10) ~= 'Bearer sb_' and headers.authorization) or headers.apikey)"
+                  export LUA_RT_WS_EXPR="\$(query_params.apikey)"
+              fi
+              awk '{
+                result = ""
+                rest = $0
+                while (match(rest, /\$[A-Za-z_][A-Za-z_0-9]*/)) {
+                  varname = substr(rest, RSTART + 1, RLENGTH - 1)
+                  if (varname in ENVIRON) {
+                    result = result substr(rest, 1, RSTART - 1) ENVIRON[varname]
+                  } else {
+                    result = result substr(rest, 1, RSTART + RLENGTH - 1)
+                  }
+                  rest = substr(rest, RSTART + RLENGTH)
+                }
+                print result rest
+              }' /tmp/kong.yml.template > "$KONG_DECLARATIVE_CONFIG"
+              sed -i '/^[[:space:]]*- key:[[:space:]]*$/d' "$KONG_DECLARATIVE_CONFIG"
+              exec /entrypoint.sh kong docker-start
+            swarmRef:
+              # /tmp rather than /home/kong: this image has no /home/kong directory
+              # for a mount to land in, unlike the older image Supabase's own compose
+              # assumes.
+              file: {name: /tmp/kong-entrypoint.sh, mode: 555}
+        configFiles:
+          KONG_DECLARATIVE:
+            content: |
+              _format_version: '2.1'
+              _transform: true
+              consumers:
+                - username: DASHBOARD
+                - username: anon
+                  keyauth_credentials:
+                    - key: $SUPABASE_ANON_KEY
+                - username: service_role
+                  keyauth_credentials:
+                    - key: $SUPABASE_SERVICE_KEY
+              acls:
+                - {consumer: anon, group: anon}
+                - {consumer: service_role, group: admin}
+              basicauth_credentials:
+                - {consumer: DASHBOARD, username: '$DASHBOARD_USERNAME', password: '$DASHBOARD_PASSWORD'}
+              services:
+                - name: auth-v1-open
+                  url: http://$AUTH_KEY:9999/verify
+                  routes:
+                    - {name: auth-v1-open, strip_path: true, paths: ["/auth/v1/verify"]}
+                  plugins: [{name: cors}]
+                - name: auth-v1-open-callback
+                  url: http://$AUTH_KEY:9999/callback
+                  routes:
+                    - {name: auth-v1-open-callback, strip_path: true, paths: ["/auth/v1/callback"]}
+                  plugins: [{name: cors}]
+                - name: auth-v1-open-authorize
+                  url: http://$AUTH_KEY:9999/authorize
+                  routes:
+                    - {name: auth-v1-open-authorize, strip_path: true, paths: ["/auth/v1/authorize"]}
+                  plugins: [{name: cors}]
+                - name: auth-v1-open-jwks
+                  url: http://$AUTH_KEY:9999/.well-known/jwks.json
+                  routes:
+                    - {name: auth-v1-open-jwks, strip_path: true, paths: ["/auth/v1/.well-known/jwks.json"]}
+                  plugins: [{name: cors}]
+                - name: auth-v1
+                  url: http://$AUTH_KEY:9999/
+                  routes:
+                    - {name: auth-v1-all, strip_path: true, paths: ["/auth/v1/"]}
+                  plugins:
+                    - {name: cors}
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                        replace: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin, anon]}}
+                - name: rest-v1-openapi
+                  url: http://$REST_KEY:3000/
+                  routes:
+                    - {name: rest-v1-openapi-root, strip_path: true, expression: 'http.path == "/rest/v1/"'}
+                  plugins:
+                    - {name: cors}
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                        replace: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin]}}
+                - name: rest-v1
+                  url: http://$REST_KEY:3000/
+                  routes:
+                    - {name: rest-v1-all, strip_path: true, paths: ["/rest/v1/"]}
+                  plugins:
+                    - {name: cors}
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                        replace: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin, anon]}}
+                - name: graphql-v1
+                  url: http://$REST_KEY:3000/rpc/graphql
+                  routes:
+                    - {name: graphql-v1-all, strip_path: true, paths: ["/graphql/v1"]}
+                  plugins:
+                    - {name: cors}
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["Content-Profile: graphql_public", "Authorization: $LUA_AUTH_EXPR"]}
+                        replace: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin, anon]}}
+                - name: realtime-v1-ws
+                  url: http://$REALTIME_KEY:4000/socket
+                  protocol: ws
+                  routes:
+                    - {name: realtime-v1-ws, strip_path: true, paths: ["/realtime/v1/"]}
+                  plugins:
+                    - {name: cors}
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["x-api-key:$LUA_RT_WS_EXPR"]}
+                        replace: {querystring: ["apikey:$LUA_RT_WS_EXPR"]}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin, anon]}}
+                - name: realtime-v1-rest-openapi
+                  url: http://$REALTIME_KEY:4000/api/openapi
+                  routes:
+                    - {name: realtime-v1-rest-openapi, strip_path: true, paths: ["/realtime/v1/api/openapi"]}
+                  plugins: [{name: request-termination, config: {status_code: 403, message: "Access is forbidden."}}]
+                - name: realtime-v1-rest-tenants
+                  url: http://$REALTIME_KEY:4000/api/tenants
+                  routes:
+                    - {name: realtime-v1-rest-tenants, strip_path: true, paths: ["/realtime/v1/api/tenants"]}
+                  plugins: [{name: request-termination, config: {status_code: 403, message: "Access is forbidden."}}]
+                - name: realtime-v1-rest
+                  url: http://$REALTIME_KEY:4000/api
+                  routes:
+                    - {name: realtime-v1-rest, strip_path: true, paths: ["/realtime/v1/api"]}
+                  plugins:
+                    - {name: cors}
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                        replace: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin, anon]}}
+                - name: storage-v1
+                  url: http://$STORAGE_KEY:5000/
+                  routes:
+                    - {name: storage-v1-all, strip_path: true, paths: ["/storage/v1/"]}
+                  plugins:
+                    - {name: cors}
+                    - name: request-transformer
+                      config:
+                        add: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                        replace: {headers: ["Authorization: $LUA_AUTH_EXPR"]}
+                    - name: post-function
+                      config:
+                        access:
+                          - |
+                            local auth = kong.request.get_header("authorization")
+                            if auth == nil or auth == "" or auth:find("^%s*$") then
+                              kong.service.request.clear_header("authorization")
+                            end
+                - name: well-known-oauth
+                  url: http://$AUTH_KEY:9999/.well-known/oauth-authorization-server
+                  routes:
+                    - {name: well-known-oauth, strip_path: true, paths: ["/.well-known/oauth-authorization-server"]}
+                  plugins: [{name: cors}]
+                - name: meta
+                  url: http://$META_KEY:8080/
+                  routes:
+                    - {name: meta-all, strip_path: true, paths: ["/pg/"]}
+                  plugins:
+                    - {name: key-auth, config: {hide_credentials: false}}
+                    - {name: acl, config: {hide_groups_header: true, allow: [admin]}}
+                - name: dashboard
+                  url: http://$STUDIO_KEY:3000/
+                  routes:
+                    - {name: dashboard-all, strip_path: true, paths: ["/"]}
+                  plugins:
+                    - {name: cors}
+                    - {name: basic-auth, config: {hide_credentials: true}}
+            swarmRef:
+              file: {name: /tmp/kong.yml.template, mode: 444}
+        routing:
+          port: 8000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Auth ─────────────────────────────────────────────────────────────────
+  - name: auth
+    title: Auth
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget --no-verbose --tries=1 --spider http://localhost:9999/health
+            interval: 20s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            - {k: GOTRUE_API_HOST, v: "0.0.0.0"}
+            - {k: GOTRUE_API_PORT, v: "9999"}
+            - {k: API_EXTERNAL_URL, v: "${{ params.appUrl }}/auth/v1"}
+            - {k: GOTRUE_DB_DRIVER, v: postgres}
+            - k: GOTRUE_DB_DATABASE_URL
+              v: >-
+                postgres://supabase_auth_admin:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: GOTRUE_SITE_URL, v: "${{ params.siteUrl }}"}
+            - {k: GOTRUE_DISABLE_SIGNUP, v: "${{ params.disableSignup }}"}
+            - {k: GOTRUE_JWT_ADMIN_ROLES, v: service_role}
+            - {k: GOTRUE_JWT_AUD, v: authenticated}
+            - {k: GOTRUE_JWT_DEFAULT_GROUP_NAME, v: authenticated}
+            - {k: GOTRUE_JWT_EXP, v: "${{ params.jwtExpiry }}"}
+            - {k: GOTRUE_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - {k: GOTRUE_JWT_ISSUER, v: "${{ params.appUrl }}/auth/v1"}
+            - {k: GOTRUE_EXTERNAL_EMAIL_ENABLED, v: "true"}
+            - {k: GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED, v: "false"}
+            - {k: GOTRUE_MAILER_AUTOCONFIRM, v: "${{ params.autoconfirmEmail }}"}
+            - {k: GOTRUE_SMTP_ADMIN_EMAIL, v: "${{ params.smtpFromEmail }}"}
+            - {k: GOTRUE_SMTP_HOST, v: "${{ params.smtpHost }}"}
+            - {k: GOTRUE_SMTP_PORT, v: "${{ params.smtpPort }}"}
+            - {k: GOTRUE_SMTP_USER, v: "${{ params.smtpUser }}"}
+            - {k: GOTRUE_SMTP_PASS, v: "${secrets.SMTP_PASSWORD}"}
+            - {k: GOTRUE_SMTP_SENDER_NAME, v: Supabase}
+            - {k: GOTRUE_MAILER_URLPATHS_INVITE, v: /auth/v1/verify}
+            - {k: GOTRUE_MAILER_URLPATHS_CONFIRMATION, v: /auth/v1/verify}
+            - {k: GOTRUE_MAILER_URLPATHS_RECOVERY, v: /auth/v1/verify}
+            - {k: GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE, v: /auth/v1/verify}
+            - {k: GOTRUE_EXTERNAL_PHONE_ENABLED, v: "true"}
+            - {k: GOTRUE_SMS_AUTOCONFIRM, v: "true"}
+        secrets:
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"
+          SMTP_PASSWORD:
+            value: "${{ params.smtpPassword }}"
+
+  # ── REST ─────────────────────────────────────────────────────────────────
+  - name: rest
+    title: REST
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: postgrest
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: postgrest --ready
+            interval: 20s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            - k: PGRST_DB_URI
+              v: >-
+                postgres://authenticator:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: PGRST_DB_SCHEMAS, v: "public,graphql_public"}
+            - {k: PGRST_DB_MAX_ROWS, v: "1000"}
+            - {k: PGRST_DB_EXTRA_SEARCH_PATH, v: public}
+            - {k: PGRST_DB_ANON_ROLE, v: anon}
+            - {k: PGRST_ADMIN_SERVER_PORT, v: "3001"}
+            # The main API's own host stays at its default - every interface, which is
+            # what lets Kong reach it. The admin one has to be a concrete address rather
+            # than that default, or the health check below cannot ask it anything.
+            - {k: PGRST_ADMIN_SERVER_HOST, v: localhost}
+            - {k: PGRST_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - {k: PGRST_DB_USE_LEGACY_GUCS, v: "false"}
+            - {k: PGRST_APP_SETTINGS_JWT_EXP, v: "${{ params.jwtExpiry }}"}
+        secrets:
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"
+
+  # ── Realtime ─────────────────────────────────────────────────────────────
+  - name: realtime
+    title: Realtime
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The tenant Realtime seeds itself with in self-host mode, SELF_HOST_TENANT_NAME
+            # below, which does not have to match anything about how the app is reached -
+            # it is an internal identifier, not a hostname.
+            command: >-
+              curl -sSfL --head -o /dev/null -H "Authorization: Bearer ${SELF_AUTH_KEY}"
+              http://localhost:4000/api/tenants/realtime-dev/health
+            interval: 30s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            - {k: PORT, v: "4000"}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_USER, v: supabase_admin}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: DB_AFTER_CONNECT_QUERY, v: "SET search_path TO _realtime"}
+            - {k: DB_ENC_KEY, v: supabaserealtime}
+            - {k: API_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - {k: METRICS_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}"}
+            - {k: ERL_AFLAGS, v: "-proto_dist inet_tcp"}
+            - {k: DNS_NODES, v: "''"}
+            - {k: RLIMIT_NOFILE, v: "10000"}
+            - {k: APP_NAME, v: realtime}
+            - {k: SEED_SELF_HOST, v: "true"}
+            - {k: RUN_JANITOR, v: "true"}
+            - {k: DISABLE_HEALTHCHECK_LOGGING, v: "true"}
+            # For the health check above only - read from the container's own secret,
+            # which the check has no other way to reach.
+            - {k: SELF_AUTH_KEY, v: "${secrets.ANON_KEY}"}
+        secrets:
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"
+          SECRET_KEY_BASE:
+            value: "${{ params.secretKeyBase }}"
+          ANON_KEY:
+            value: "${{ params.anonKey }}"
+
+  # ── Storage ──────────────────────────────────────────────────────────────
+  - name: storage
+    title: Storage
+    needs: [rest]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/lib/storage: {type: volume, source: "${{ params.dataVolume }}"}
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # 127.0.0.1, not localhost: this image resolves "localhost" to ::1 first,
+            # and it listens on IPv4 only, so wget would refuse a connection that is
+            # there.
+            command: wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/status
+            interval: 20s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            - {k: ANON_KEY, v: "${secrets.ANON_KEY}"}
+            - {k: SERVICE_KEY, v: "${secrets.SERVICE_ROLE_KEY}"}
+            - {k: POSTGREST_URL, v: "http://${{ comp.rest.key }}:3000"}
+            - {k: AUTH_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - k: DATABASE_URL
+              v: >-
+                postgres://supabase_storage_admin:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: STORAGE_PUBLIC_URL, v: "${{ params.appUrl }}"}
+            - {k: REQUEST_ALLOW_X_FORWARDED_PATH, v: "true"}
+            - {k: FILE_SIZE_LIMIT, v: "52428800"}
+            - {k: STORAGE_BACKEND, v: file}
+            - {k: GLOBAL_S3_BUCKET, v: stub}
+            - {k: FILE_STORAGE_BACKEND_PATH, v: /var/lib/storage}
+            - {k: TENANT_ID, v: stub}
+            - {k: REGION, v: stub}
+            # No imgproxy in this stack, so on-the-fly image resizing is off; files still
+            # serve at their original size.
+            - {k: ENABLE_IMAGE_TRANSFORMATION, v: "false"}
+        secrets:
+          ANON_KEY:
+            value: "${{ params.anonKey }}"
+          SERVICE_ROLE_KEY:
+            value: "${{ params.serviceRoleKey }}"
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"
+
+  # ── Meta ─────────────────────────────────────────────────────────────────
+  - name: meta
+    title: Meta
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            - {k: PG_META_PORT, v: "8080"}
+            - {k: PG_META_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: PG_META_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: PG_META_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: PG_META_DB_USER, v: postgres}
+            - {k: PG_META_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: CRYPTO_KEY, v: "${secrets.META_CRYPTO_KEY}"}
+        secrets:
+          META_CRYPTO_KEY:
+            value: "${{ params.metaCryptoKey }}"
+
+  # ── Studio ───────────────────────────────────────────────────────────────
+  - name: studio
+    title: Studio
+    needs: [meta]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: >-
+              node -e "fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
+            interval: 20s
+            timeout: 10s
+            startPeriod: 30s
+            retries: 5
+      settings:
+        kind: {category: webapp, engine: supabase, webapp: {}}
+        envVars:
+          data:
+            # Overrides the container's own hostname, which the app's server otherwise
+            # binds to - and Docker sets it to the app's key, so without this every
+            # loopback request, including the health check, is refused.
+            - {k: HOSTNAME, v: "0.0.0.0"}
+            - {k: STUDIO_PG_META_URL, v: "http://${{ comp.meta.key }}:8080"}
+            - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: POSTGRES_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: POSTGRES_USER_READ_WRITE, v: postgres}
+            - {k: PG_META_CRYPTO_KEY, v: "${secrets.META_CRYPTO_KEY}"}
+            - {k: PGRST_DB_SCHEMAS, v: "public,graphql_public"}
+            - {k: PGRST_DB_MAX_ROWS, v: "1000"}
+            - {k: PGRST_DB_EXTRA_SEARCH_PATH, v: public}
+            - {k: DEFAULT_ORGANIZATION_NAME, v: "Default Organization"}
+            - {k: DEFAULT_PROJECT_NAME, v: "Default Project"}
+            - {k: SUPABASE_URL, v: "http://${{ comp.gw.key }}:8000"}
+            - {k: SUPABASE_PUBLIC_URL, v: "${{ params.appUrl }}"}
+            - {k: SUPABASE_ANON_KEY, v: "${secrets.ANON_KEY}"}
+            - {k: SUPABASE_SERVICE_KEY, v: "${secrets.SERVICE_ROLE_KEY}"}
+            - {k: AUTH_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - {k: ENABLED_FEATURES_LOGS_ALL, v: "false"}
+        secrets:
+          META_CRYPTO_KEY:
+            value: "${{ params.metaCryptoKey }}"
+          ANON_KEY:
+            value: "${{ params.anonKey }}"
+          SERVICE_ROLE_KEY:
+            value: "${{ params.serviceRoleKey }}"
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"

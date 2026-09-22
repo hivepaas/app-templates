@@ -85,7 +85,10 @@ The rules, all checked by `apptemplate lint`:
 
 A dependency parameter the template does not fix, with no default, not optional and not a
 generated secret, is asked of the person creating the app - for a database, its data volume.
-Deleting the app never deletes its dependencies.
+**Deleting the app deletes its dependencies too** - a dependency is a logical child of the
+app it was created for, and deleting an app deletes its logical children along with it. A
+database created as a dependency is not something to keep past the app that used it; treat
+it the same as any other data on an app you are about to delete.
 
 ## Working on templates
 
