@@ -2544,6 +2544,47 @@
       }
     },
     {
+      "name": "fizzy",
+      "file": {
+        "path": "templates/fizzy.yaml",
+        "sha256": "cced39a2c8e624e70ebf0c68603f35629ece4f709725b4938a506eb1d2baf97b"
+      },
+      "icon": {
+        "path": "icons/fizzy.svg",
+        "sha256": "02de59d007afc28e04b7d198ff321807fd1ef9f3b314fe3677f959b4f543f10d"
+      },
+      "title": "Fizzy",
+      "tagline": "Kanban for issues and ideas, from the people who wrote Basecamp",
+      "categories": [
+        "webapps/project-management",
+        "webapps/business"
+      ],
+      "tags": [
+        "project-management",
+        "tasks",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "kanban",
+        "board",
+        "issues",
+        "trello alternative",
+        "37signals"
+      ],
+      "license": "LicenseRef-OSaasy",
+      "versions": [
+        {
+          "name": "main",
+          "release": "2026.09",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "flarum",
       "file": {
         "path": "templates/flarum.yaml",
@@ -3322,6 +3363,59 @@
       }
     },
     {
+      "name": "glitchtip",
+      "file": {
+        "path": "templates/glitchtip.yaml",
+        "sha256": "0f2cd9a4b13e68f9882a6517e8e49b0de73cc6fa87153c457edb0483853c5388"
+      },
+      "icon": {
+        "path": "icons/glitchtip.svg",
+        "sha256": "ae55a71ff8e7a1521fbdca2c46e0a2929eb672c5b1877d958d176e3966e1fb99"
+      },
+      "title": "GlitchTip",
+      "tagline": "Error tracking that speaks Sentry, with teams, alerts and uptime checks",
+      "categories": [
+        "observability/monitoring",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "error-tracking",
+        "monitoring",
+        "uptime",
+        "open-source"
+      ],
+      "aliases": [
+        "sentry alternative",
+        "error tracking",
+        "exceptions",
+        "crash reports",
+        "apm"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.2",
+          "release": "6.2.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "goatcounter",
       "file": {
         "path": "templates/goatcounter.yaml",
@@ -3516,6 +3610,47 @@
         {
           "name": "0.22",
           "release": "0.22.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gowa",
+      "file": {
+        "path": "templates/gowa.yaml",
+        "sha256": "bbaf69fb0b5569ca14e847227643ae3cbca5d82c46f56089c189a0a561b7b2d5"
+      },
+      "icon": {
+        "path": "icons/gowa.svg",
+        "sha256": "3e197e0e1f3e679ee09823c75e1c7bad3a19da9bd1ba01df395268b9ae91816f"
+      },
+      "title": "GOWA (WhatsApp API)",
+      "tagline": "An HTTP API for your own WhatsApp account, for the apps that need one",
+      "categories": [
+        "webapps/communication",
+        "webapps/automation"
+      ],
+      "tags": [
+        "chat",
+        "notifications",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "whatsapp",
+        "whatsapp api",
+        "whatsmeow",
+        "messaging",
+        "bot"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "9.4",
+          "release": "9.4.0",
           "default": true
         }
       ],
@@ -3898,6 +4033,59 @@
       }
     },
     {
+      "name": "heyform",
+      "file": {
+        "path": "templates/heyform.yaml",
+        "sha256": "9d2de4319c461821ec6f2e54a28a1baf6df16ca41a8c0980351992dd36ab5ca3"
+      },
+      "icon": {
+        "path": "icons/heyform.svg",
+        "sha256": "8ba045961b15510c4b7b5a1b687e3757f8c9b3ede07eb8fa7c7d3883e175abc4"
+      },
+      "title": "HeyForm",
+      "tagline": "Conversational forms - one question at a time, on your own domain",
+      "categories": [
+        "webapps/business",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "collaboration",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "typeform alternative",
+        "forms",
+        "survey",
+        "questionnaire",
+        "google forms"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mongodb"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.0",
+          "release": "3.0.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "hi-events",
       "file": {
         "path": "templates/hi-events.yaml",
@@ -3943,6 +4131,47 @@
         {
           "name": "1.11",
           "release": "1.11.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "home-assistant",
+      "file": {
+        "path": "templates/home-assistant.yaml",
+        "sha256": "a36f34a3ea325def354567ce6934b88aa942ea196f7b8816a958ed4501ece001"
+      },
+      "icon": {
+        "path": "icons/home-assistant.svg",
+        "sha256": "a38346804cf53f84d217e80b13210dd5f541d4fa3453b029e0e552b860b70349"
+      },
+      "title": "Home Assistant",
+      "tagline": "Home automation that keeps the devices and the history to itself",
+      "categories": [
+        "webapps/automation",
+        "webapps/networking"
+      ],
+      "tags": [
+        "automation",
+        "iot",
+        "mqtt",
+        "open-source"
+      ],
+      "aliases": [
+        "hass",
+        "smart home",
+        "home automation",
+        "zigbee",
+        "domotics"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.3",
           "default": true
         }
       ],
@@ -4443,6 +4672,54 @@
         {
           "name": "5",
           "release": "5.3.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "joplin-server",
+      "file": {
+        "path": "templates/joplin-server.yaml",
+        "sha256": "22a8358e0c4621c2696b3a9fafa8fd64b8e5ad6ee50727d0fddad9b7ab452b5d"
+      },
+      "icon": {
+        "path": "icons/joplin-server.svg",
+        "sha256": "5dfdf3fb114ab534bab91fdb2a788392308173cb2a0b3217bc577381fff1bee7"
+      },
+      "title": "Joplin Server",
+      "tagline": "Sync your Joplin notes through a server you own",
+      "categories": [
+        "webapps/knowledge",
+        "storage/files"
+      ],
+      "tags": [
+        "notes",
+        "files",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "joplin",
+        "notes sync",
+        "markdown notes",
+        "evernote alternative",
+        "note taking"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.7",
+          "release": "3.7.2",
           "default": true
         }
       ],
@@ -6680,6 +6957,54 @@
         {
           "name": "31",
           "release": "31.0.10"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "nocobase",
+      "file": {
+        "path": "templates/nocobase.yaml",
+        "sha256": "0470b85089b60e54dadcaac63ac2383303c74d1c5cfdd4c41507962cbfb7bff7"
+      },
+      "icon": {
+        "path": "icons/nocobase.svg",
+        "sha256": "5420bcaa2e55526b49d57dd64f989daa235493090a2c3a61697b7edc109801b7"
+      },
+      "title": "NocoBase",
+      "tagline": "Build an internal tool on your own database, without writing much of one",
+      "categories": [
+        "webapps/low-code",
+        "webapps/business"
+      ],
+      "tags": [
+        "low-code",
+        "spreadsheet",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "no-code",
+        "internal tools",
+        "admin panel",
+        "airtable alternative",
+        "crud"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.2",
+          "release": "2.2.16",
+          "default": true
         }
       ],
       "requires": {

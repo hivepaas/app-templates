@@ -1,0 +1,176 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: fizzy
+  title: Fizzy
+  tagline: Kanban for issues and ideas, from the people who wrote Basecamp
+  description: |
+    Fizzy is 37signals' Kanban tool: cards move across columns, anyone can file an idea,
+    and the board stays readable because the tool refuses most of what other boards pile
+    on. There are no story points, no swimlanes and no burndown charts - a card, a column,
+    a person and a comment thread.
+
+    **This template sets up**
+
+    - Fizzy, on a volume for its database and its uploads
+    - a secret key for the cookies and the signed links
+    - the mail settings its sign-in codes are sent with
+    - a memory limit you choose
+
+    **It needs a domain**
+
+    The address is in the sign-in e-mails and the links it generates. Give it its domain
+    when you create it.
+
+    **After the first deployment**
+
+    Open the address and give your e-mail; Fizzy sends a six-character code to sign in
+    with. Without the mail settings below, that code is in the app's logs instead - fine
+    for the first look, not for a team.
+
+    **Everything is on the volume**
+
+    Fizzy keeps its data in SQLite files under `/rails/storage`, along with the uploads.
+    One volume is the whole installation, and backing it up is backing up everything.
+
+    **About the licence**
+
+    Fizzy is under 37signals' O'Saasy licence: you may run it, change it and use it
+    commercially, but you may not offer it to other people as a hosted service that
+    competes with theirs. Running it for your own team is exactly what it allows.
+  categories: [webapps/project-management, webapps/business]
+  tags: [project-management, tasks, collaboration, open-source]
+  aliases: [kanban, board, issues, trello alternative, 37signals]
+  icon: icons/fizzy.svg
+  links:
+    website: https://fizzy.do
+    documentation: https://github.com/basecamp/fizzy/blob/main/docs/docker-deployment.md
+    source: https://github.com/basecamp/fizzy
+  license: LicenseRef-OSaasy
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://board.example.com. It is
+      what the links in its e-mails point at.
+    type: string
+    default: https://board.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: secretKeyBase
+    title: Secret key
+    description: >-
+      Signs the cookies and the links Fizzy hands out. Leave empty to generate one, and do
+      not change it afterwards - everyone would be signed out.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: smtpHost
+    title: Mail server
+    description: >-
+      The SMTP host the sign-in codes are sent through. Leave the default unchanged and
+      the codes appear in the app's logs instead.
+    type: string
+    default: smtp.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    description: 587 for STARTTLS, which is the default here, or 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: Mail user name
+    description: What it signs in to the mail server as. Leave empty for a relay that asks for nothing.
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    type: secret
+    optional: true
+  - name: fromEmail
+    title: From address
+    description: What the sign-in codes are sent from.
+    type: string
+    default: fizzy@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and the uploaded files are kept on.
+    type: volume
+
+versions:
+  - name: main
+    release: "2026.09"
+    default: true
+    # Fizzy publishes no version tags - only `main` and one per commit - so the release
+    # this template was tested against is named by its digest.
+    image: ghcr.io/basecamp/fizzy@sha256:1db3c866095af486da666c90b056e633f4e2cc16675966e5fa662ecf9c592f87
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /rails/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Rails' own health endpoint, which answers once the database has migrated.
+        command: curl -fsS -o /dev/null http://127.0.0.1/up
+        interval: 20s
+        timeout: 10s
+        # The first start creates and migrates the SQLite databases.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: fizzy
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}"}
+        - {k: BASE_URL, v: "${{ params.appUrl }}"}
+        # TLS ends at HivePaaS' reverse proxy, so the container serves plain HTTP and
+        # must not try to redirect to HTTPS itself.
+        - {k: DISABLE_SSL, v: "true"}
+        - {k: MAILER_FROM_ADDRESS, v: "${{ params.fromEmail }}"}
+        - {k: SMTP_ADDRESS, v: "${{ params.smtpHost }}"}
+        - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+    secrets:
+      SECRET_KEY_BASE:
+        value: "${{ params.secretKeyBase }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

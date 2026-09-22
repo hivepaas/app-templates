@@ -1,0 +1,187 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gowa
+  title: GOWA (WhatsApp API)
+  tagline: An HTTP API for your own WhatsApp account, for the apps that need one
+  description: |
+    GOWA puts an HTTP API in front of a WhatsApp account: POST a message and it is sent,
+    and incoming messages are forwarded to a webhook you give it. It is what n8n, a shop's
+    order notifications or an on-call alert needs when the destination is WhatsApp rather
+    than e-mail. Groups, media, replies, reactions and read receipts are all in the API,
+    and it has a web interface for pairing and for trying calls by hand.
+
+    **This template sets up**
+
+    - GOWA, on a volume for the paired session and the chat history
+    - a user name and password on both the API and the web interface
+    - a webhook address for incoming messages, if you give one
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the address, sign in, and scan the QR code with WhatsApp on your phone, under
+    Settings, Linked devices. The pairing is kept on the volume, so it survives restarts.
+
+    **Sending a message**
+
+    ```sh
+    curl -u <user>:<password> -X POST https://<address>/send/message \
+      -d '{"phone":"6289...@s.whatsapp.net","message":"hello"}' \
+      -H 'Content-Type: application/json'
+    ```
+
+    **This is not WhatsApp's own API**
+
+    It signs in as a linked device, the way WhatsApp Web does. Meta does not sanction it,
+    and accounts that send in bulk, message strangers or behave like software get banned -
+    sometimes the number, permanently. Use it for your own traffic to people who expect it,
+    keep the volume low, and do not put a number you cannot lose on it. For anything
+    commercial at scale, the official WhatsApp Business API is the answer.
+
+    **Keep it private**
+
+    Whoever reaches the API sends as you and reads what you receive. The user name and
+    password below are the only thing in front of it.
+  categories: [webapps/communication, webapps/automation]
+  tags: [chat, notifications, automation, open-source]
+  aliases: [whatsapp, whatsapp api, whatsmeow, messaging, bot]
+  icon: icons/gowa.svg
+  links:
+    website: https://github.com/aldinokemal/go-whatsapp-web-multidevice
+    documentation: https://github.com/aldinokemal/go-whatsapp-web-multidevice#readme
+    source: https://github.com/aldinokemal/go-whatsapp-web-multidevice
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: authUser
+    title: User name
+    description: What the API and the web interface ask for.
+    type: string
+    default: gowa
+    pattern: '^[A-Za-z0-9._-]{2,32}$'
+  - name: authPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: webhookUrl
+    title: Webhook address
+    description: >-
+      Where incoming messages are POSTed - an n8n or Node-RED app in this project, for
+      instance. Leave it empty to receive nothing.
+    type: string
+    optional: true
+    maxLength: 500
+  - name: webhookSecret
+    title: Webhook secret
+    description: >-
+      Signs what GOWA sends to that address, so the receiver can tell it is really from
+      here. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: autoReply
+    title: Automatic reply
+    description: >-
+      Sent back to anyone who messages this number. Leave empty to reply to nothing.
+    type: string
+    optional: true
+    maxLength: 500
+  - name: accountValidation
+    title: Validate numbers before sending
+    description: >-
+      Check that a number is on WhatsApp first. Safer, but one more request to Meta per
+      message.
+    type: bool
+    default: true
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to keep the API on the project
+      network, where the pairing QR code is still reachable from the app's console.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the paired session, the chat history and the downloaded media are kept on.
+      Losing it means pairing the phone again.
+    type: volume
+
+versions:
+  - name: "9.4"
+    release: "9.4.0"
+    default: true
+    image: aldinokemal2104/go-whatsapp-web-multidevice:v9.4.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: rest
+    storage:
+      mounts:
+        # The session database and the chat history.
+        /app/storages:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: storages}
+        # QR codes, sent items and downloaded media.
+        /app/statics:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: statics}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own endpoint, which answers whether or not a phone is paired. The image is
+        # Alpine with busybox wget and no curl.
+        command: wget -q -O /dev/null "http://127.0.0.1:3000/app/devices" 2>/dev/null || wget -q -S -O /dev/null http://127.0.0.1:3000/ 2>&1 | grep -q "401\|200"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gowa
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_PORT, v: "3000"}
+        - {k: APP_HOST, v: 0.0.0.0}
+        - {k: APP_BASIC_AUTH, v: "${{ params.authUser }}:${secrets.AUTH_PASSWORD}"}
+        # HivePaaS' reverse proxy is what sees the real client, and it is the only thing
+        # that reaches this app from outside the project network.
+        - {k: APP_TRUSTED_PROXIES, v: "0.0.0.0/0"}
+        - {k: WHATSAPP_WEBHOOK, v: "${{ params.webhookUrl }}"}
+        - {k: WHATSAPP_WEBHOOK_SECRET, v: "${secrets.WEBHOOK_SECRET}"}
+        - {k: WHATSAPP_AUTO_REPLY, v: "${{ params.autoReply }}"}
+        - {k: WHATSAPP_ACCOUNT_VALIDATION, v: "${{ params.accountValidation }}"}
+        - {k: WHATSAPP_CHAT_STORAGE, v: "true"}
+        - {k: DB_URI, v: "file:storages/whatsapp.db?_foreign_keys=on"}
+    secrets:
+      AUTH_PASSWORD:
+        value: "${{ params.authPassword }}"
+      WEBHOOK_SECRET:
+        value: "${{ params.webhookSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

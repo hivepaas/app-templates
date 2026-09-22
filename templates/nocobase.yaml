@@ -1,0 +1,151 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: nocobase
+  title: NocoBase
+  tagline: Build an internal tool on your own database, without writing much of one
+  description: |
+    NocoBase builds the back office: define collections, then arrange pages out of tables,
+    forms, kanban boards, calendars and charts, with roles deciding who sees what and
+    workflows running on a record change, a schedule or a button. Unlike a spreadsheet
+    database, it treats the data model as the thing and the interface as a view of it - so
+    it also points at a database you already have.
+
+    **This template creates two apps**
+
+    - **NocoBase**, on a volume for the uploads and the installed plugins
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    Sign in at the address as `admin@nocobase.com` with the password `admin123`, and change
+    both at once - that pair is the same on every installation until you do.
+
+    **Its own database, and yours**
+
+    The database beside it holds NocoBase's own tables. To build on data you already have,
+    add that database as an external data source in the interface instead of pointing this
+    one at it.
+
+    **Keep the application key**
+
+    It signs the sessions and the tokens. Changing it signs everyone out; losing it with a
+    restored backup does the same.
+
+    **About the licence**
+
+    The core is Apache-2.0 and some plugins are commercial, but NocoBase's licence
+    agreement has one condition worth knowing: you may not offer NocoBase itself to the
+    public as a no-code or low-code platform. Running it for your own organisation, and
+    building tools with it, is what it is for.
+  categories: [webapps/low-code, webapps/business]
+  tags: [low-code, spreadsheet, automation, open-source]
+  aliases: [no-code, internal tools, admin panel, airtable alternative, crud]
+  icon: icons/nocobase.svg
+  links:
+    website: https://www.nocobase.com
+    documentation: https://docs.nocobase.com
+    source: https://github.com/nocobase/nocobase
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: appKey
+    title: Application key
+    description: >-
+      Signs the sessions and the tokens. Leave empty to generate one, and do not change it
+      afterwards.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: timezone
+    title: Time zone
+    description: What dates without one are taken to mean.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: Node and the plugins share it; a gigabyte is the floor for a real install.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the uploads, the installed plugins and the logs are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: nocobase
+      username: nocobase
+
+versions:
+  - name: "2.2"
+    release: "2.2.16"
+    default: true
+    image: nocobase/nocobase:2.2.16
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/nocobase/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own endpoint, which answers once the schema is installed.
+        command: >-
+          node -e "fetch('http://127.0.0.1:13000/api/__health_check').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        # The first start installs the schema and the bundled plugins, which is slow.
+        startPeriod: 300s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: nocobase
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_ENV, v: production}
+        - {k: APP_PORT, v: "13000"}
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: DB_DIALECT, v: postgres}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The database is on the project network, which does not carry TLS.
+        - {k: DB_UNDERSCORED, v: "false"}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+    routing:
+      port: 13000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,144 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: joplin-server
+  title: Joplin Server
+  tagline: Sync your Joplin notes through a server you own
+  description: |
+    Joplin Server is the sync end of Joplin, the note-taking application with Markdown
+    notes, notebooks, tags, attachments and end-to-end encryption. Put it here and the
+    desktop, phone and terminal clients sync through it instead of Dropbox, OneDrive or
+    Joplin Cloud - which also unlocks sharing a notebook with someone else and publishing a
+    note as a link.
+
+    **This template creates two apps**
+
+    - **Joplin Server**, on a volume for the attachments
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **It needs a domain**
+
+    The clients are told this address and keep using it, and the published-note links point
+    at it. Give it its domain when you create it.
+
+    **After the first deployment**
+
+    Sign in at the address as `admin@localhost` with the password `admin`, and change both
+    at once under Profile - that pair is the same on every installation until you do. Then
+    in each Joplin client, choose Joplin Server as the sync target and give it the address
+    and your account.
+
+    **End-to-end encryption stays yours**
+
+    With it on in the clients, the server stores ciphertext it cannot read - so the notes
+    are safe here even though the sharing features need the server to be trusted with the
+    parts you share.
+
+    **Backups are two things**
+
+    The database holds the notes and the accounts; the volume holds the attachments. Keep
+    both.
+  categories: [webapps/knowledge, storage/files]
+  tags: [notes, files, collaboration, open-source]
+  aliases: [joplin, notes sync, markdown notes, evernote alternative, note taking]
+  icon: icons/joplin-server.svg
+  links:
+    website: https://joplinapp.org
+    documentation: https://joplinapp.org/help/install/sync/joplin_server/
+    source: https://github.com/laurent22/joplin
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address the clients sync with, scheme and all - https://notes.example.com. It is
+      what published note links point at.
+    type: string
+    default: https://notes.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Attachments volume
+    description: The volume the attached files and images are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: joplin
+      username: joplin
+
+versions:
+  - name: "3.7"
+    release: "3.7.2"
+    default: true
+    image: joplin/server:3.7.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/joplin: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Joplin checks the Host header against APP_BASE_URL and answers 404 to
+        # anything else, so a request over the loopback proves nothing. This checks that
+        # the port is open, which it only is once the migrations are done.
+        command: >-
+          node -e "require('net').connect(22300,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        # The first start migrates the database.
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: joplin-server
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_PORT, v: "22300"}
+        - {k: APP_BASE_URL, v: "${{ params.appUrl }}"}
+        - {k: DB_CLIENT, v: pg}
+        - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: POSTGRES_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Attachments on the volume rather than as rows in the database, which keeps the
+        # database small enough to dump and the backups of the two kinds separate.
+        - {k: STORAGE_DRIVER, v: "Type=Filesystem; Path=/var/lib/joplin"}
+        - {k: MAX_TIME_DRIFT, v: "0"}
+    routing:
+      port: 22300
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

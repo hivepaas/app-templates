@@ -1,0 +1,173 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: home-assistant
+  title: Home Assistant
+  tagline: Home automation that keeps the devices and the history to itself
+  description: |
+    Home Assistant is the hub for the things in a home: lights, sensors, switches, cameras,
+    media players and the cars and energy meters that have APIs. It has thousands of
+    integrations, automations you draw or write, dashboards you arrange, and it keeps the
+    history locally rather than in a manufacturer's cloud.
+
+    **This template sets up**
+
+    - Home Assistant, on a volume for the configuration, the history and the integrations
+    - the settings it needs to work behind HivePaaS' reverse proxy
+    - a memory limit you choose
+
+    **This is the container version, and it has limits**
+
+    This is what Home Assistant calls Container: the application alone, without the
+    Supervisor. Three things it therefore cannot do:
+
+    - **No add-ons.** Zigbee2MQTT, ESPHome, Node-RED and the rest are separate apps here -
+      several of them are in this store - rather than things installed from a Home
+      Assistant add-on store.
+    - **No USB devices.** A Zigbee or Z-Wave stick plugged into the node is not reachable
+      from here. Network coordinators work: a SkyConnect over Ethernet, a Zigbee2MQTT
+      talking MQTT to the Mosquitto app in this store, anything with an IP.
+    - **No discovery on your home network** unless the node is on it. Integrations that
+      find devices by mDNS or broadcast need to be on the same network segment; cloud
+      integrations and anything reachable by IP are unaffected.
+
+    **Where it makes sense**
+
+    On a node in the house - a mini PC or NAS running HivePaaS - it is most of Home
+    Assistant with the add-on store traded for ordinary apps. On a rented server far from
+    the house, only the cloud-connected half works.
+
+    **After the first deployment**
+
+    Open the address and create the first account, which is the owner. Its configuration is
+    seeded once, with `use_x_forwarded_for` and the private ranges as trusted proxies -
+    without which Home Assistant refuses requests that came through a reverse proxy. After
+    that the file is yours: edit it in the app's console or through the File Editor.
+
+    **Backups are the volume**
+
+    Everything - configuration, accounts, the recorder database, the integrations you
+    added - lives under `/config`.
+  categories: [webapps/automation, webapps/networking]
+  tags: [automation, iot, mqtt, open-source]
+  aliases: [hass, smart home, home automation, zigbee, domotics]
+  icon: icons/home-assistant.svg
+  links:
+    website: https://www.home-assistant.io
+    documentation: https://www.home-assistant.io/installation/linux#docker-compose
+    source: https://github.com/home-assistant/core
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: What its automations and its history are timed by.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: The recorder and the integrations are what use it.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Configuration volume
+    description: >-
+      The volume `/config` lives on: the configuration, the accounts, the history database
+      and everything the integrations store.
+    type: volume
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.3"
+    default: true
+    image: ghcr.io/home-assistant/home-assistant:2026.9.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Home Assistant writes its own configuration.yaml on the first start and then owns
+      # it, so a mounted file is no good: it could never be edited afterwards. This seeds
+      # the file once, with the reverse proxy settings it needs here, and leaves it alone
+      # from then on. The three files it includes are seeded empty for the same reason:
+      # an include of a file that does not exist fails the whole configuration, and Home
+      # Assistant then starts in safe mode - where the proxy settings are not applied and
+      # every request through the proxy is refused.
+      command: >-
+        sh -c 'mkdir -p /config;
+        if [ ! -f /config/configuration.yaml ]; then
+        cp /etc/hivepaas/configuration.yaml /config/configuration.yaml; fi;
+        for f in automations scripts scenes; do
+        [ -f "/config/$f.yaml" ] || echo "[]" > "/config/$f.yaml"; done;
+        exec /init'
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The manifest is served before anyone signs in, which is what makes it usable as
+        # a check on a fresh installation.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8123/manifest.json
+        interval: 30s
+        timeout: 10s
+        # The first start writes its configuration and builds the database.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: home-assistant
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+    configFiles:
+      configuration.yaml:
+        # Copied to /config/configuration.yaml on the first start only. The trusted
+        # proxies are the private ranges a container network uses: HivePaaS' reverse
+        # proxy is the only thing that reaches this app from outside the project.
+        content: |
+          # Loads default_config, which is what a normal installation starts with.
+          default_config:
+
+          http:
+            use_x_forwarded_for: true
+            trusted_proxies:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 127.0.0.1
+              - ::1
+
+          # Keep the automations, scenes and scripts the interface writes in their own
+          # files, as a default installation does.
+          automation: !include automations.yaml
+          script: !include scripts.yaml
+          scene: !include scenes.yaml
+        swarmRef:
+          file: {name: /etc/hivepaas/configuration.yaml, mode: 444}
+    routing:
+      port: 8123
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

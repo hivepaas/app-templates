@@ -1,0 +1,217 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: glitchtip
+  title: GlitchTip
+  tagline: Error tracking that speaks Sentry, with teams, alerts and uptime checks
+  description: |
+    GlitchTip collects what your applications throw - stack traces, breadcrumbs, the
+    release and the user it happened to - groups them into issues and tells the right
+    people. It takes events from the Sentry SDKs unchanged, so switching is a matter of
+    changing the DSN, and it adds organisations, teams, alert rules that reach Discord,
+    Slack, e-mail or a webhook, and uptime monitors for the addresses you name.
+
+    **This template creates three apps**
+
+    - **GlitchTip**, running its web server and its background worker in one container
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+    - **a Redis** for its queue, with `-cache` added
+
+    **Bugsink is the smaller one**
+
+    This store has both. Take Bugsink when you want one container and a database and
+    nothing else to think about. Take GlitchTip when several teams share it, when alerts
+    need to reach somewhere other than e-mail, or when you want the uptime checks.
+
+    **It needs a domain**
+
+    The address is in every alert, and the SDKs send to it. Give it its domain when you
+    create it.
+
+    **After the first deployment**
+
+    Open the address and register; the first account is the administrator. Then make an
+    organisation and a project, and put the DSN it gives you into your application's
+    Sentry SDK. Registration is open by default - turn it off in the settings once your
+    people are in, or nobody needs an invitation.
+
+    **Mail is how alerts leave**
+
+    Fill in the mail settings below, or alerts stay inside the interface.
+
+    **Memory**
+
+    The web server and the worker share the limit, and the worker is what needs room while
+    a burst of events is ingested. A gigabyte is a floor.
+  categories: [observability/monitoring, webapps/dev-tools]
+  tags: [error-tracking, monitoring, uptime, open-source]
+  aliases: [sentry alternative, error tracking, exceptions, crash reports, apm]
+  icon: icons/glitchtip.svg
+  links:
+    website: https://glitchtip.com
+    documentation: https://glitchtip.com/documentation/install
+    source: https://gitlab.com/glitchtip/glitchtip-backend
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address the SDKs send to and the alerts link to, scheme and all -
+      https://errors.example.com.
+    type: string
+    default: https://errors.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: secretKey
+    title: Secret key
+    description: Signs the sessions and the tokens. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 50}
+  - name: openRegistration
+    title: Anyone may register
+    description: >-
+      Leave it on until your own account exists, then turn it off unless this instance is
+      meant to be public.
+    type: bool
+    default: true
+  - name: fromEmail
+    title: From address
+    description: What the alerts and the invitations are sent from.
+    type: string
+    default: glitchtip@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpHost
+    title: Mail server
+    description: The SMTP host the alerts are sent through.
+    type: string
+    default: smtp.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    description: 587 for STARTTLS, 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: Mail user name
+    description: Leave empty for a relay that asks for nothing.
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    type: secret
+    optional: true
+  - name: eventRetention
+    title: Keep events for
+    description: How long an event is kept before it is deleted. Issues themselves stay.
+    type: select
+    default: "90"
+    options:
+      - {value: "30", title: 30 days}
+      - {value: "90", title: 90 days}
+      - {value: "365", title: A year}
+  - name: memoryLimit
+    title: Memory limit
+    description: The web server and the worker share it.
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: glitchtip
+      username: glitchtip
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the ingestion queue, so evicting a key would lose events rather than a
+      # cached value.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "6.2"
+    release: "6.2.6"
+    default: true
+    image: glitchtip/glitchtip:6.2.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own endpoint, which answers once the migrations are done.
+        command: >-
+          python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/_health/', timeout=5).status==200 else 1)"
+        interval: 30s
+        timeout: 10s
+        # The first start migrates the database and builds its partitions.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: glitchtip
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The worker normally runs as a second container. This runs it beside the web
+        # server instead, which is what one node wants.
+        - {k: GLITCHTIP_EMBED_WORKER, v: "true"}
+        - {k: PORT, v: "8080"}
+        - {k: GLITCHTIP_DOMAIN, v: "${{ params.appUrl }}"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        # Separate fields rather than DATABASE_URL, so nothing in the password has to be
+        # escaped.
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: ENABLE_OPEN_USER_REGISTRATION, v: "${{ params.openRegistration }}"}
+        - {k: GLITCHTIP_MAX_EVENT_LIFE_DAYS, v: "${{ params.eventRetention }}"}
+        - {k: DEFAULT_FROM_EMAIL, v: "${{ params.fromEmail }}"}
+        - {k: EMAIL_HOST, v: "${{ params.smtpHost }}"}
+        - {k: EMAIL_PORT, v: "${{ params.smtpPort }}"}
+        - {k: EMAIL_HOST_USER, v: "${{ params.smtpUser }}"}
+        - {k: EMAIL_HOST_PASSWORD, v: "${secrets.EMAIL_PASSWORD}"}
+        - {k: EMAIL_USE_TLS, v: "true"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      EMAIL_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,214 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: heyform
+  title: HeyForm
+  tagline: Conversational forms - one question at a time, on your own domain
+  description: |
+    HeyForm builds forms that ask one question at a time, the way Typeform does: logic that
+    skips questions based on earlier answers, hidden fields, file uploads, payments through
+    Stripe, and a results view with each submission and the summary. Forms are published at
+    your own address and the answers stay in your own database.
+
+    **This template creates three apps**
+
+    - **HeyForm**, on a volume for the uploaded files
+    - **a MongoDB** for the forms and the answers, named after the app with `-db` added
+    - **a Redis** for its sessions and its queue, with `-cache` added
+
+    **It needs a domain**
+
+    The address is in the form links you hand out and in the e-mails it sends. Give it its
+    domain when you create it.
+
+    **After the first deployment**
+
+    Open the address and register; the first account is yours. Registration stays open, so
+    turn on invite-only in the settings, or restrict it at the reverse proxy, unless
+    strangers should be able to sign up.
+
+    **Mail is how people verify and recover**
+
+    Sign-up verification, password resets and submission notifications are all e-mail, so
+    fill in the mail settings below.
+
+    **Keep the encryption key**
+
+    Answers are encrypted with it. Changing it makes what is already stored unreadable, so
+    keep it with the backup rather than only in the app.
+
+    **Formbricks is the other one**
+
+    This store has both. HeyForm is the form builder - ask people something at a link you
+    send them. Formbricks is survey and feedback inside a product, triggered by what
+    someone does in your application.
+  categories: [webapps/business, webapps/low-code]
+  tags: [low-code, collaboration, documents, open-source]
+  aliases: [typeform alternative, forms, survey, questionnaire, google forms]
+  icon: icons/heyform.svg
+  links:
+    website: https://heyform.net
+    documentation: https://docs.heyform.net/open-source/self-hosting
+    source: https://github.com/heyform/heyform
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address the forms are published at, scheme and all - https://forms.example.com.
+    type: string
+    default: https://forms.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: sessionKey
+    title: Session secret
+    description: Signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: encryptionKey
+    title: Answer encryption key
+    description: >-
+      Encrypts the answers in the database. Leave empty to generate one, and keep it with
+      your backup - changing it makes what is stored unreadable.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: smtpHost
+    title: Mail server
+    description: The SMTP host the verification and notification mail is sent through.
+    type: string
+    default: smtp.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    description: 587 for STARTTLS, 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: TLS from the first byte
+    description: On for port 465. Leave it off for 587, which starts plain and upgrades.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: Mail user name
+    description: Leave empty for a relay that asks for nothing.
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    type: secret
+    optional: true
+  - name: fromEmail
+    title: From address
+    description: What the verification and notification mail is sent from.
+    type: string
+    default: forms@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Uploads volume
+    description: The volume the files people attach to their answers are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mongodb
+    # 8.x refuses to start on Linux 6.19 and newer, which is where this would land on a
+    # recent host; 7.0 runs on both.
+    version: "7.0"
+    params:
+      dbName: heyform
+      username: heyform
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the sessions and the job queue, so evicting a key would sign people out
+      # or lose work rather than drop a cached value.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "3.0"
+    release: "3.0.3"
+    default: true
+    image: heyform/community-edition:v3.0.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/static/upload: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: >-
+          node -e "fetch('http://127.0.0.1:9157/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: heyform
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_HOMEPAGE_URL, v: "${{ params.appUrl }}"}
+        - k: MONGO_URI
+          v: >-
+            mongodb://${{ deps.db.ref.HIVEPAAS_USER }}:${{
+            deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{
+            deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME
+            }}?authSource=admin
+        - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SESSION_KEY, v: "${secrets.SESSION_KEY}"}
+        - {k: FORM_ENCRYPTION_KEY, v: "${secrets.FORM_ENCRYPTION_KEY}"}
+        - {k: SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+        - {k: SMTP_USER, v: "${{ params.smtpUser }}"}
+        - {k: SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: SMTP_FROM, v: "${{ params.fromEmail }}"}
+    secrets:
+      SESSION_KEY:
+        value: "${{ params.sessionKey }}"
+      FORM_ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 9157
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
