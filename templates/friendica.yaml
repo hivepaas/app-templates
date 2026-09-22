@@ -1,0 +1,176 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: friendica
+  title: Friendica
+  tagline: A social network of your own that talks to all the others
+  description: |
+    Friendica is the Fediverse server that speaks the most dialects: ActivityPub to
+    Mastodon, Misskey and the rest, plus diaspora*, and it can pull in RSS feeds and mailing
+    lists as if they were friends. Posts have titles and formatting, groups and circles
+    decide who sees what, and the whole thing runs on PHP and MySQL, so it is undemanding
+    to keep.
+
+    **This template creates two apps**
+
+    - **Friendica**, on a volume for its files and uploads
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    **The address is forever**
+
+    It is the part after the @ in every account, and other servers remember it. Set it to
+    the HTTPS address of the domain you give the app, and never change it.
+
+    **After the first deployment**
+
+    The installer runs itself with the settings below. Open the address and register the
+    account whose e-mail you gave as the administrator's - that account becomes the admin.
+    Then look at Admin, Site to close registration or set it to approval.
+
+    **The worker**
+
+    Friendica does its federating in a background worker, which normally runs from cron.
+    This app runs it every five minutes inside the container instead, which is why
+    deliveries take up to that long to leave.
+
+    **Backups are two things**
+
+    The database holds the posts and the accounts; the volume holds the uploads and the
+    configuration. Keep both.
+  categories: [webapps/social, webapps/communication]
+  tags: [chat, collaboration, open-source]
+  aliases: [fediverse, activitypub, diaspora, mastodon alternative, social network]
+  icon: icons/friendica.svg
+  links:
+    website: https://friendi.ca
+    documentation: https://wiki.friendi.ca
+    source: https://github.com/friendica/friendica
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people reach it at, scheme and all - https://social.example.com. It is
+      written into every post this server federates and cannot be changed later.
+    type: string
+    default: https://social.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator e-mail
+    description: >-
+      The account registered with this address becomes the administrator. Register it
+      yourself after the first start.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: language
+    title: Language
+    description: The default for the interface, as a two-letter code.
+    type: string
+    default: en
+    pattern: '^[a-z]{2}(-[a-z]{2})?$'
+  - name: timezone
+    title: Time zone
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z]+(/[A-Za-z0-9._+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: PHP and the worker share it.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the application files, the configuration and the uploads are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: friendica
+      username: friendica
+
+versions:
+  - name: "2026.05"
+    release: "2026.05"
+    default: true
+    image: friendica:2026.05-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Friendica federates from a worker that normally runs from cron, which a single
+      # container has none of. This runs it beside the web server, every five minutes.
+      command: >-
+        sh -c 'while true; do sleep 300;
+        php /var/www/html/bin/console.php worker >/dev/null 2>&1 || true;
+        done & exec /entrypoint.sh apache2-foreground'
+    storage:
+      mounts:
+        # The image keeps the application here and expects to write to it: it copies the
+        # release in at the first start and writes the configuration beside it.
+        /var/www/html:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: html}
+        # Uploads and the storage backend.
+        /var/www/data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Answers once the installer has finished and the tables are there.
+        command: curl -fsS -o /dev/null http://127.0.0.1/friendica/
+        interval: 30s
+        timeout: 10s
+        # The first start copies the release onto the volume and installs the schema.
+        startPeriod: 300s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: friendica
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MYSQL_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: MYSQL_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: MYSQL_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: MYSQL_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: MYSQL_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # These three are what the image's own installer runs with on an empty database.
+        - {k: FRIENDICA_URL, v: "${{ params.appUrl }}"}
+        - {k: FRIENDICA_ADMIN_MAIL, v: "${{ params.adminEmail }}"}
+        - {k: FRIENDICA_LANG, v: "${{ params.language }}"}
+        - {k: FRIENDICA_TZ, v: "${{ params.timezone }}"}
+        # Upgrade the schema when the image is newer than what is on the volume.
+        - {k: FRIENDICA_UPGRADE, v: "true"}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

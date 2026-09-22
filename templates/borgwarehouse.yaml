@@ -1,0 +1,192 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: borgwarehouse
+  title: BorgWarehouse
+  tagline: A home for your machines' Borg backups, with a screen to watch them
+  description: |
+    BorgWarehouse is the server end of Borg: each machine gets a repository with a quota
+    and its own SSH key, and the web interface shows when each one last checked in and how
+    much space it has taken. Borg does the hard part - deduplicated, compressed, encrypted
+    backups - and this makes running the repositories for a dozen machines something you
+    can see at a glance.
+
+    **This template sets up**
+
+    - BorgWarehouse, on a volume for the repositories, the keys and its configuration
+    - the SSH port published on the node, which is what Borg clients connect to
+    - an authentication secret, generated unless you give one
+
+    **After the first deployment**
+
+    Open the address and complete the setup wizard, which creates the first account. Then
+    add a repository, paste the machine's public SSH key, and the wizard gives you the
+    command to run there:
+
+    ```sh
+    borg init -e repokey-blake2 ssh://borg@backup.example.com:2222/./repo-name
+    ```
+
+    **The SSH port has to be reachable**
+
+    Borg clients connect to it directly; the domain is only for the web interface. Open the
+    port you choose below on the node's firewall.
+
+    **The address it tells clients**
+
+    The public address below is what appears in the commands it generates. Set it to the
+    name clients can resolve, which is the node rather than the web interface if they
+    differ.
+
+    **Backups of the backups**
+
+    Everything is on the one volume: the repositories, the SSH keys and the host keys. If
+    it is lost, the clients' own data is still theirs, but every repository and every key
+    here is gone.
+  categories: [storage/backup, webapps/dev-tools]
+  tags: [backup, files, open-source]
+  aliases: [borg, borgbackup, borgbase alternative, repositories, restic alternative]
+  icon: icons/borgwarehouse.svg
+  links:
+    website: https://borgwarehouse.com
+    documentation: https://borgwarehouse.com/docs/
+    source: https://github.com/Ravinou/borgwarehouse
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Web address
+    description: >-
+      The address the web interface is reached at, scheme and all -
+      https://backup.example.com. Its sign-in flow checks requests against it.
+    type: string
+    default: https://backup.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: sshHost
+    title: Address for clients
+    description: >-
+      What Borg clients connect to, which goes into the commands it generates - the node's
+      own name or address.
+    type: string
+    default: backup.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: sshPort
+    title: SSH port
+    description: The port on the node Borg clients connect to.
+    type: int
+    default: 2222
+    min: 1
+    max: 65535
+  - name: authSecret
+    title: Session secret
+    description: >-
+      Signs the sessions. Leave empty to generate one - a new one at every start would log
+      everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 44}
+  - name: setupSecret
+    title: Setup passphrase
+    description: >-
+      Asked for when the first account is created, so that nobody who finds the address
+      first can take the instance. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the repositories, the clients' keys, the server's host keys and the
+      configuration are kept on. This is where the backups themselves land.
+    type: volume
+
+versions:
+  - name: "3.7"
+    release: "3.7.0"
+    default: true
+    image: borgwarehouse/borgwarehouse:v3.7.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # Four directories the image requires to be real mounts, all on the one volume.
+        /home/borgwarehouse/repos:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: repos}
+        /home/borgwarehouse/.ssh:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: ssh}
+        /home/borgwarehouse/app/config:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+        # The server's own host keys: without keeping them, every client would see the
+        # host key change at every restart and refuse to connect.
+        /etc/ssh:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: ssh-host}
+    networks:
+      endpointSpec:
+        ports:
+          - {target: 22, published: "${{ params.sshPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:3000/
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: borgwarehouse
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: FQDN, v: "${{ params.sshHost }}"}
+        - {k: SSH_SERVER_PORT, v: "${{ params.sshPort }}"}
+        - {k: BETTER_AUTH_URL, v: "${{ params.appUrl }}"}
+        - {k: BETTER_AUTH_SECRET, v: "${secrets.AUTH_SECRET}"}
+        - {k: SETUP_SECRET, v: "${secrets.SETUP_SECRET}"}
+        # The user the app runs as, which also owns what it writes on the volume. It
+        # refuses to run as root.
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+    secrets:
+      AUTH_SECRET:
+        value: "${{ params.authSecret }}"
+      SETUP_SECRET:
+        value: "${{ params.setupSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

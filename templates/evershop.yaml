@@ -1,0 +1,144 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: evershop
+  title: EverShop
+  tagline: A shop you run yourself, with a storefront and an admin that come as one
+  description: |
+    EverShop is a shop in the plain sense: a catalogue with variants and attributes, a
+    cart, a checkout, orders, coupons and taxes, a storefront people browse and an admin
+    behind it. It is Node and PostgreSQL and nothing else - no queue, no search cluster -
+    and extensions are directories you drop in, which keeps a small shop small.
+
+    **This template creates two apps**
+
+    - **EverShop**, on a volume for the product images and other uploads
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **After the first deployment**
+
+    There is no administrator until you make one. Open the app's console:
+
+    ```sh
+    evershop user:create --email you@example.com --password '<a password>' --name 'Your Name'
+    ```
+
+    Then sign in at `/admin` and add a product. The storefront is at the root of the same
+    address.
+
+    **It needs a domain**
+
+    The address goes into the pages it renders, the links in its e-mails and the return
+    from the payment providers. Give it its domain when you create it.
+
+    **Payments and shipping are extensions**
+
+    Stripe and PayPal come in the box and are turned on in the admin, under Settings. Other
+    providers, and anything else you add, are npm packages installed into the app.
+
+    **Backups are two things**
+
+    The database holds the catalogue and the orders; the volume holds the images. Keep
+    both.
+  categories: [webapps/ecommerce, webapps/business]
+  tags: [ecommerce, cms, open-source]
+  aliases: [shop, store, online store, cart, checkout]
+  icon: icons/evershop.svg
+  links:
+    website: https://evershop.io
+    documentation: https://evershop.io/docs/development/getting-started/introduction
+    source: https://github.com/evershopcommerce/evershop
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address the shop is reached at, scheme and all - https://shop.example.com.
+    type: string
+    default: https://shop.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: Rendering the storefront is what uses it.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Media volume
+    description: The volume the product images and other uploads are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: evershop
+      username: evershop
+
+versions:
+  - name: "2.2"
+    release: "2.2.1"
+    default: true
+    image: evershop/evershop:2.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/media: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image carries Node and neither curl nor wget.
+        command: >-
+          node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        interval: 20s
+        timeout: 10s
+        # The first start creates the schema before the storefront answers.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: evershop
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The database is on the project network, which does not carry TLS.
+        - {k: DB_SSLMODE, v: disable}
+        - {k: EVERSHOP_HOME_URL, v: "${{ params.appUrl }}"}
+        - {k: NODE_ENV, v: production}
+        # The image ships no config directory, and says so at every start unless told
+        # that this is deliberate.
+        - {k: SUPPRESS_NO_CONFIG_WARNING, v: "true"}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

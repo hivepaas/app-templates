@@ -1099,6 +1099,46 @@
       }
     },
     {
+      "name": "borgwarehouse",
+      "file": {
+        "path": "templates/borgwarehouse.yaml",
+        "sha256": "c457c47c37a1aa34f1a3766405c93719a978e0ca48cd3fd2efe11c2eadd681d7"
+      },
+      "icon": {
+        "path": "icons/borgwarehouse.svg",
+        "sha256": "8acb9e6e048664dd9892d66db286a7912d5ba24c230b6f455ac7deda073501c9"
+      },
+      "title": "BorgWarehouse",
+      "tagline": "A home for your machines' Borg backups, with a screen to watch them",
+      "categories": [
+        "storage/backup",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "backup",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "borg",
+        "borgbackup",
+        "borgbase alternative",
+        "repositories",
+        "restic alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.7",
+          "release": "3.7.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "bugsink",
       "file": {
         "path": "templates/bugsink.yaml",
@@ -1453,6 +1493,46 @@
         {
           "name": "26.04",
           "release": "26.04.4.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "copyparty",
+      "file": {
+        "path": "templates/copyparty.yaml",
+        "sha256": "032e55bfbae1bae10f95d54c5d07c9600d287e4eedd5d5492cdce6c4e0d231e0"
+      },
+      "icon": {
+        "path": "icons/copyparty.svg",
+        "sha256": "17e3dfdbe2455c07e311e974032f2998519ff7c2b13f69666a5b839041ad9137"
+      },
+      "title": "copyparty",
+      "tagline": "A file server that takes uploads a browser would otherwise give up on",
+      "categories": [
+        "storage/files",
+        "webapps/media"
+      ],
+      "tags": [
+        "files",
+        "file-transfer",
+        "open-source"
+      ],
+      "aliases": [
+        "file server",
+        "upload",
+        "webdav",
+        "file sharing",
+        "ftp"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.20",
+          "release": "1.20.24",
           "default": true
         }
       ],
@@ -2211,6 +2291,53 @@
       }
     },
     {
+      "name": "evershop",
+      "file": {
+        "path": "templates/evershop.yaml",
+        "sha256": "62395234766a3c5411e4793d72576501a4f3e11b5aee5ab7e3f639d3bdef1f17"
+      },
+      "icon": {
+        "path": "icons/evershop.svg",
+        "sha256": "2fed9438fd513d995b77ffcdbdfb3bd1882d4c4ac6cc427fdf60c3dcea9c5aaa"
+      },
+      "title": "EverShop",
+      "tagline": "A shop you run yourself, with a storefront and an admin that come as one",
+      "categories": [
+        "webapps/ecommerce",
+        "webapps/business"
+      ],
+      "tags": [
+        "ecommerce",
+        "cms",
+        "open-source"
+      ],
+      "aliases": [
+        "shop",
+        "store",
+        "online store",
+        "cart",
+        "checkout"
+      ],
+      "license": "GPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.2",
+          "release": "2.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "excalidraw",
       "file": {
         "path": "templates/excalidraw.yaml",
@@ -2771,6 +2898,53 @@
         {
           "name": "1.30",
           "release": "1.30.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "friendica",
+      "file": {
+        "path": "templates/friendica.yaml",
+        "sha256": "ba1e3cd0463013e9e075be16f643b0b7383fe9a31f60e44c445da542f5684652"
+      },
+      "icon": {
+        "path": "icons/friendica.svg",
+        "sha256": "e44a4f04432c7d69446bb11d7c557ca542f332318c91851cb553c7e2f9ea815d"
+      },
+      "title": "Friendica",
+      "tagline": "A social network of your own that talks to all the others",
+      "categories": [
+        "webapps/social",
+        "webapps/communication"
+      ],
+      "tags": [
+        "chat",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "fediverse",
+        "activitypub",
+        "diaspora",
+        "mastodon alternative",
+        "social network"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.05",
+          "release": "2026.05",
           "default": true
         }
       ],
@@ -3472,6 +3646,48 @@
       }
     },
     {
+      "name": "greptimedb",
+      "file": {
+        "path": "templates/greptimedb.yaml",
+        "sha256": "d3c4914ad39acc6761a481a117ba165a05a09799a9eed9b60948525801120772"
+      },
+      "icon": {
+        "path": "icons/greptimedb.svg",
+        "sha256": "55e04addd31c5c73cd659d59a38aa705d67e49a23fd03631900a50a932454808"
+      },
+      "title": "GreptimeDB",
+      "tagline": "Metrics, logs and traces in one database, queried with SQL or PromQL",
+      "categories": [
+        "databases/time-series",
+        "databases/analytics",
+        "observability/monitoring"
+      ],
+      "tags": [
+        "time-series",
+        "sql",
+        "metrics",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "influxdb alternative",
+        "promql",
+        "metrics database",
+        "observability"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.2",
+          "release": "1.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "grist",
       "file": {
         "path": "templates/grist.yaml",
@@ -3674,6 +3890,59 @@
         {
           "name": "1.12",
           "release": "1.12.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "hi-events",
+      "file": {
+        "path": "templates/hi-events.yaml",
+        "sha256": "56c2fe308058a3a0c56276530dacc3dcf13af99bddaf591369401d321d01d2dd"
+      },
+      "icon": {
+        "path": "icons/hi-events.svg",
+        "sha256": "7d24f6f5eb67b10be6ee554213ab866f0942cd4c927555b747c224b72f84eb91"
+      },
+      "title": "Hi.Events",
+      "tagline": "Sell tickets to your events, with the door scanner in the box",
+      "categories": [
+        "webapps/scheduling",
+        "webapps/business"
+      ],
+      "tags": [
+        "scheduling",
+        "ecommerce",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "tickets",
+        "ticketing",
+        "events",
+        "eventbrite alternative",
+        "rsvp"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.11",
+          "release": "1.11.1",
           "default": true
         }
       ],
@@ -5680,6 +5949,47 @@
       }
     },
     {
+      "name": "milvus",
+      "file": {
+        "path": "templates/milvus.yaml",
+        "sha256": "b04e9ce5bfb57fc0f9103f108682a88c20fa88691f30557f542c5515150f7afc"
+      },
+      "icon": {
+        "path": "icons/milvus.svg",
+        "sha256": "36ae12b9f51849ce40363b8d3a2ee510b88ca248a4d87fd57c0f1da4a3ff8064"
+      },
+      "title": "Milvus",
+      "tagline": "A vector database built for billions of embeddings",
+      "categories": [
+        "databases/vector",
+        "webapps/ai"
+      ],
+      "tags": [
+        "vector",
+        "ai",
+        "search",
+        "open-source"
+      ],
+      "aliases": [
+        "vector database",
+        "embeddings",
+        "similarity search",
+        "rag",
+        "ann"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.0",
+          "release": "3.0.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mimir",
       "file": {
         "path": "templates/mimir.yaml",
@@ -7120,6 +7430,49 @@
         {
           "name": "3.1",
           "release": "3.1.3"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "paradedb",
+      "file": {
+        "path": "templates/paradedb.yaml",
+        "sha256": "7ee4990de61a008112aaba8ae0fc90f1a92b80652454187ad2f3e9ed1c75604c"
+      },
+      "icon": {
+        "path": "icons/paradedb.svg",
+        "sha256": "19d94e9fe5188e47ec817df553423ce44ce7b3d858ebc1d980f58be07319c8a1"
+      },
+      "title": "ParadeDB",
+      "tagline": "PostgreSQL with real full-text search and analytics built in",
+      "categories": [
+        "databases/search",
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "search",
+        "full-text",
+        "relational",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "postgres search",
+        "pg_search",
+        "bm25",
+        "elasticsearch alternative",
+        "full text"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.25",
+          "release": "0.25.9",
+          "default": true
         }
       ],
       "requires": {
@@ -8763,6 +9116,46 @@
       }
     },
     {
+      "name": "rustfs",
+      "file": {
+        "path": "templates/rustfs.yaml",
+        "sha256": "2fcb89b5f41840ea78e510c85027fd56ef17c4d9e7ed0a74c924aa15fd858556"
+      },
+      "icon": {
+        "path": "icons/rustfs.svg",
+        "sha256": "7d1241c7e9c6079188d9e9d555e4eb0ef3c98e29aec872fde1c1807805f173c9"
+      },
+      "title": "RustFS",
+      "tagline": "S3-compatible object storage in a single Rust binary",
+      "categories": [
+        "storage/object-storage",
+        "storage/files"
+      ],
+      "tags": [
+        "object-storage",
+        "s3",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "minio alternative",
+        "s3",
+        "buckets",
+        "object store"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "1.0",
+          "release": "1.0.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "s3proxy",
       "file": {
         "path": "templates/s3proxy.yaml",
@@ -10200,6 +10593,47 @@
         {
           "name": "8.1",
           "release": "8.1.10"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "varnish",
+      "file": {
+        "path": "templates/varnish.yaml",
+        "sha256": "86c2cb866ef39daed7a82e5c4e7be9f08daa77bc293cb900160a5dc9fc4ece1c"
+      },
+      "icon": {
+        "path": "icons/varnish.svg",
+        "sha256": "f8ed9802bf139dbf75aedd5ceeaa1354fb078f8c31280c57b8067f7cf9099d73"
+      },
+      "title": "Varnish Cache",
+      "tagline": "An HTTP cache in front of an app that renders the same page too often",
+      "categories": [
+        "databases/cache",
+        "webapps/networking"
+      ],
+      "tags": [
+        "cache",
+        "in-memory",
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "http cache",
+        "reverse proxy cache",
+        "cdn",
+        "accelerator",
+        "vcl"
+      ],
+      "license": "BSD-2-Clause",
+      "versions": [
+        {
+          "name": "9.0",
+          "release": "9.0.4",
+          "default": true
         }
       ],
       "requires": {

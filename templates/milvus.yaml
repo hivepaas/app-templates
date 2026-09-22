@@ -1,0 +1,129 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: milvus
+  title: Milvus
+  tagline: A vector database built for billions of embeddings
+  description: |
+    Milvus stores embeddings and finds the nearest ones fast: several index types to choose
+    between - HNSW, IVF, DiskANN - filtering on scalar fields in the same query, hybrid
+    search that mixes dense and sparse vectors, and collections partitioned so that a
+    tenant's rows are the only ones searched. It is what people move to when the vector
+    table has outgrown what an extension beside the application can do.
+
+    **This template sets up**
+
+    - Milvus as a standalone node, with its coordinator, data node and query node in one
+      process
+    - its own etcd inside the same process, and its files on a volume
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps use `<the app's key>:19530` - the port every Milvus client speaks, from
+    `pymilvus` to LangChain and LlamaIndex. The REST API is on the same port under `/v2`.
+
+    ```python
+    from pymilvus import MilvusClient
+    client = MilvusClient(uri="http://<the app's key>:19530")
+    ```
+
+    **It starts with no password**
+
+    Authentication is off, as it is in Milvus' own standalone setup: anything that reaches
+    it can read and write every collection. Keep it on the project network, which is why
+    this template gives it no domain. Turning it on means a `user.yaml` in the app's config
+    files with `common.security.authorizationEnabled: true`, after which the account is
+    `root` with the password `Milvus`, to be changed at once.
+
+    **Files on a volume, not object storage**
+
+    Milvus is built to keep its segments in S3, which is what makes it scale sideways. Local
+    storage works for one node and is what this template uses; the Garage app in this store
+    is the S3 to move to.
+
+    **Memory**
+
+    Indexes are searched in memory. Two gigabytes is a floor for trying it; a collection of
+    a few million vectors wants much more.
+  categories: [databases/vector, webapps/ai]
+  tags: [vector, ai, search, open-source]
+  aliases: [vector database, embeddings, similarity search, rag, ann]
+  icon: icons/milvus.svg
+  links:
+    website: https://milvus.io
+    documentation: https://milvus.io/docs
+    source: https://github.com/milvus-io/milvus
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: memoryLimit
+    title: Memory limit
+    description: The indexes are held in memory; two gigabytes is a floor, not a target.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the collections, the indexes and the embedded etcd are kept on.
+    type: volume
+
+versions:
+  - name: "3.0"
+    release: "3.0.2"
+    default: true
+    image: milvusdb/milvus:v3.0.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: milvus run standalone
+    storage:
+      mounts:
+        /var/lib/milvus: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The metrics port answers this once every component inside has registered.
+        command: curl -fsS -o /dev/null http://127.0.0.1:9091/healthz
+        interval: 30s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: milvus
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        # Milvus normally needs an etcd and a MinIO beside it. These are the settings its
+        # own standalone script uses instead: etcd inside the process, files on disk.
+        - {k: ETCD_USE_EMBED, v: "true"}
+        - {k: ETCD_DATA_DIR, v: /var/lib/milvus/etcd}
+        - {k: ETCD_CONFIG_PATH, v: /milvus/configs/embedEtcd.yaml}
+        - {k: COMMON_STORAGETYPE, v: local}
+        - {k: DEPLOY_MODE, v: STANDALONE}
+        - {k: LOCALSTORAGE_PATH, v: /var/lib/milvus/data}
+    configFiles:
+      embedEtcd.yaml:
+        # What the embedded etcd listens on and how large it may grow. Milvus refuses to
+        # start with ETCD_USE_EMBED and no such file.
+        content: |
+          listen-client-urls: http://0.0.0.0:2379
+          advertise-client-urls: http://0.0.0.0:2379
+          quota-backend-bytes: 4294967296
+          auto-compaction-mode: revision
+          auto-compaction-retention: '1000'
+        swarmRef:
+          file: {name: /milvus/configs/embedEtcd.yaml, mode: 444}
+    routing:
+      port: 19530

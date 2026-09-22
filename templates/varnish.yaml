@@ -1,0 +1,217 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: varnish
+  title: Varnish Cache
+  tagline: An HTTP cache in front of an app that renders the same page too often
+  description: |
+    Varnish sits in front of a web application and answers from memory what it has already
+    seen. A page that took the application a second to render is served in a millisecond,
+    and the application is asked for it once rather than a thousand times. It is the thing
+    that keeps a news site up when it is linked from somewhere large.
+
+    **This template sets up**
+
+    - Varnish, caching one backend app in this project
+    - a cache size, a default lifetime and a grace period you choose
+    - a configuration file you can replace with your own
+
+    **Putting it in front of an app**
+
+    Give the backend app's key below - the app whose pages are cached - and move the
+    domain: the domain goes on this app, and the app behind it keeps only its key on the
+    project network. Nothing else about the backend changes.
+
+    **What is cached**
+
+    The rules in the generated `default.vcl` are Varnish's built-in ones plus a default
+    lifetime for answers that carry no `Cache-Control`. Requests with cookies and anything
+    but GET and HEAD go straight through, which is what keeps a signed-in page from being
+    served to someone else. The file is in the app's config files, as `backend.vcl` - edit
+    it when the application needs more than that.
+
+    **If the backend app is recreated**
+
+    Varnish resolves the backend's address once, while it starts. Deleting and recreating
+    the app behind it gives that app a new address, so restart this one afterwards.
+
+    **Emptying the cache**
+
+    Everything it holds is in memory, so restarting the app empties it. To purge one page
+    instead, add a VCL rule for `PURGE` requests; Varnish's documentation has the standard
+    one.
+
+    **Memory**
+
+    The cache size is what Varnish keeps in memory; the memory limit has to be higher, or
+    the container is killed as the cache fills. Keep the limit about twice the cache.
+  categories: [databases/cache, webapps/networking]
+  tags: [cache, in-memory, networking, open-source]
+  aliases: [http cache, reverse proxy cache, cdn, accelerator, vcl]
+  icon: icons/varnish.svg
+  links:
+    website: https://varnish-cache.org
+    documentation: https://varnish-cache.org/docs/
+    source: https://github.com/varnishcache/varnish-cache
+  license: BSD-2-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: backendHost
+    title: Backend app
+    description: >-
+      The key of the app whose answers are cached - what it is called on the project
+      network.
+    type: string
+    default: web
+    pattern: '^[a-z0-9][a-z0-9-]{0,62}$'
+  - name: backendPort
+    title: Backend port
+    description: The port that app listens on.
+    type: int
+    default: 80
+    min: 1
+    max: 65535
+  - name: defaultTtl
+    title: Default lifetime
+    description: >-
+      How long an answer with no `Cache-Control` of its own is kept. The backend's own
+      headers win over this.
+    type: select
+    default: 2m
+    options:
+      - {value: 30s, title: 30 seconds}
+      - {value: 2m, title: 2 minutes}
+      - {value: 10m, title: 10 minutes}
+      - {value: 1h, title: An hour}
+      - {value: 24h, title: A day}
+  - name: grace
+    title: Grace period
+    description: >-
+      How long a stale answer may still be served while the backend is asked for a fresh
+      one - which is what keeps the site up when the backend is slow or down.
+    type: select
+    default: 1h
+    options:
+      - {value: 0s, title: "Never serve stale"}
+      - {value: 10m, title: 10 minutes}
+      - {value: 1h, title: An hour}
+      - {value: 24h, title: A day}
+  - name: cacheSize
+    title: Cache size
+    description: >-
+      How much it keeps in memory before it starts evicting. Keep it below the memory
+      limit.
+    type: size
+    default: 256MB
+    min: 64MB
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes here - the one that used to point at the backend app.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: About twice the cache size, which leaves room for Varnish's own overhead.
+    type: size
+    default: 512MB
+    min: 128MB
+
+versions:
+  - name: "9.0"
+    release: "9.0.4"
+    default: true
+    image: varnish:9.0.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Two things happen before varnishd starts.
+      #
+      # The backend's address is resolved here and written into the VCL, because Varnish
+      # resolves it while compiling and refuses a name with more than one address - which
+      # is what an app's key on the project network is, since the service and its tasks
+      # both answer to it. The first address is the service's own, which is stable for as
+      # long as the app exists; restart this app if the backend app is recreated.
+      #
+      # The cache size is read from the variable the app's kind settings publish, so
+      # changing it under Settings > App Kind restarts Varnish with the new size. That
+      # variable is a byte count and -s malloc takes a suffix, hence the division.
+      command: >-
+        sh -c 'ip=$(getent ahostsv4 "${{ params.backendHost }}" | awk "{print \$1; exit}");
+        [ -z "$ip" ] && { echo "cannot resolve ${{ params.backendHost }}"; exit 1; };
+        sed "s/@BACKEND_IP@/$ip/" /etc/varnish/backend.vcl > /tmp/default.vcl;
+        mb=$(( ${HIVEPAAS_MAX_MEMORY:-268435456} / 1048576 ));
+        [ "$mb" -lt 64 ] && mb=64;
+        exec varnishd -F -f /tmp/default.vcl -a http=:80,HTTP
+        -p feature=+http2 -s malloc,${mb}m'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The management interface, which answers whether or not the backend is up - a
+        # check through the cache would make the backend's health this app's health.
+        command: varnishadm ping
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: cache
+      engine: varnish
+      version: "${{ version.name }}"
+      cache:
+        maxMemory: "${{ params.cacheSize }}"
+        # Varnish evicts the least recently used object and keeps nothing on disk.
+        # Neither is a choice; both are named as the App Kind screen names them.
+        evictionRule: allkeys-lru
+        persistenceMode: none
+    envVars:
+      data:
+        - {k: VARNISH_HTTP_PORT, v: "80"}
+    configFiles:
+      backend.vcl:
+        # Varnish's built-in rules, with a lifetime for answers that set none and a grace
+        # period for when the backend is unwell.
+        content: |
+          vcl 4.1;
+
+          backend default {
+              # Replaced with the address this name resolves to, at start.
+              .host = "@BACKEND_IP@";
+              .host_header = "${{ params.backendHost }}";
+              .port = "${{ params.backendPort }}";
+              .first_byte_timeout = 60s;
+              .between_bytes_timeout = 60s;
+          }
+
+          sub vcl_backend_response {
+              if (beresp.ttl <= 0s) {
+                  set beresp.ttl = ${{ params.defaultTtl }};
+              }
+              set beresp.grace = ${{ params.grace }};
+          }
+
+          sub vcl_deliver {
+              # Whether this page came from the cache, which is what you check first.
+              if (obj.hits > 0) {
+                  set resp.http.X-Cache = "HIT";
+              } else {
+                  set resp.http.X-Cache = "MISS";
+              }
+          }
+        swarmRef:
+          file: {name: /etc/varnish/backend.vcl, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

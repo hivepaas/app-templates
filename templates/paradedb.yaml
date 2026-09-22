@@ -1,0 +1,125 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: paradedb
+  title: ParadeDB
+  tagline: PostgreSQL with real full-text search and analytics built in
+  description: |
+    ParadeDB is PostgreSQL with `pg_search` in it: a BM25 index over your own tables, so
+    ranked full-text search, fuzzy matching and faceting are `SELECT` statements against
+    the rows you already have, rather than a second system to keep in step. Everything a
+    PostgreSQL client can do it does, because it is PostgreSQL - the same drivers, the same
+    dumps, the same extensions.
+
+    **This template sets up**
+
+    - PostgreSQL with `pg_search` and the ParadeDB extensions available
+    - a database, a user and a generated password
+    - a volume for the data, and a memory limit you choose
+
+    **After the first deployment**
+
+    Create the index inside the database:
+
+    ```sql
+    CREATE EXTENSION IF NOT EXISTS pg_search;
+    CREATE INDEX articles_idx ON articles
+      USING bm25 (id, title, body) WITH (key_field = 'id');
+
+    SELECT id, title, paradedb.score(id)
+    FROM articles WHERE title @@@ 'postgres OR search' ORDER BY 3 DESC;
+    ```
+
+    **When to use it instead of plain PostgreSQL**
+
+    PostgreSQL's own `tsvector` search is fine for a few thousand rows and a simple
+    ranking. This is for when the ranking matters, the corpus is large, or the alternative
+    was going to be an Elasticsearch beside the database.
+
+    **It replaces the database, not adds to it**
+
+    Point an application at this instead of the PostgreSQL app; restoring a dump from one
+    into the other works, since this is the same server with extensions on top.
+  categories: [databases/search, databases/sql]
+  tags: [sql, search, full-text, relational, analytics, open-source]
+  aliases: [postgres search, pg_search, bm25, elasticsearch alternative, full text]
+  icon: icons/paradedb.svg
+  links:
+    website: https://paradedb.com
+    documentation: https://docs.paradedb.com
+    source: https://github.com/paradedb/paradedb
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: User name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: The BM25 index is memory-mapped; give it room above what the tables need.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the tables and the search indexes are kept on.
+    type: volume
+
+versions:
+  - name: "0.25"
+    release: "0.25.9"
+    default: true
+    # Built on the PostgreSQL 18 image.
+    image: paradedb/paradedb:0.25.9-pg18
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: paradedb
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+    routing:
+      port: 5432

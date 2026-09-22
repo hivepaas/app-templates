@@ -1,0 +1,142 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rustfs
+  title: RustFS
+  tagline: S3-compatible object storage in a single Rust binary
+  description: |
+    RustFS stores objects and speaks the S3 API, so anything written against S3 - the AWS
+    SDKs, `aws s3`, rclone, Terraform, an application's backup target - works against it
+    unchanged. It is one static binary in Rust, which is what keeps it small and quick to
+    start, and it has a web console for looking at buckets by hand.
+
+    **This template sets up**
+
+    - RustFS on a volume, with the S3 API on port 9000
+    - a root access key and secret key, generated unless you give them
+    - the web console on port 9001
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps in the project use `http://<the app's key>:9000` with the keys below, and
+    path-style addressing:
+
+    ```sh
+    aws --endpoint-url http://<the app's key>:9000 s3 mb s3://backups
+    ```
+
+    Most SDKs default to virtual-hosted style - `bucket.host` - which needs a wildcard
+    domain; set `force_path_style` (or `s3_use_path_style`) in the client instead, or give
+    RustFS a wildcard domain with `RUSTFS_SERVER_DOMAINS` in the app's environment
+    variables.
+
+    **The console**
+
+    It is on port 9001 and is not routed by this template, since the domain here belongs to
+    the S3 endpoint itself. Reach it from another app on the project network, or publish
+    the port in the app's network settings when you need it.
+
+    **One node, one disk**
+
+    Erasure coding across several nodes is what RustFS does in a cluster; here it is one
+    process over one volume, so the volume is the only copy. Back it up.
+
+    **It is young**
+
+    RustFS reached 1.0 recently. It is a reasonable target for backups and for an
+    application's uploads; for the one copy of something irreplaceable, keep a second.
+  categories: [storage/object-storage, storage/files]
+  tags: [object-storage, s3, files, open-source]
+  aliases: [minio alternative, s3, buckets, object store]
+  icon: icons/rustfs.svg
+  links:
+    website: https://rustfs.com
+    documentation: https://docs.rustfs.com
+    source: https://github.com/rustfs/rustfs
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: accessKey
+    title: Access key
+    description: The root account's key - what clients send as the user name.
+    type: string
+    default: rustfsadmin
+    pattern: '^[A-Za-z0-9._-]{3,64}$'
+  - name: secretKey
+    title: Secret key
+    description: The root account's secret. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 40}
+  - name: domain
+    title: Domain
+    description: >-
+      A domain for the S3 endpoint, if clients outside the project use it. Leave it empty
+      to keep RustFS on the project network.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the buckets and their objects are kept on.
+    type: volume
+
+versions:
+  - name: "1.0"
+    release: "1.0.0"
+    default: true
+    image: rustfs/rustfs:1.0.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The S3 endpoint answers this without credentials once the disk is ready.
+        command: curl -fsS -o /dev/null http://127.0.0.1:9000/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 45s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: rustfs
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        - {k: RUSTFS_VOLUMES, v: /data}
+        - {k: RUSTFS_ADDRESS, v: "0.0.0.0:9000"}
+        - {k: RUSTFS_ACCESS_KEY, v: "${{ params.accessKey }}"}
+        # Read from a file rather than passed in directly, so the secret is not in the
+        # service's environment for anything that can read it there.
+        - {k: RUSTFS_SECRET_KEY_FILE, v: /run/secrets/rustfs-secret-key}
+        - {k: RUSTFS_CONSOLE_ENABLE, v: "true"}
+        - {k: RUSTFS_CONSOLE_ADDRESS, v: "0.0.0.0:9001"}
+    secrets:
+      RUSTFS_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+        swarmRef:
+          file: {name: /run/secrets/rustfs-secret-key, mode: 444}
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

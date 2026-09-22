@@ -1,0 +1,170 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: copyparty
+  title: copyparty
+  tagline: A file server that takes uploads a browser would otherwise give up on
+  description: |
+    copyparty is a file server in one Python file: browse and upload in a browser,
+    resumable uploads that survive a closed laptop, deduplication, a media player for what
+    is on it, a search over a file index, thumbnails, and shares by link. It also speaks
+    WebDAV, FTP, TFTP and SMB, so the same directory mounts as a drive.
+
+    **This template sets up**
+
+    - copyparty, serving one volume as its root
+    - an administrator account, and read-only access for everyone else if you want it
+    - the file index and thumbnails, kept beside the files
+    - a memory limit you choose
+
+    **Accounts**
+
+    One account is created here. More - and per-directory permissions - go in the
+    configuration file, which is in the app's config files:
+
+    ```
+    [accounts]
+      alice: a-password
+    [/photos]
+      /w/photos
+      accs:
+        r: alice
+        rw: ${{ params.adminUser }}
+    ```
+
+    **Uploading large files**
+
+    Uploads are chunked and resumable, which is the point: a twenty-gigabyte file over a
+    domestic line survives a dropped connection. HivePaaS' reverse proxy is what the
+    browser talks to, so the same limits it puts on request bodies apply.
+
+    **What is on the volume**
+
+    The files, and a `.hist` directory beside them with the index, the thumbnails and the
+    upload state. Back up both, or the index is rebuilt on the next start.
+  categories: [storage/files, webapps/media]
+  tags: [files, file-transfer, open-source]
+  aliases: [file server, upload, webdav, file sharing, ftp]
+  icon: icons/copyparty.svg
+  links:
+    website: https://github.com/9001/copyparty
+    documentation: https://github.com/9001/copyparty#readme
+    source: https://github.com/9001/copyparty
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[a-z0-9._-]{2,32}$'
+  - name: adminPassword
+    title: Administrator password
+    description: What that account signs in with. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: anonymousAccess
+    title: What everyone else may do
+    description: >-
+      People who have not signed in. "Nothing" keeps the whole server behind the password.
+    type: select
+    default: "# nobody: signing in is the only way in"
+    options:
+      - {value: "# nobody: signing in is the only way in", title: "Nothing: sign in to see anything"}
+      - {value: "r: *", title: "Read: browse and download"}
+      - {value: "rw: *", title: "Read and write: also upload and delete"}
+  - name: indexing
+    title: Index the files
+    description: >-
+      Keep a searchable index and thumbnails beside the files. Turn it off on a slow disk
+      or a very large library.
+    type: select
+    default: "e2dsa, e2ts"
+    options:
+      - {value: "e2dsa, e2ts", title: "Index the files and read their media tags"}
+      - {value: "# no index", title: "No index"}
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app. Leave it empty to add one later, in the
+      app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Files volume
+    description: The volume the files, the index and the thumbnails are kept on.
+    type: volume
+
+versions:
+  - name: "1.20"
+    release: "1.20.24"
+    default: true
+    # The "ac" image: copyparty with the optional dependencies for thumbnails, media
+    # tags and fast hashing.
+    image: copyparty/ac:1.20.24
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /w: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image is Alpine with busybox wget and no curl. A server behind a password
+        # answers the browser page as well, so this proves the listener and nothing more.
+        command: wget -q -O /dev/null http://127.0.0.1:3923/?h
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: copyparty
+      version: "${{ version.name }}"
+      webapp: {}
+    secrets:
+      # The account's password is in here, so it is a secret rather than a config file.
+      # The image reads every file in /cfg by itself - naming it on the command line as
+      # well would load it twice, and copyparty refuses two volumes at the same path.
+      COPYPARTY_CONF:
+        value: |
+          [global]
+            p: 3923
+            # Behind HivePaaS' reverse proxy, which is what sees the real client.
+            xff-hdr: x-forwarded-for
+            xff-src: any
+            rproxy: 1
+            ${{ params.indexing }}
+
+          [accounts]
+            ${{ params.adminUser }}: ${{ params.adminPassword }}
+
+          [/]
+            /w
+            accs:
+              rwmda: ${{ params.adminUser }}
+              ${{ params.anonymousAccess }}
+        swarmRef:
+          file: {name: /cfg/copyparty.conf, mode: 444}
+    routing:
+      port: 3923
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,262 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: hi-events
+  title: Hi.Events
+  tagline: Sell tickets to your events, with the door scanner in the box
+  description: |
+    Hi.Events runs an event from the ticket page to the door: ticket types with capacities
+    and time windows, promo codes, questions asked at checkout, a customisable event page,
+    Stripe for payment, and a check-in app that scans the QR code on the ticket. The
+    reports show what sold, when, and through which code.
+
+    **This template creates three apps**
+
+    - **Hi.Events**, front end and API in one, on a volume for the uploads
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+    - **a Redis** for its job queue, with `-cache` added
+
+    **It needs a domain**
+
+    The address goes into the ticket e-mails, the QR codes and what Stripe returns to. Give
+    it its domain when you create it.
+
+    **After the first deployment**
+
+    Open the address and register; the first account is the organiser. Then add a payment
+    provider under Settings if you are selling rather than listing - without Stripe keys,
+    free tickets still work.
+
+    **Mail is how tickets arrive**
+
+    The ticket and the order confirmation are e-mails, so fill in the mail settings below.
+    Without them nothing reaches the buyer.
+
+    **About the licence**
+
+    Hi.Events is AGPL with one extra condition: the "Powered by Hi.Events" line on the
+    ticket page stays unless you buy a licence from them. The template changes nothing
+    about that.
+  categories: [webapps/scheduling, webapps/business]
+  tags: [scheduling, ecommerce, collaboration, open-source]
+  aliases: [tickets, ticketing, events, eventbrite alternative, rsvp]
+  icon: icons/hi-events.svg
+  links:
+    website: https://hi.events
+    documentation: https://hi.events/docs
+    source: https://github.com/HiEventsDev/hi.events
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: appUrl
+    title: Public address
+    description: >-
+      The address people buy tickets at, scheme and all - https://tickets.example.com.
+    type: string
+    default: https://tickets.example.com
+    # A scheme and a host, and nothing after them.
+    pattern: '^https?://[^\s/?#]+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to this app - the host part of the address above. Leave it
+      empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: appName
+    title: Name
+    description: What the interface and the e-mails call this installation.
+    type: string
+    default: Hi.Events
+    pattern: '^[^\n]{1,60}$'
+  - name: appKey
+    title: Application key
+    description: >-
+      Encrypts what Laravel puts in cookies and in the database. It has to be exactly 32
+      characters. Leave empty to generate one, and never change it afterwards.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: jwtSecret
+    title: Token secret
+    description: Signs the sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: smtpHost
+    title: Mail server
+    description: The SMTP host tickets and confirmations are sent through.
+    type: string
+    default: smtp.example.com
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    description: 587 for STARTTLS, 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: Mail user name
+    description: What it signs in to the mail server as. Leave empty for a relay that asks for nothing.
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    type: secret
+    optional: true
+  - name: fromEmail
+    title: From address
+    description: What the tickets and confirmations are sent from.
+    type: string
+    default: tickets@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: stripePublishableKey
+    title: Stripe publishable key
+    description: >-
+      From the Stripe dashboard. Leave empty to list free tickets only - nothing can be
+      sold without it.
+    type: string
+    optional: true
+    maxLength: 200
+  - name: stripeSecretKey
+    title: Stripe secret key
+    description: The key that takes the payment. Leave empty if you are not selling.
+    type: secret
+    optional: true
+  - name: stripeWebhookSecret
+    title: Stripe webhook secret
+    description: >-
+      Signs what Stripe sends back, which is how an order becomes paid. Leave empty if you
+      are not selling.
+    type: secret
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: PHP, the queue worker and the front end share it.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the event images, the generated tickets and the logs are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: hievents
+      username: hievents
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the job queue - the e-mails and the ticket generation - so evicting a
+      # key would lose work rather than a cached value.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "1.11"
+    release: "1.11.1"
+    default: true
+    # The project publishes every release with a -beta suffix; this is its latest.
+    image: daveearley/hi.events-all-in-one:v1.11.1-beta
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own startup script runs the migrations once and gives up if they
+      # fail, rather than retrying - which loses the race, sometimes, against the
+      # dependency apps' DNS records not being registered yet when this app is first
+      # created alongside them. This waits for the database to resolve first.
+      command: >-
+        sh -c 'for i in $(seq 1 30); do getent hosts "$DB_HOST_ONLY" >/dev/null 2>&1 && break; sleep 2; done;
+        exec /startup.sh'
+    storage:
+      mounts:
+        /app/backend/storage/app: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 10s
+        # The first start runs the migrations and builds Laravel's caches.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: hi-events
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Laravel takes a raw 32-character key as well as a base64: one, which is what
+        # this is: generated secrets are letters and digits, and 32 of them are 32 bytes.
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: APP_FRONTEND_URL, v: "${{ params.appUrl }}"}
+        - {k: APP_CDN_URL, v: "${{ params.appUrl }}/storage"}
+        - {k: VITE_FRONTEND_URL, v: "${{ params.appUrl }}"}
+        - {k: VITE_API_URL_CLIENT, v: "${{ params.appUrl }}/api"}
+        # What the front end uses inside the container, where it talks to the API over
+        # the loopback rather than out through the domain.
+        - {k: VITE_API_URL_SERVER, v: "http://localhost:80/api"}
+        - {k: VITE_APP_NAME, v: "${{ params.appName }}"}
+        # The front end's supervisor entry names this one, and refuses to start if it is
+        # not in the environment at all - empty is fine, missing is not.
+        - {k: VITE_STRIPE_PUBLISHABLE_KEY, v: "${{ params.stripePublishableKey }}"}
+        - {k: STRIPE_PUBLIC_KEY, v: "${{ params.stripePublishableKey }}"}
+        - {k: STRIPE_SECRET_KEY, v: "${secrets.STRIPE_SECRET_KEY}"}
+        - {k: STRIPE_WEBHOOK_SECRET, v: "${secrets.STRIPE_WEBHOOK_SECRET}"}
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{
+            deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{
+            deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        # What the wait loop above resolves for - the host name alone, ahead of the
+        # connection string PHP parses.
+        - {k: DB_HOST_ONLY, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: QUEUE_CONNECTION, v: redis}
+        - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: LOG_CHANNEL, v: stderr}
+        - {k: MAIL_MAILER, v: smtp}
+        - {k: MAIL_HOST, v: "${{ params.smtpHost }}"}
+        - {k: MAIL_PORT, v: "${{ params.smtpPort }}"}
+        - {k: MAIL_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: MAIL_PASSWORD, v: "${secrets.MAIL_PASSWORD}"}
+        - {k: MAIL_FROM_ADDRESS, v: "${{ params.fromEmail }}"}
+        - {k: MAIL_FROM_NAME, v: "${{ params.appName }}"}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      MAIL_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+      STRIPE_SECRET_KEY:
+        value: "${{ params.stripeSecretKey }}"
+      STRIPE_WEBHOOK_SECRET:
+        value: "${{ params.stripeWebhookSecret }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

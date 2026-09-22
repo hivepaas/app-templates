@@ -1,0 +1,131 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: greptimedb
+  title: GreptimeDB
+  tagline: Metrics, logs and traces in one database, queried with SQL or PromQL
+  description: |
+    GreptimeDB keeps time series, logs and traces in the same engine and lets you join
+    across them: SQL for the questions a database answers, PromQL for the ones a monitoring
+    system answers, over the same tables. It speaks the MySQL and PostgreSQL wire protocols
+    as well as its own HTTP API, and takes writes from Prometheus remote write, InfluxDB
+    line protocol and OpenTelemetry without a translation layer in front.
+
+    **This template sets up**
+
+    - GreptimeDB as a standalone node, on a volume
+    - a user name and password, read from a file rather than the command line
+    - its HTTP API and dashboard, and the MySQL and PostgreSQL ports
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps in the project use `<the app's key>` with:
+
+    - port 4000 for HTTP, the dashboard and the OpenTelemetry and InfluxDB endpoints
+    - port 4001 for gRPC, which its own clients use
+    - port 4002 as MySQL, and 4003 as PostgreSQL - which is how Grafana, Superset and most
+      drivers read it
+
+    Prometheus remote-writes to `http://<the app's key>:4000/v1/prometheus/write`.
+
+    **Data on a volume, not object storage**
+
+    Greptime is built to keep its files in S3, which is what makes storage cheap to grow. A
+    volume works for one node and is what this template uses; the Garage app in this store
+    is the S3 to move to.
+
+    **It is one node**
+
+    A cluster needs the frontend, the datanode and the metasrv as separate services, which
+    is another shape entirely. Here the volume is the only copy of the data.
+  categories: [databases/time-series, databases/analytics, observability/monitoring]
+  tags: [time-series, sql, metrics, analytics, open-source]
+  aliases: [influxdb alternative, promql, metrics database, observability]
+  icon: icons/greptimedb.svg
+  links:
+    website: https://greptime.com
+    documentation: https://docs.greptime.com
+    source: https://github.com/GreptimeTeam/greptimedb
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: username
+    title: User name
+    type: string
+    default: greptime
+    pattern: '^[a-z_][a-z0-9_]{0,30}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: Ingestion and compaction are what use it.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the tables, the index and the write-ahead log are kept on.
+    type: volume
+
+versions:
+  - name: "1.2"
+    release: "1.2.1"
+    default: true
+    image: greptime/greptimedb:v1.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Every service in one process, listening on all four protocols. The accounts come
+      # from a file, so the password is not in the command line.
+      command: >-
+        standalone start
+        --http-addr 0.0.0.0:4000
+        --rpc-bind-addr 0.0.0.0:4001
+        --mysql-addr 0.0.0.0:4002
+        --postgres-addr 0.0.0.0:4003
+        --data-home /data
+        --user-provider static_user_provider:file:/etc/greptimedb/users
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Its own health endpoint, which needs no credentials.
+        command: curl -fsS -o /dev/null http://127.0.0.1:4000/health
+        interval: 20s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: greptimedb
+      version: "${{ version.name }}"
+      database:
+        dbName: public
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    secrets:
+      # One account per line, as `name=password`, which is what the static user provider
+      # reads at start.
+      GREPTIME_USERS:
+        value: "${{ params.username }}=${{ params.password }}"
+        swarmRef:
+          file: {name: /etc/greptimedb/users, mode: 444}
+    routing:
+      port: 4000
