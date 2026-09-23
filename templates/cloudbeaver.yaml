@@ -1,0 +1,104 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cloudbeaver
+  title: CloudBeaver
+  tagline: Web-based database manager for SQL and NoSQL databases
+  description: |
+    CloudBeaver is an open-source, web-based database management tool built by the team
+    behind DBeaver. It provides a rich SQL editor with syntax highlighting and auto-completion,
+    an interactive data grid for viewing and editing records, ER diagrams, and connection
+    management for dozens of SQL and NoSQL engines.
+
+    **This template sets up**
+
+    - CloudBeaver server ready to connect to databases inside and outside the project
+    - a persistent volume for its workspace, saved connections, queries and settings
+    - a memory limit you choose
+
+    **Connecting to databases in this project**
+
+    Databases running in the same project environment can be reached using their app key as
+    the host and their default port (e.g. `myapp-postgres` and `5432`), along with credentials
+    found under that database app's Secrets. No public routing is needed for the database.
+
+    **Initial setup**
+
+    On first start, CloudBeaver guides you through an initial setup wizard where you create
+    the administrative user account and configure server preferences.
+
+    **Security**
+
+    CloudBeaver manages access to all registered databases. If you expose it to a public
+    domain, protect it with a strong administrator password and consider adding basic
+    authentication or SSO in the app's routing settings.
+  categories: [webapps/dev-tools]
+  tags: [sql, relational, open-source]
+  aliases: [dbeaver, dbeaver-web, cloud-beaver, database-gui, sql-workbench]
+  icon: icons/cloudbeaver.svg
+  links:
+    website: https://cloudbeaver.io
+    documentation: https://dbeaver.com/docs/cloudbeaver/
+    source: https://github.com/dbeaver/cloudbeaver
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leaving it empty keeps the console inside the
+      project.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume where CloudBeaver keeps its workspace, connections and configurations.
+    type: volume
+
+versions:
+  - name: "26.2"
+    release: "26.2.0"
+    default: true
+    image: dbeaver/cloudbeaver:26.2.0
+  - name: "25.3"
+    release: "25.3.0"
+    image: dbeaver/cloudbeaver:25.3.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /opt/cloudbeaver/workspace: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8978/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: cloudbeaver
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8978
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

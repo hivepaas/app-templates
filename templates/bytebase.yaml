@@ -1,0 +1,104 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: bytebase
+  title: Bytebase
+  tagline: Database schema change and version control for DevOps teams
+  description: |
+    Bytebase is a database CI/CD and schema migration tool for developers and DBAs. It
+    provides a unified web console to track database schema changes, review SQL with automated
+    lint rules, manage role-based data access control, and automate database deployments across
+    different environments.
+
+    **This template sets up**
+
+    - Bytebase with embedded SQLite metadata storage
+    - a persistent volume for its configuration, change history, and data
+    - a memory limit you choose
+
+    **Connecting to databases in this project**
+
+    Databases in the same project can be registered as instances in Bytebase using their app
+    key as the host and their internal port (e.g. `myapp-postgres` and `5432`), using the
+    credentials from that database app's Secrets.
+
+    **First-time setup**
+
+    When you first open Bytebase, you will be prompted to create the initial workspace owner
+    account. Once created, you can invite team members, configure environments, and connect
+    your databases.
+
+    **Security and external access**
+
+    If you configure a domain, Bytebase will be reachable externally. Ensure the workspace
+    owner has a strong password and review Bytebase's member permissions and security policies.
+  categories: [webapps/dev-tools]
+  tags: [sql, relational, open-source]
+  aliases: [database-ci-cd, schema-migrations, database-governance, db-devops, liquibase-alternative]
+  icon: icons/bytebase.svg
+  links:
+    website: https://www.bytebase.com
+    documentation: https://www.bytebase.com/docs
+    source: https://github.com/bytebase/bytebase
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leaving it empty keeps the console inside the
+      project.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume where Bytebase stores its metadata database, change history and configuration.
+    type: volume
+
+versions:
+  - name: "3.22"
+    release: "3.22.1"
+    default: true
+    image: bytebase/bytebase:3.22.1
+  - name: "3.21"
+    release: "3.21.1"
+    image: bytebase/bytebase:3.21.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/opt/bytebase: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8080/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: bytebase
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

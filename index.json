@@ -1187,6 +1187,49 @@
       }
     },
     {
+      "name": "bytebase",
+      "file": {
+        "path": "templates/bytebase.yaml",
+        "sha256": "c9baf57fdd58940e260287d283e9aa61e69eeed631d7a26fe32ac01e3caf5af4"
+      },
+      "icon": {
+        "path": "icons/bytebase.svg",
+        "sha256": "42e15b3eda72ef2670a306467d4013a3cb5a8a6f2ebfcddfdf799c019ceb5489"
+      },
+      "title": "Bytebase",
+      "tagline": "Database schema change and version control for DevOps teams",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "database-ci-cd",
+        "schema-migrations",
+        "database-governance",
+        "db-devops",
+        "liquibase-alternative"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.22",
+          "release": "3.22.1",
+          "default": true
+        },
+        {
+          "name": "3.21",
+          "release": "3.21.1"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "calibre-web",
       "file": {
         "path": "templates/calibre-web.yaml",
@@ -1338,6 +1381,49 @@
         {
           "name": "26.3",
           "release": "26.3.33.24"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "cloudbeaver",
+      "file": {
+        "path": "templates/cloudbeaver.yaml",
+        "sha256": "cb1b51196042d220a7be4f6affaa4ce7b417981bdd5a429c970829db18a65ce6"
+      },
+      "icon": {
+        "path": "icons/cloudbeaver.svg",
+        "sha256": "28e3eaef10ae59b2059f94002ebb16ce3adc4a40c80860b1b83fb620b47adf53"
+      },
+      "title": "CloudBeaver",
+      "tagline": "Web-based database manager for SQL and NoSQL databases",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "dbeaver",
+        "dbeaver-web",
+        "cloud-beaver",
+        "database-gui",
+        "sql-workbench"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "26.2",
+          "release": "26.2.0",
+          "default": true
+        },
+        {
+          "name": "25.3",
+          "release": "25.3.0"
         }
       ],
       "requires": {
