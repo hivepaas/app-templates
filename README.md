@@ -44,7 +44,15 @@ reference; the rules are:
   (volumes), `deployment.container.healthcheck`, `deployment.container.init`,
   `deployment.resources`, and `settings.kind`, `settings.envVars`,
   `settings.secrets`, `settings.configFiles`, `settings.routing` (`port`,
-  `exposePublicly` and up to five `domains`).
+  `exposePublicly` and up to five `domains`), and `settings.dockerApi`.
+
+  `settings.dockerApi` gives the app the Docker API through HivePaaS, without the Docker
+  socket: `images` its containers may run (`"*"` for any), `sharedDirs` of its own storage
+  they may bind, `networks` besides their own (`env`), `allow` for more than running
+  containers (`exec`, `files`, `volumes`, `networks`, `nestedSocket`), and `limits`
+  (`containers`, `memory`, `cpus`). The app reaches it at `${HIVEPAAS_DOCKER_HOST}`, and
+  creating it needs Write on the Cluster module. The block is read from the template, so it
+  takes no placeholders and a version cannot override it.
 
   `init: false` turns off the init process an app is otherwise created with.
   Only an image that brings its own supervisor needs it: an s6-overlay image

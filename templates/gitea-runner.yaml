@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gitea-runner
+  title: Gitea Actions Runner
+  tagline: Runs the Actions workflows of a Gitea in the same environment
+  description: |
+    Gitea Actions are GitHub Actions-compatible workflows, and a Gitea runs none of them by
+    itself: a runner picks jobs up and runs each in containers of its own. This is Gitea's
+    runner, act_runner, for a Gitea app in the same environment.
+
+    **This app is given the Docker API, and that is how it works**
+
+    Every job is a container, and so is every service a job asks for. Upstream installs the
+    runner with the Docker socket mounted, which makes it root on its node. Here it reaches the
+    Docker API through HivePaaS instead:
+
+    - jobs run any image, but with no privileges, no path of the host and no host network;
+    - a job may use Docker itself - `docker build`, `docker run` - and what it starts goes
+      through the same limits;
+    - at most 20 containers exist at once, with 4 GB of memory and two CPUs each.
+
+    A workflow that needs `--privileged` does not run here. Creating this app needs Write
+    permission on the Cluster module.
+
+    **Registering**
+
+    In Gitea, open Site Administration, then Actions, then Runners, and create a runner: the
+    token it shows is the **Registration token** below. The runner registers once, on its first
+    start, and keeps what it was given on its data volume.
+
+    **What jobs can reach**
+
+    - Jobs run on networks of their own, not the project's. They clone from the address Gitea
+      tells them, its ROOT_URL, so that Gitea needs a domain the jobs can reach over the internet.
+    - `actions/cache` finds no cache server: the runner's own cannot be reached from the jobs'
+      networks, so it is off.
+  categories: [webapps/dev-tools]
+  tags: [automation, testing, git, open-source]
+  aliases: [act_runner, act runner, ci, actions, gitea actions]
+  icon: icons/gitea-runner.svg
+  links:
+    website: https://docs.gitea.com/usage/actions/overview
+    documentation: https://docs.gitea.com/usage/actions/act-runner
+    source: https://gitea.com/gitea/act_runner
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: giteaApp
+    title: Gitea
+    description: The Gitea app in this environment whose workflows this runner runs.
+    type: app
+    engine: gitea
+  - name: registrationToken
+    title: Registration token
+    description: >-
+      The token Gitea shows when you create a runner, under Site Administration, Actions,
+      Runners - or in a repository's or organization's settings, for a runner of its own.
+    type: secret
+  - name: labels
+    title: Labels
+    description: >-
+      What jobs ask for in runs-on, and the image each runs in, comma separated. The default
+      runs ubuntu-latest, ubuntu-24.04 and ubuntu-22.04 in Gitea's runner images.
+    type: string
+    default: >-
+      ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest,ubuntu-24.04:docker://docker.gitea.com/runner-images:ubuntu-24.04,ubuntu-22.04:docker://docker.gitea.com/runner-images:ubuntu-22.04
+  - name: capacity
+    title: Jobs at once
+    description: How many jobs this runner runs at the same time.
+    type: int
+    default: 1
+    min: 1
+    max: 4
+  - name: dataVolume
+    title: Data volume
+    description: The runner's registration.
+    type: volume
+  - name: memoryLimit
+    title: Memory limit
+    description: What the runner itself gets. Its jobs are containers of their own, with limits of their own.
+    type: size
+    default: 512MB
+
+versions:
+  - name: "0.6"
+    release: "0.6.1"
+    default: true
+    image: gitea/act_runner:0.6.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The runner serves nothing to ask; what it keeps once registered is what says it
+        # got past its start.
+        command: test -s /data/.runner
+        interval: 30s
+        timeout: 5s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gitea-runner
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The runner reaches Gitea on the project's network; the jobs reach it by its ROOT_URL.
+        - {k: GITEA_INSTANCE_URL, v: "http://${${{ params.giteaApp }}.HIVEPAAS_HOST}:${${{ params.giteaApp }}.HIVEPAAS_PORT}"}
+        - {k: GITEA_RUNNER_REGISTRATION_TOKEN, v: "${secrets.REGISTRATION_TOKEN}"}
+        - {k: GITEA_RUNNER_NAME, v: "${HIVEPAAS_APP_NAME}"}
+        - {k: GITEA_RUNNER_LABELS, v: "${{ params.labels }}"}
+        - {k: CONFIG_FILE, v: /etc/act_runner/config.yaml}
+        - {k: DOCKER_HOST, v: "${HIVEPAAS_DOCKER_HOST}"}
+    secrets:
+      REGISTRATION_TOKEN:
+        value: "${{ params.registrationToken }}"
+    configFiles:
+      config.yaml:
+        content: |
+          log:
+            level: info
+          runner:
+            file: .runner
+            capacity: ${{ params.capacity }}
+            timeout: 3h
+          cache:
+            # A job runs on a network of its own and cannot reach the runner's cache server.
+            enabled: false
+          container:
+            # Empty: every job gets a network of its own, where its services answer by name.
+            network: ""
+            privileged: false
+            # Empty: jobs are given the runner's Docker API, and use Docker through it.
+            docker_host: ""
+        swarmRef:
+          file: {name: /etc/act_runner/config.yaml, mode: 444}
+    dockerApi:
+      images: ["*"]
+      allow: [exec, files, volumes, networks, nestedSocket]
+      limits: {containers: 20, memory: 4gb, cpus: 2}
