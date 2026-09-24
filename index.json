@@ -890,6 +890,46 @@
       }
     },
     {
+      "name": "autobase",
+      "file": {
+        "path": "templates/autobase.yaml",
+        "sha256": "a2958fe171ef30339e97b2057621427b99e06e70f95e407fcdbb505134c1b6a7"
+      },
+      "icon": {
+        "path": "icons/autobase.svg",
+        "sha256": "6a10c553e207e5ad37dc355f9767be4bfd0ea61f6283109489b7e54f5e2bfb67"
+      },
+      "title": "Autobase",
+      "tagline": "Highly available PostgreSQL clusters on your own servers, from a web console",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "postgresql cluster",
+        "postgres ha",
+        "patroni",
+        "high availability",
+        "dbaas"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.11",
+          "release": "2.11.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "backrest",
       "file": {
         "path": "templates/backrest.yaml",
@@ -3363,6 +3403,46 @@
         {
           "name": "1.27",
           "release": "1.27.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "gitea-runner",
+      "file": {
+        "path": "templates/gitea-runner.yaml",
+        "sha256": "6a34808cc42dead1ebcd83148f86866c955d5ee3871ad8b26aa398c8d5afd26c"
+      },
+      "icon": {
+        "path": "icons/gitea-runner.svg",
+        "sha256": "72e13379b6f0ddfb083558f6c7d0212c311860949f07d7295269bc186f8bf5d8"
+      },
+      "title": "Gitea Actions Runner",
+      "tagline": "Runs the Actions workflows of a Gitea in the same environment",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "automation",
+        "testing",
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "act_runner",
+        "act runner",
+        "ci",
+        "actions",
+        "gitea actions"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.6",
+          "release": "0.6.1",
           "default": true
         }
       ],
