@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: openhands
+  title: OpenHands
+  tagline: A coding agent that works on your repositories from the browser
+  description: |
+    OpenHands is an AI software engineer: give it a task and it reads the code, runs
+    commands, edits files, runs the tests and opens the pull request. Agent Canvas is its
+    web interface - conversations, the agent's terminal and files side by side, and
+    automations that start an agent on a schedule or on a webhook from GitHub, Slack or
+    Linear. It runs the OpenHands agent, and Claude Code, Codex or Gemini CLI as well.
+
+    **This template sets up**
+
+    - the interface, the agent server and the automation service, in one app
+    - the interface at the app's address, behind an API key
+    - the settings, conversations and your projects on a volume
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the address and paste the API key - the `API_KEY` secret of this app. Then, in
+    Settings, pick a model and give it a provider key; nothing works until it has one.
+    Repositories go under `/projects`, cloned by the agent or by you from its terminal,
+    and a GitHub or GitLab token in Settings lets it push and open pull requests.
+
+    **The agent works inside this app**
+
+    There is no separate sandbox: every command the agent runs, runs in this app's
+    container, as a user with `sudo`. It reaches the project network and whatever the node
+    routes to, and it can read what the app holds - the model keys and tokens you give it
+    included. Anyone with the API key gets all of that, so keep the address behind HTTPS.
+    Inside the project the app also answers on port 8000 with the key already filled in,
+    so run it in a project whose other apps you trust.
+
+    The built-in code editor is not served here: it would share the interface's address,
+    and with it the key. The agent's terminal and file view are.
+
+    **Memory and disk**
+
+    The image is large - about 1.4 GB to download - and the agent's builds and the browser
+    it drives run inside the same limit. Four gigabytes is a comfortable floor for one
+    person; give it more for large repositories.
+  categories: [webapps/ai, webapps/dev-tools]
+  tags: [ai, llm, automation, git, open-source]
+  aliases: [coding agent, ai software engineer, agent canvas, opendevin, all hands, devin]
+  icon: icons/openhands.svg
+  links:
+    website: https://openhands.dev
+    documentation: https://docs.openhands.dev
+    source: https://github.com/OpenHands/OpenHands
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the interface is served at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: apiKey
+    title: API key
+    description: >-
+      What the interface asks for before it shows anything, and what every request to the
+      agent carries. Leave empty to generate one.
+    type: secret
+    minLength: 24
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: The agent, its builds and the browser it drives share it.
+    type: size
+    default: 4GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the settings, the conversations, the automations and your projects are
+      kept on.
+    type: volume
+
+versions:
+  - name: "1.23"
+    release: "1.23.0"
+    default: true
+    image: ghcr.io/openhands/agent-canvas:1.23.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /home/openhands/.openhands:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: state}
+        /projects:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: projects}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Through the proxy the address is routed to, so a proxy that is down fails it too.
+        command: curl -fsS -o /dev/null http://127.0.0.1:8080/health
+        interval: 30s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: openhands
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # The key the agent server and the automation service accept. The image generates
+        # one onto the volume when none is given; giving it here keeps it among the app's
+        # secrets, where it can be read and changed.
+        - {k: OH_SESSION_API_KEYS_0, v: "${secrets.API_KEY}"}
+        # The image's own entry port, 8000, writes the key into the page it serves, which
+        # is right for a laptop and wrong for an address anyone can open. This second port
+        # serves the same interface asking for the key instead, and it is the one routed.
+        - {k: PUBLIC_MODE_PORT, v: "8080"}
+        # The editor is only routed on the port above, which is not the one routed here, so
+        # it would run for nothing.
+        - {k: OH_ENABLE_VSCODE, v: "false"}
+        # Where a conversation works when none is chosen: the volume, not the container.
+        - {k: OH_WORKSPACE_PATH, v: /projects}
+        # The image reports usage to OpenHands' analytics unless told not to.
+        - {k: DO_NOT_TRACK, v: "1"}
+        - {k: VITE_DO_NOT_TRACK, v: "1"}
+        - {k: AGENT_CANVAS_DISABLE_TELEMETRY, v: "1"}
+    secrets:
+      API_KEY:
+        value: "${{ params.apiKey }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
