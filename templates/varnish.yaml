@@ -208,6 +208,7 @@ app:
                   set resp.http.X-Cache = "MISS";
               }
           }
+        inheritable: true
         swarmRef:
           file: {name: /etc/varnish/backend.vcl, mode: 444}
     routing:

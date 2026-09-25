@@ -147,6 +147,7 @@ app:
               enabled: true
 
           log: {type: stdout, format: pretty, level: http}
+        inheritable: true
         swarmRef:
           file: {name: /verdaccio/conf/config.yaml, mode: 444}
     routing:

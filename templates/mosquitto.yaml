@@ -162,6 +162,7 @@ app:
           log_type error
           log_type warning
           log_type notice
+        inheritable: true
         swarmRef:
           file: {name: /mosquitto/config/mosquitto.conf, mode: 444}
     routing:

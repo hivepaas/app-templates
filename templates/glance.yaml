@@ -160,6 +160,7 @@ app:
                       feeds:
                         - url: https://hnrss.org/frontpage
                           title: Hacker News
+        inheritable: true
         swarmRef:
           file: {name: /app/config/glance.yml, mode: 444}
     routing:

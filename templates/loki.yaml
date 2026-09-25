@@ -142,6 +142,7 @@ app:
 
           analytics:
             reporting_enabled: false
+        inheritable: true
         swarmRef:
           file: {name: /etc/loki/local-config.yaml, mode: 444}
     routing:

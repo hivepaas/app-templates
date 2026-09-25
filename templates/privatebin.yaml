@@ -164,6 +164,7 @@ app:
 
           [model_options]
           dir = "/srv/data"
+        inheritable: true
         swarmRef:
           file: {name: /srv/cfg/conf.php, mode: 444}
     routing:

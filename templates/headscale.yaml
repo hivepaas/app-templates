@@ -192,6 +192,7 @@ app:
 
           policy:
             mode: file
+        inheritable: true
         swarmRef:
           file: {name: /etc/headscale/config.yaml, mode: 444}
     routing:

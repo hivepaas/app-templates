@@ -129,6 +129,7 @@ app:
               "ui": {"enable": true}
             }
           }
+        inheritable: true
         swarmRef:
           file: {name: /etc/zot/config.json, mode: 444}
     routing:

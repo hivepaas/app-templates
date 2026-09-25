@@ -292,6 +292,7 @@ app:
 
           touch /var/lib/mysql/.hivepaas-replica-ready
           echo "[replica] copied $PRIMARY_DB from $PRIMARY_HOST and set to follow it"
+        inheritable: true
         swarmRef:
           file: {name: /docker-entrypoint-initdb.d/10-replica.sh, mode: 755}
     routing:

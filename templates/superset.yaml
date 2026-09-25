@@ -166,6 +166,7 @@ app:
 
           # TLS ends at the reverse proxy; believe the scheme and host it forwards.
           ENABLE_PROXY_FIX = True
+        inheritable: true
         swarmRef:
           file: {name: /app/pythonpath/superset_config.py, mode: 444}
     routing:

@@ -114,6 +114,7 @@ app:
             #   conditions:
             #     - "[STATUS] == 200"
             #     - "[RESPONSE_TIME] < 500"
+        inheritable: true
         swarmRef:
           file: {name: /config/config.yaml, mode: 444}
     routing:

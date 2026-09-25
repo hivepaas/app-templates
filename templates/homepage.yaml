@@ -128,6 +128,7 @@ app:
             Applications:
               style: row
               columns: 3
+        inheritable: true
         swarmRef:
           file: {name: /app/config/settings.yaml, mode: 444}
       services.yaml:
@@ -148,6 +149,7 @@ app:
               # - Grafana:
               #     href: http://grafana:3000
               #     icon: grafana
+        inheritable: true
         swarmRef:
           file: {name: /app/config/services.yaml, mode: 444}
       widgets.yaml:
@@ -161,6 +163,7 @@ app:
                 dateStyle: long
                 timeStyle: short
                 hourCycle: h23
+        inheritable: true
         swarmRef:
           file: {name: /app/config/widgets.yaml, mode: 444}
       bookmarks.yaml:
@@ -169,6 +172,7 @@ app:
               - Homepage docs:
                   - abbr: HP
                     href: https://gethomepage.dev/configs/
+        inheritable: true
         swarmRef:
           file: {name: /app/config/bookmarks.yaml, mode: 444}
     routing:

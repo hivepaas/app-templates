@@ -158,6 +158,7 @@ app:
               functionGlobalContext: {},
               logging: {console: {level: "info", metrics: false, audit: false}},
           };
+        inheritable: true
         swarmRef:
           file: {name: /data/settings.js, mode: 444}
     routing:

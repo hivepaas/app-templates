@@ -247,12 +247,14 @@ app:
             REVOKE ALL ON FUNCTION supabase_functions.http_request() FROM PUBLIC;
             GRANT EXECUTE ON FUNCTION supabase_functions.http_request() TO postgres, anon, authenticated, service_role;
           COMMIT;
+        inheritable: true
         swarmRef:
           file: {name: /docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql, mode: 444}
       JWT_SQL:
         content: |
           \set jwt_exp `echo "$JWT_EXP"`
           ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
+        inheritable: true
         swarmRef:
           file: {name: /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql, mode: 444}
       ROLES_SQL:
@@ -263,6 +265,7 @@ app:
           ALTER USER supabase_auth_admin WITH PASSWORD :'pgpass';
           ALTER USER supabase_functions_admin WITH PASSWORD :'pgpass';
           ALTER USER supabase_storage_admin WITH PASSWORD :'pgpass';
+        inheritable: true
         swarmRef:
           file: {name: /docker-entrypoint-initdb.d/init-scripts/99-roles.sql, mode: 444}
       REALTIME_SQL:
@@ -270,6 +273,7 @@ app:
           \set pguser `echo "$POSTGRES_USER"`
           create schema if not exists _realtime;
           alter schema _realtime owner to :pguser;
+        inheritable: true
         swarmRef:
           file: {name: /docker-entrypoint-initdb.d/migrations/99-realtime.sql, mode: 444}
     routing:

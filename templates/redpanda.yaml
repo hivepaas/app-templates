@@ -159,6 +159,7 @@ app:
         content: |
           default_topic_partitions: ${{ params.partitions }}
           log_retention_ms: ${{ params.retention }}
+        inheritable: true
         swarmRef:
           file: {name: /etc/redpanda/.bootstrap.yaml, mode: 444}
     routing:
