@@ -186,6 +186,7 @@ app:
             max_retries: 3
             find_time: 2m
             ban_time: 5m
+        inheritable: true
         swarmRef:
           file: {name: /config/configuration.yml, mode: 444}
     routing:

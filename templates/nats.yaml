@@ -118,6 +118,7 @@ app:
           authorization {
             token: $NATS_TOKEN
           }
+        inheritable: true
         swarmRef:
           file: {name: /etc/nats/nats-server.conf, mode: 444}
     routing:

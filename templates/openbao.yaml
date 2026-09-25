@@ -140,6 +140,7 @@ app:
             address = "0.0.0.0:8200"
             tls_disable = true
           }
+        inheritable: true
         swarmRef:
           file: {name: /openbao/config/config.hcl, mode: 444}
     routing:

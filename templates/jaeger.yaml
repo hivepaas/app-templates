@@ -159,6 +159,7 @@ app:
           exporters:
             jaeger_storage_exporter:
               trace_storage: traces_store
+        inheritable: true
         swarmRef:
           file: {name: /etc/jaeger/config.yaml, mode: 444}
     routing:

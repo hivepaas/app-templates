@@ -123,6 +123,7 @@ app:
           quota-backend-bytes: 4294967296
           auto-compaction-mode: revision
           auto-compaction-retention: '1000'
+        inheritable: true
         swarmRef:
           file: {name: /milvus/configs/embedEtcd.yaml, mode: 444}
     routing:

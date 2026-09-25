@@ -199,6 +199,7 @@ app:
           trusted_key_servers:
             - server_name: matrix.org
           suppress_key_server_warning: true
+        inheritable: true
         swarmRef:
           file: {name: /config/homeserver.yaml, mode: 444}
     routing:

@@ -487,6 +487,7 @@ components:
                   plugins:
                     - {name: cors}
                     - {name: basic-auth, config: {hide_credentials: true}}
+            inheritable: true
             swarmRef:
               file: {name: /tmp/kong.yml.template, mode: 444}
         routing:

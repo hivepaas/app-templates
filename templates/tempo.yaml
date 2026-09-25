@@ -157,6 +157,7 @@ app:
 
           usage_report:
             reporting_enabled: false
+        inheritable: true
         swarmRef:
           file: {name: /etc/tempo/tempo.yaml, mode: 444}
     routing:

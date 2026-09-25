@@ -148,6 +148,7 @@ app:
             privileged: false
             # Empty: jobs are given the runner's Docker API, and use Docker through it.
             docker_host: ""
+        inheritable: true
         swarmRef:
           file: {name: /etc/act_runner/config.yaml, mode: 444}
     dockerApi:

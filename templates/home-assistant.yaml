@@ -164,6 +164,7 @@ app:
           automation: !include automations.yaml
           script: !include scripts.yaml
           scene: !include scenes.yaml
+        inheritable: true
         swarmRef:
           file: {name: /etc/hivepaas/configuration.yaml, mode: 444}
     routing:

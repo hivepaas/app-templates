@@ -170,6 +170,7 @@ app:
             // TLS ends at the reverse proxy, which forwards the client's address.
             proxyRemoteFiles: true,
           }, null, 2));
+        inheritable: true
         swarmRef:
           file: {name: /etc/misskey/write-config.js, mode: 444}
     routing:

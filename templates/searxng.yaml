@@ -149,6 +149,7 @@ app:
             formats:
               - html
               - json
+        inheritable: true
         swarmRef:
           file: {name: /etc/searxng/settings.yml, mode: 444}
     routing:

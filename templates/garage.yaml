@@ -185,6 +185,7 @@ app:
 
           [admin]
           api_bind_addr = "[::]:3903"
+        inheritable: true
         swarmRef:
           file: {name: /etc/garage.toml, mode: 444}
     routing:

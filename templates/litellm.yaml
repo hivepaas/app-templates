@@ -172,6 +172,7 @@ app:
             telemetry: false
 
           model_list: []
+        inheritable: true
         swarmRef:
           file: {name: /etc/litellm/config.yaml, mode: 444}
     routing:

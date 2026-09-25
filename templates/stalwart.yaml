@@ -228,6 +228,7 @@ app:
           [authentication.fallback-admin]
           user = "admin"
           secret = "%{env:STALWART_ADMIN_SECRET}%"
+        inheritable: true
         swarmRef:
           file: {name: /opt/stalwart/etc/config.toml, mode: 444}
     routing:

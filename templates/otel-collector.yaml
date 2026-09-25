@@ -147,6 +147,7 @@ app:
             telemetry:
               logs:
                 level: info
+        inheritable: true
         swarmRef:
           file: {name: /etc/otelcol-contrib/config.yaml, mode: 444}
     routing:

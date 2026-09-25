@@ -610,7 +610,7 @@
       "name": "alertmanager",
       "file": {
         "path": "templates/alertmanager.yaml",
-        "sha256": "f09300a8f4f79273ddde40a31ca56ad3ef4c932f7ff9f22aae25372c1e5cea64"
+        "sha256": "2c0b29fe22aa280af5184d79f2c4ee3c02ec095ba47fa33443d882f97d26d2be"
       },
       "icon": {
         "path": "icons/alertmanager.svg",
@@ -802,7 +802,7 @@
       "name": "authelia",
       "file": {
         "path": "templates/authelia.yaml",
-        "sha256": "7dfe271d8d8f65a082915dfdcab233265123958fd1a693f74bf0fa7db6ec756a"
+        "sha256": "18de5f9654b041526d8f52ebc793365e1076a607761f36d44918d33f0881c986"
       },
       "icon": {
         "path": "icons/authelia.svg",
@@ -2169,7 +2169,7 @@
       "name": "drupal",
       "file": {
         "path": "templates/drupal.yaml",
-        "sha256": "e8ae7addf46561e0972dcd21df5faa094f91001e90c64bf8e0791fed68631d60"
+        "sha256": "ec157758f2ac0b44e1457d9df0de920ca9c8a321c4804559805e8a33b0d19c9e"
       },
       "icon": {
         "path": "icons/drupal.svg",
@@ -2295,7 +2295,7 @@
       "name": "element-web",
       "file": {
         "path": "templates/element-web.yaml",
-        "sha256": "d54e3c1a6a7d898e483f52b0ada113d12c27b4cbe4feae76f5a7aef9232b0414"
+        "sha256": "b22c8448d8daac98ff49dc085b0081295a7f515aae130de983376879f1d00d85"
       },
       "icon": {
         "path": "icons/element-web.svg",
@@ -3164,7 +3164,7 @@
       "name": "garage",
       "file": {
         "path": "templates/garage.yaml",
-        "sha256": "83ac6e2948addbe4013618e66a4531a6647a23b526cc510dcf7a67e2d60f5df6"
+        "sha256": "d43397f649e752469d5eab8f498c3ffb7fb5d89e8383635eb5cccc2e06adf57f"
       },
       "icon": {
         "path": "icons/garage.svg",
@@ -3243,7 +3243,7 @@
       "name": "gatus",
       "file": {
         "path": "templates/gatus.yaml",
-        "sha256": "8409b5f2ad2d6ccad583d8fa684bf5684f93807d3f14f4a61543b5b830a2cd61"
+        "sha256": "24f22628b07f58c17bba05185add41f0916af355476e6086b8e63219ea438abe"
       },
       "icon": {
         "path": "icons/gatus.svg",
@@ -3415,7 +3415,7 @@
       "name": "gitea-runner",
       "file": {
         "path": "templates/gitea-runner.yaml",
-        "sha256": "6a34808cc42dead1ebcd83148f86866c955d5ee3871ad8b26aa398c8d5afd26c"
+        "sha256": "353c5ffe58c87d36aa22c0bd660a707b7aad3d833dad4489bd9418e9e931873d"
       },
       "icon": {
         "path": "icons/gitea-runner.svg",
@@ -3537,7 +3537,7 @@
       "name": "glance",
       "file": {
         "path": "templates/glance.yaml",
-        "sha256": "16d9bedc093f04b908bd2b4ea6ce3f86f5db1c92b9ef7e6d96969960d1767022"
+        "sha256": "9023c3f631f9cffd27f9b42d22a3a42196c77dc53ca02a0eb725fe87ab8a8d8d"
       },
       "icon": {
         "path": "icons/glance.svg",
@@ -4112,7 +4112,7 @@
       "name": "headscale",
       "file": {
         "path": "templates/headscale.yaml",
-        "sha256": "5bf1d90b78e531ba8325d820333b4fdfa74fb851764acf6da6cd20816a14feaf"
+        "sha256": "6a8f7c45321f36e3badc2b54f2c95d669b0ede4660033c3ea922097690d37cc6"
       },
       "icon": {
         "path": "icons/headscale.svg",
@@ -4390,7 +4390,7 @@
       "name": "home-assistant",
       "file": {
         "path": "templates/home-assistant.yaml",
-        "sha256": "a36f34a3ea325def354567ce6934b88aa942ea196f7b8816a958ed4501ece001"
+        "sha256": "83f04199174542a002959f4a2b17ebddebe02172c8846b6f1944d253a480a030"
       },
       "icon": {
         "path": "icons/home-assistant.svg",
@@ -4469,7 +4469,7 @@
       "name": "homepage",
       "file": {
         "path": "templates/homepage.yaml",
-        "sha256": "793003208f9ef2736d48930217c33f64e35ccfadea033662adc01882c8a49dfb"
+        "sha256": "bdf7baeeaae97e6631fc01227027227714a9d6f228ce450060f870b464c1d20f"
       },
       "icon": {
         "path": "icons/homepage.svg",
@@ -4730,7 +4730,7 @@
       "name": "jaeger",
       "file": {
         "path": "templates/jaeger.yaml",
-        "sha256": "6c24bdcf4201c9cf0ba383e77914c1ae3814849abb14e6d23e1c2d41205a9545"
+        "sha256": "cd1c62c55bfe39fcc65b85bc7ccec3b1375558fe5b6568a5f1bb905614f471c1"
       },
       "icon": {
         "path": "icons/jaeger.svg",
@@ -5887,7 +5887,7 @@
       "name": "litellm",
       "file": {
         "path": "templates/litellm.yaml",
-        "sha256": "ce78c6f9902692ec5181789dcdf9bf19afa59f1e78c0db3ffdbec572c1e319f9"
+        "sha256": "4084f2f67e44b7a70da76eb41fc25925f50137549222b82586be3cb57c6164f6"
       },
       "icon": {
         "path": "icons/litellm.svg",
@@ -5971,7 +5971,7 @@
       "name": "loki",
       "file": {
         "path": "templates/loki.yaml",
-        "sha256": "111fcfef44527d116d2c46c734637cebb964a8692f5c026be8aa4d2b4b723394"
+        "sha256": "450f86bb50d80ff1fee058d0cd9487d36474218f754de5fbc6bca09a76f14121"
       },
       "icon": {
         "path": "icons/loki.svg",
@@ -6209,7 +6209,7 @@
       "name": "mariadb-replica",
       "file": {
         "path": "templates/mariadb-replica.yaml",
-        "sha256": "9ba3f572d2435b164dcea4ce62ed3ce8350b41b00d08777547f7f6bcf04ade69"
+        "sha256": "f6d0e856c130db0ee5944a986f34b46f7b852a8b65b3c69b3715d978dc0b6405"
       },
       "icon": {
         "path": "icons/mariadb.svg",
@@ -6673,7 +6673,7 @@
       "name": "milvus",
       "file": {
         "path": "templates/milvus.yaml",
-        "sha256": "b04e9ce5bfb57fc0f9103f108682a88c20fa88691f30557f542c5515150f7afc"
+        "sha256": "b8182b4d1d38110f84b4ddadca4430797443b02325adcb6083e6193f3f9e1377"
       },
       "icon": {
         "path": "icons/milvus.svg",
@@ -6875,7 +6875,7 @@
       "name": "misskey",
       "file": {
         "path": "templates/misskey.yaml",
-        "sha256": "3bde7043ec754d7dd799abfc3072bdee1f6be82c6ea1e15d17cdf9fbba0e52e8"
+        "sha256": "9b0f8d491b3014653cf6e1f1f5164a117082936cbb38d42c4c7d2c477f730ca3"
       },
       "icon": {
         "path": "icons/misskey.svg",
@@ -6963,7 +6963,7 @@
       "name": "mosquitto",
       "file": {
         "path": "templates/mosquitto.yaml",
-        "sha256": "0c8ed767475102ca3406d7fad229c7cb11971af43adfad98187b7dfe40f0bd16"
+        "sha256": "a081b4837ece9de672c38a7a249cb2419cc5727c6dd5ec40a89a9a9131a0eeec"
       },
       "icon": {
         "path": "icons/mosquitto.svg",
@@ -7081,7 +7081,7 @@
       "name": "mysql-replica",
       "file": {
         "path": "templates/mysql-replica.yaml",
-        "sha256": "c2f7c7fa40090479efef2830dda423c73f4414d110a0a1950a840b4d8aea7d18"
+        "sha256": "d32e91d375c3b24f245b73a92ff4ad0ddf85a17de907c3978b1f429e7cbebe7e"
       },
       "icon": {
         "path": "icons/mysql.svg",
@@ -7291,7 +7291,7 @@
       "name": "nats",
       "file": {
         "path": "templates/nats.yaml",
-        "sha256": "e235daefcd7f4842a57712df2b19cc413ac45018be752d6fcdc5a3e687f05c2d"
+        "sha256": "daebeb030ee82c64079c4ff94c6edf98cf056d1e32c470da33826db16f65a4fc"
       },
       "icon": {
         "path": "icons/nats.svg",
@@ -7596,7 +7596,7 @@
       "name": "node-red",
       "file": {
         "path": "templates/node-red.yaml",
-        "sha256": "52a8431ce17eb8e7d74e7e4443078113da9ad6c47b383433eeffafa16457f6ed"
+        "sha256": "2bc049dd1c0865b952b53c59c661667ee2c18159736061d255eb936c1b689e9e"
       },
       "icon": {
         "path": "icons/node-red.svg",
@@ -7882,7 +7882,7 @@
       "name": "openbao",
       "file": {
         "path": "templates/openbao.yaml",
-        "sha256": "4e34889b52346789d4a3de0497012cf1d8e7f046a23ae0d7b379740fe144e876"
+        "sha256": "3d9d41572606ae649ef7a0c3410c36e8d0e5a417edbf02bc313f4e51d25aa209"
       },
       "icon": {
         "path": "icons/openbao.svg",
@@ -8149,7 +8149,7 @@
       "name": "otel-collector",
       "file": {
         "path": "templates/otel-collector.yaml",
-        "sha256": "e6a9e8f392e15fcad012ca4d2657d8535c6aa667cc998b02e5bec48e7ec222ce"
+        "sha256": "1bc202d8c346b4db93f25414bcac88bbdbf10440518de634433ff18061a2315c"
       },
       "icon": {
         "path": "icons/otel-collector.svg",
@@ -9210,7 +9210,7 @@
       "name": "privatebin",
       "file": {
         "path": "templates/privatebin.yaml",
-        "sha256": "0e2f180d69927646f575b519a8670f5007f02aa937854ef3652ed153189c19bd"
+        "sha256": "8b9353615c2ac550ee43e772c8271e3b70c99efef0ca3f725d7699c1e62b706e"
       },
       "icon": {
         "path": "icons/privatebin.svg",
@@ -9247,7 +9247,7 @@
       "name": "prometheus",
       "file": {
         "path": "templates/prometheus.yaml",
-        "sha256": "b95b637b98dfb36df74d323f9e229857aaeb264d60247d63c59ad6505709e460"
+        "sha256": "088c38151d356c964c50490a4b8eeeefef0fd97118165cbcdcb6c38a6165dfdf"
       },
       "icon": {
         "path": "icons/prometheus.svg",
@@ -9798,7 +9798,7 @@
       "name": "redpanda",
       "file": {
         "path": "templates/redpanda.yaml",
-        "sha256": "2010d7fd59f35a648a291c9b99d0b688058a049c9bf41cacb9e04e25312dfa3d"
+        "sha256": "1ed5181c77a8a5fd8cd9e435d15f60774f99bf8557b3f0403a713f9cface2606"
       },
       "icon": {
         "path": "icons/redpanda.svg",
@@ -10137,7 +10137,7 @@
       "name": "searxng",
       "file": {
         "path": "templates/searxng.yaml",
-        "sha256": "16f5647fc696182afafedbe140ebcac160f979d47b7d0c311c3572f1c6fd16d9"
+        "sha256": "10dbb1078e0368882b0a5f8f09c418577bb8d1384426eef36458a5011bf004aa"
       },
       "icon": {
         "path": "icons/searxng.svg",
@@ -10551,7 +10551,7 @@
       "name": "stalwart",
       "file": {
         "path": "templates/stalwart.yaml",
-        "sha256": "db129ea2a1059b7d0ade8e49629cac06b98be6cbc49219618784ab0103a222da"
+        "sha256": "1ec61f2da2535ca8b422b4f1c9097a00b327097da084bf7ea065c243dbd518e6"
       },
       "icon": {
         "path": "icons/stalwart.svg",
@@ -10671,7 +10671,7 @@
       "name": "supabase",
       "file": {
         "path": "templates/supabase.yaml",
-        "sha256": "10a5d96e3f3d29e0b80a3deb1dca129f26eb2d3d9933f33f1bd93aa8d65d8dca"
+        "sha256": "3bb6271459407bf1cc52b188cc3fccf63d9fd248c40894eccce156c21b234337"
       },
       "icon": {
         "path": "icons/supabase.svg",
@@ -10749,7 +10749,7 @@
       "name": "supabase-postgres",
       "file": {
         "path": "templates/supabase-postgres.yaml",
-        "sha256": "b1c55544fbded11954d6e6f9cf40c9684cf91cca3fc07a38c2dc3aa5103f988c"
+        "sha256": "dbad9c750302d1744988ecac99287ea403e5995edb224ec396006afb3ad73bab"
       },
       "icon": {
         "path": "icons/postgres.svg",
@@ -10782,7 +10782,7 @@
       "name": "superset",
       "file": {
         "path": "templates/superset.yaml",
-        "sha256": "05ea7c383674d88b7915bf7cd06308c1eba302ca11984201c2db650afb59278e"
+        "sha256": "8c2378b01e5c7c027caf6a5e8024c19d16372c904075ccaa670c81ea6c3509ee"
       },
       "icon": {
         "path": "icons/superset.svg",
@@ -10867,7 +10867,7 @@
       "name": "synapse",
       "file": {
         "path": "templates/synapse.yaml",
-        "sha256": "299af25fd5ac6de0464fbd9f9418281548f7a6db0d1cb219e88063c1f0f6d0ab"
+        "sha256": "e279a46dc237de5f785fb7ce3add775af2e4e4e89716c917b3b6c1eed3c10612"
       },
       "icon": {
         "path": "icons/synapse.svg",
@@ -11076,7 +11076,7 @@
       "name": "tempo",
       "file": {
         "path": "templates/tempo.yaml",
-        "sha256": "1008392ca3aac5bfbb686487f1fe261317a972a995f2a5462509c2dd9cef7754"
+        "sha256": "c5af0ec44816aaeae724d23ba31ae6efbb1226949b7e1013f00c3c116466e328"
       },
       "icon": {
         "path": "icons/tempo.svg",
@@ -11618,7 +11618,7 @@
       "name": "varnish",
       "file": {
         "path": "templates/varnish.yaml",
-        "sha256": "86c2cb866ef39daed7a82e5c4e7be9f08daa77bc293cb900160a5dc9fc4ece1c"
+        "sha256": "15697ac0f0be32fad1183f1689a39f1cd650e6d65d0c8d74bf83f7c924207a0c"
       },
       "icon": {
         "path": "icons/varnish.svg",
@@ -11739,7 +11739,7 @@
       "name": "verdaccio",
       "file": {
         "path": "templates/verdaccio.yaml",
-        "sha256": "65754af69237fbf90461122aff037b9d5a1408677ebb42bb62e70120c6a45688"
+        "sha256": "b9e7252af49f689d4ae2a3a191ccc9dbeac14a6677f8cd7d2fd48ff83c94c1dc"
       },
       "icon": {
         "path": "icons/verdaccio.svg",
@@ -12236,7 +12236,7 @@
       "name": "zot",
       "file": {
         "path": "templates/zot.yaml",
-        "sha256": "a8a788fe1f9665c7d8c7e2c3262d8a9e33e80d71fe121a7e5773857eb3a37f0b"
+        "sha256": "0eec52d2f31db601a4fe0dc78dc5cb501d3c59c710d7cdce83b9d2d28776a372"
       },
       "icon": {
         "path": "icons/zot.svg",

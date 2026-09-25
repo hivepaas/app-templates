@@ -106,6 +106,7 @@ app:
             "show_labs_settings": false,
             "default_theme": "light"
           }
+        inheritable: true
         swarmRef:
           file: {name: /app/config.json, mode: 444}
     routing:
