@@ -48,11 +48,15 @@ reference; the rules are:
 
   `settings.dockerApi` gives the app the Docker API through HivePaaS, without the Docker
   socket: `images` its containers may run (`"*"` for any), `sharedDirs` of its own storage
-  they may bind, `networks` besides their own (`env`), `allow` for more than running
-  containers (`exec`, `files`, `volumes`, `networks`, `nestedSocket`), and `limits`
-  (`containers`, `memory`, `cpus`). The app reaches it at `${HIVEPAAS_DOCKER_HOST}`, and
-  creating it needs Write on the Cluster module. The block is read from the template, so it
-  takes no placeholders and a version cannot override it.
+  they may bind, `sharedVolumes` - volume names that stand for one of those directories, for
+  an app that mounts a volume by name (`{appwrite-builds: /storage/builds}`) - `networks`
+  besides their own (`env`), `allow` for more than running containers (`exec`, `files`,
+  `volumes`, `networks`, `nestedSocket`), and `limits` (`containers`, `memory`, `cpus`).
+  The app reaches it at `${HIVEPAAS_DOCKER_HOST}`; `${HIVEPAAS_DOCKER_NETWORK}` names the
+  network its containers join by default, and with `networks: [env]`,
+  `${HIVEPAAS_DOCKER_ENV_NETWORK}` names the env's. Creating it needs Write on the Cluster
+  module. The block is read from the template, so it takes no placeholders and a version
+  cannot override it; in a template of components, each component declares its own.
 
   `init: false` turns off the init process an app is otherwise created with.
   Only an image that brings its own supervisor needs it: an s6-overlay image

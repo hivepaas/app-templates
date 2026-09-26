@@ -1,0 +1,907 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: appwrite
+  title: Appwrite
+  tagline: Auth, databases, storage, messaging and realtime behind one API and console
+  description: |
+    Appwrite is a backend for web and mobile applications: accounts and sessions with
+    OAuth, teams and permissions, document databases, file storage with image previews,
+    email, SMS and push messaging, and realtime subscriptions to all of it - reached through
+    one API and its SDKs, and managed from a console in the browser.
+
+    **This template creates eleven apps and three databases**
+
+    - **Gateway** (`caddy`) - the address you give your application: on Appwrite's own
+      host, `/v1/realtime` goes to Realtime, `/v1` to the API and everything else to the
+      Console; any other host - a function's, a site's - goes to the API
+    - **API** - the Appwrite server itself
+    - **Console** - the dashboard
+    - **Realtime** - the WebSocket server for subscriptions
+    - **Worker** - every queue Appwrite runs in the background, in one process: mail,
+      webhooks, deletes, database jobs, migrations, usage
+    - **Scheduler**, **Maintenance** and **Interval** - the timers that queue that work
+    - **Geo** - the IP lookup that puts a country on sessions and logs
+    - **Executor** - runs functions and sites, each in a container of its own
+    - **Orchestrator** - builds them, each build in containers of its own
+    - **a PostgreSQL database**, `appwrite/postgres`, with the PostGIS and pgvector
+      extensions Appwrite needs; **a Redis** for its cache and queues; and **a ClickHouse**
+      for the usage figures the console charts
+
+    **Functions and Sites run through HivePaaS's Docker API**
+
+    The Executor and the Orchestrator start containers of their own. Upstream installs both
+    with the Docker socket mounted, which is root on the node; here each is given the Docker
+    API through HivePaaS instead, and creating this app needs Write permission on the
+    Cluster module:
+
+    - they run only Open Runtimes images, with no privileges, no path of the node and no
+      port of their own;
+    - a runtime or a build gets at most 4GB of memory and two CPUs, and that is also the
+      largest specification the console offers;
+    - builds reach the API on the env network; runtimes are on the Executor's own.
+
+    A function runs on its execution endpoint without anything more. A domain - a function's
+    or a site's - reaches it only once HivePaaS routes it: add it to the gateway app's
+    routing, beside the host below. HivePaaS routes named domains, up to five, not a
+    wildcard, so the domains Appwrite generates under `functions.` and `sites.` are not
+    reachable by themselves.
+
+    **What is not included**
+
+    The MQTT broker (it listens on TCP ports of its own, not behind an address), the AI
+    assistant, the browser that takes screenshots of sites, and the image-cropping model.
+
+    **It needs a domain**
+
+    The console and the API share it: the console calls the API on the same address, and
+    the sessions it signs in with are cookies of that address. Give the same host to
+    **Host name**, which Appwrite is configured with, and **Domain**, which HivePaaS routes
+    to the gateway; then give it to your SDKs as `https://<host>/v1`. A web app that uses
+    Realtime has to be added as a Web platform of its project in the console first -
+    Appwrite refuses a WebSocket from an origin it does not know.
+
+    **After the first deployment**
+
+    The API sets its database up on its first start - allow it two minutes. Then open the
+    address and sign up: the first account is the owner of this installation, and after it
+    nobody can sign up to the console without an invitation. To open console sign-ups again,
+    set `_APP_CONSOLE_WHITELIST_ROOT` to `disabled` on the API app.
+
+    Without a mail server below, nothing that needs an email works - verification, password
+    recovery, invitations by email and magic links. Fill it in to turn them on.
+
+    **Back up the database, the volume and the key**
+
+    Everything Appwrite knows is in PostgreSQL; uploaded files and the builds of functions
+    and sites are on the data volume. The encryption key encrypts sessions, webhook secrets
+    and API keys inside that database - a restore without the same key has them all
+    unreadable. Keep a copy of it apart from the backups.
+  categories: [webapps/dev-tools, webapps/low-code]
+  tags: [document, identity, object-storage, notifications, open-source]
+  aliases: [baas, backend as a service, firebase alternative, appwrite console]
+  icon: icons/appwrite.svg
+  links:
+    website: https://appwrite.io
+    documentation: https://appwrite.io/docs/advanced/self-hosting
+    source: https://github.com/appwrite/appwrite
+  license: BSD-3-Clause
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: hostname
+    title: Host name
+    description: >-
+      The address of the console and the API, without a scheme - appwrite.example.com.
+      Appwrite builds its links and signs its sessions for this host, so it is asked for now
+      rather than added later.
+    type: string
+    default: appwrite.example.com
+    pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
+  - name: domain
+    title: Domain
+    description: >-
+      The domain HivePaaS routes to the gateway - the host name above. Leave it empty to add
+      it later, in the gateway app's routing settings.
+    type: domain
+    optional: true
+  - name: opensslKey
+    title: Encryption key
+    description: >-
+      Encrypts sessions, webhook secrets and API keys in the database. Leave empty to
+      generate one, then keep a copy: a database restored without it cannot be read.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: emailName
+    title: Sender name
+    description: The name the emails Appwrite sends come from.
+    type: string
+    default: Appwrite
+    maxLength: 100
+  - name: emailAddress
+    title: Sender address
+    description: The address the emails Appwrite sends come from.
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpHost
+    title: Mail server
+    description: The SMTP host for verification, recovery and invitation mail.
+    type: string
+    optional: true
+    pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+  - name: smtpPort
+    title: Mail server port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: Mail encryption
+    description: >-
+      tls for STARTTLS (usually port 587), ssl for TLS from the first byte (usually 465).
+      Empty for neither.
+    type: string
+    default: tls
+    optional: true
+    pattern: '^(tls|ssl)?$'
+  - name: smtpUser
+    title: Mail user name
+    type: string
+    optional: true
+    maxLength: 200
+  - name: smtpPassword
+    title: Mail password
+    type: secret
+    optional: true
+  - name: cpuNum
+    title: API processes, in CPUs
+    description: >-
+      The API and Realtime start six processes for every CPU counted here, and size their
+      database connections from it. Upstream counts every CPU of the node, which on a large
+      node is more processes than the memory limit below holds.
+    type: int
+    default: 2
+    min: 1
+    max: 32
+  - name: memoryLimit
+    title: Memory limit
+    description: For the API and the Worker each. Every other app of the stack has a fixed, smaller one.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: geoSecret
+    title: Geo service secret
+    description: What the API authenticates to the Geo app with. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: trackingSecret
+    title: Tracking secret
+    description: Signs the tracking links in messages Appwrite sends. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: executorSecret
+    title: Executor secret
+    description: What the API and the Worker authenticate to the Executor with. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: jobsSecret
+    title: Builds secret
+    description: >-
+      What the API and the Worker authenticate to the Orchestrator with, which runs every
+      build. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: functionsRuntimes
+    title: Function runtimes
+    description: The runtimes a function may be created with, comma separated.
+    type: string
+    default: node-22,python-3.12,php-8.3
+    pattern: '^[a-z0-9.-]+(,[a-z0-9.-]+)*$'
+  - name: sitesRuntimes
+    title: Site runtimes
+    description: The runtimes a site may be built with, comma separated.
+    type: string
+    default: static-1,node-22
+    pattern: '^[a-z0-9.-]+(,[a-z0-9.-]+)*$'
+  - name: runtimeImages
+    title: Runtime images
+    description: >-
+      The image of every runtime above, comma separated. The Executor pulls them as it
+      starts and runs nothing it has not pulled: add the image of a runtime you add, named
+      openruntimes/<language>:v5-<version>.
+    type: string
+    default: openruntimes/node:v5-22,openruntimes/python:v5-3.12,openruntimes/php:v5-8.3,openruntimes/static:v5-1
+    pattern: '^[a-z0-9./:_-]+(,[a-z0-9./:_-]+)*$'
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      Uploaded files, imports, the cache, and what Appwrite keeps of its own configuration -
+      each in a directory of its own on this volume.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: appwrite-postgres
+    params:
+      dbName: appwrite
+      username: appwrite
+  - name: redis
+    title: Cache and queues
+    template: redis
+    version: "7.4"
+    params:
+      # As upstream runs it: a cache that evicts, with a snapshot now and then.
+      maxMemory: 512MB
+      evictionPolicy: allkeys-lru
+      persistence: rdb
+      memoryLimit: 768MB
+  - name: usage
+    title: Usage statistics
+    template: clickhouse
+    version: "26.3"
+    params:
+      dbName: appwrite
+      username: appwrite
+
+versions:
+  - name: "2.3"
+    release: "2.3.0"
+    default: true
+    components:
+      gw: {image: "caddy:2.11.4-alpine"}
+      api: {image: "appwrite/appwrite:2.3.0"}
+      # The console Appwrite 2.3.0's own installation pins.
+      console: {image: "appwrite/new:1.1.159-self-hosted"}
+      realtime: {image: "appwrite/appwrite:2.3.0"}
+      worker: {image: "appwrite/appwrite:2.3.0"}
+      scheduler: {image: "appwrite/appwrite:2.3.0"}
+      maintenance: {image: "appwrite/appwrite:2.3.0"}
+      interval: {image: "appwrite/appwrite:2.3.0"}
+      geo: {image: "appwrite/geo:0.3.1"}
+      executor: {image: "openruntimes/executor:0.29.0"}
+      orchestrator: {image: "ghcr.io/open-runtimes/orchestrator/orchestrator:2.2.2"}
+
+components:
+  # ── Gateway ──────────────────────────────────────────────────────────────
+  - name: gw
+    title: Gateway
+    primary: true
+    needs: [api, console, realtime]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget -q -O /dev/null http://127.0.0.1:8081/
+            interval: 20s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 128MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        configFiles:
+          CADDYFILE:
+            # The routes upstream gives Traefik, in Caddy's words: the console on Appwrite's
+            # own host only, the API for every other. The upstreams are the app keys of the
+            # components below, which is how siblings reach each other.
+            content: |
+              {
+              	admin off
+              	auto_https off
+              	servers {
+              		# HivePaaS's proxy terminates TLS in front of this one: the scheme and the
+              		# client address it passes on are kept, not replaced with this hop's.
+              		trusted_proxies static private_ranges
+              	}
+              }
+
+              # For the health check only.
+              :8081 {
+              	bind 127.0.0.1
+              	respond "OK" 200
+              }
+
+              :80 {
+              	handle /v1/realtime* {
+              		reverse_proxy ${{ comp.realtime.key }}:80
+              	}
+              	@appwrite host ${{ params.hostname }}
+              	handle @appwrite {
+              		handle /v1* {
+              			reverse_proxy ${{ comp.api.key }}:80
+              		}
+              		handle /.well-known/* {
+              			reverse_proxy ${{ comp.api.key }}:80
+              		}
+              		handle {
+              			reverse_proxy ${{ comp.console.key }}:3000
+              		}
+              	}
+              	# Any other host is a function's, a site's or a project's own domain, which the
+              	# API routes by host.
+              	handle {
+              		reverse_proxy ${{ comp.api.key }}:80
+              	}
+              }
+            inheritable: true
+            swarmRef:
+              file: {name: /etc/caddy/Caddyfile, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── API ──────────────────────────────────────────────────────────────────
+  - name: api
+    title: API
+    needs: [geo]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /storage/uploads: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: uploads}}
+            /storage/imports: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: imports}}
+            /storage/cache: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: cache}}
+            /storage/config: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: config}}
+            /storage/certificates:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: certificates}
+            /storage/functions: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: functions}}
+            /storage/sites: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: sites}}
+            /storage/builds: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: builds}}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The Host header is Appwrite's own check's: a request for any other host is
+            # treated as one for a project's custom domain.
+            command: >-
+              curl -fsS -o /dev/null -H "Host: $_APP_DOMAIN" http://localhost/v1/health/version
+            interval: 20s
+            timeout: 5s
+            # The first start creates every table of the platform's database.
+            startPeriod: 180s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: _APP_ENV, v: production}
+            - {k: _APP_EDITION, v: self-hosted}
+            - {k: _APP_OPENSSL_KEY_V1, v: "${secrets.OPENSSL_KEY}"}
+            - {k: _APP_CPU_NUM, v: "${{ params.cpuNum }}"}
+            - {k: _APP_DOMAIN, v: "${{ params.hostname }}"}
+            - {k: _APP_DOMAIN_TARGET_CNAME, v: "${{ params.hostname }}"}
+            - {k: _APP_CONSOLE_WHITELIST_ROOT, v: enabled}
+            # The values upstream's installer writes. Unset, the code's own defaults differ,
+            # and for the storage limit the difference is every upload refused: a bucket
+            # created without a size of its own takes this one, and the code's is 0.
+            - {k: _APP_OPTIONS_ABUSE, v: enabled}
+            - {k: _APP_STORAGE_LIMIT, v: "30000000"}
+            - {k: _APP_STORAGE_PREVIEW_LIMIT, v: "20000000"}
+            - {k: _APP_STORAGE_ANTIVIRUS, v: disabled}
+            # HivePaaS's proxy redirects to HTTPS and holds the certificate; Appwrite doing
+            # either behind it would only fight it.
+            - {k: _APP_OPTIONS_FORCE_HTTPS, v: disabled}
+            - {k: _APP_OPTIONS_ROUTER_FORCE_HTTPS, v: disabled}
+            - {k: _APP_ROUTER_AUTO_CERTIFICATES, v: disabled}
+            - {k: _APP_DB_ADAPTER, v: postgresql}
+            - {k: _APP_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_DB_SCHEMA, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: _APP_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: _APP_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: _APP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            # A URL with the password in it: the dependency's is generated, letters and
+            # digits only, so nothing in it needs escaping.
+            - k: _APP_CONNECTIONS_DB_USAGE
+              v: >-
+                http://${{ deps.usage.ref.HIVEPAAS_USER }}:${{ deps.usage.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.usage.ref.HIVEPAAS_HOST }}:${{ deps.usage.ref.HIVEPAAS_PORT }}/${{
+                deps.usage.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: _APP_USAGE_STATS, v: enabled}
+            - {k: _APP_GEO_ENDPOINT, v: "http://${{ comp.geo.key }}/v1"}
+            - {k: _APP_GEO_SECRET, v: "${secrets.GEO_SECRET}"}
+            # Where the migrations worker reaches this API; upstream's default is the
+            # compose service name.
+            - {k: _APP_MIGRATION_HOST, v: "${{ comp.api.key }}"}
+            - {k: _APP_NOTIFICATIONS_TRACKING_SECRET, v: "${secrets.TRACKING_SECRET}"}
+            - {k: _APP_SYSTEM_EMAIL_NAME, v: "${{ params.emailName }}"}
+            - {k: _APP_SYSTEM_EMAIL_ADDRESS, v: "${{ params.emailAddress }}"}
+            - {k: _APP_SMTP_HOST, v: "${{ params.smtpHost }}"}
+            - {k: _APP_SMTP_PORT, v: "${{ params.smtpPort }}"}
+            - {k: _APP_SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+            - {k: _APP_SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+            - {k: _APP_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+            # Functions and Sites: the Executor runs them, the Orchestrator builds them.
+            - {k: _APP_EXECUTOR_HOST, v: "http://${{ comp.executor.key }}/v1"}
+            - {k: _APP_EXECUTOR_SECRET, v: "${secrets.EXECUTOR_SECRET}"}
+            - {k: _APP_JOBS_HOST, v: "http://${{ comp.orchestrator.key }}:8080"}
+            - {k: _APP_JOBS_SECRET, v: "${secrets.JOBS_SECRET}"}
+            # Where a build fetches its source and reports back from the env network.
+            - {k: _APP_JOBS_ENDPOINT, v: "http://${{ comp.api.key }}"}
+            # The volume every build mounts by name: the Orchestrator's Docker API gives the
+            # directory of /storage/builds for it, the one this app reads builds from.
+            - {k: _APP_BUILDS_VOLUME, v: appwrite-builds}
+            - {k: _APP_FUNCTIONS_RUNTIMES, v: "${{ params.functionsRuntimes }}"}
+            - {k: _APP_SITES_RUNTIMES, v: "${{ params.sitesRuntimes }}"}
+            - {k: _APP_DOMAIN_FUNCTIONS, v: "functions.${{ params.hostname }}"}
+            - {k: _APP_DOMAIN_SITES, v: "sites.${{ params.hostname }}"}
+            # The most a function, a site or a build may ask for, and so the most it is
+            # offered: the Docker API's limits below, which refuse anything more. Unset,
+            # Appwrite offers its largest, 8GB, and every build is refused.
+            - {k: _APP_COMPUTE_MEMORY, v: "4096"}
+            - {k: _APP_COMPUTE_CPUS, v: "2"}
+            - {k: _APP_COMPUTE_BUILD_TIMEOUT, v: "2700"}
+            - {k: _APP_FUNCTIONS_TIMEOUT, v: "900"}
+            - {k: _APP_SITES_TIMEOUT, v: "900"}
+        secrets:
+          OPENSSL_KEY:
+            value: "${{ params.opensslKey }}"
+          GEO_SECRET:
+            value: "${{ params.geoSecret }}"
+          TRACKING_SECRET:
+            value: "${{ params.trackingSecret }}"
+          SMTP_PASSWORD:
+            value: "${{ params.smtpPassword }}"
+          EXECUTOR_SECRET:
+            value: "${{ params.executorSecret }}"
+          JOBS_SECRET:
+            value: "${{ params.jobsSecret }}"
+
+  # ── Console ──────────────────────────────────────────────────────────────
+  - name: console
+    title: Console
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image's own check: the console is a Bun server, with no curl or wget.
+            command: >-
+              bun -e "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            interval: 30s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          # It loads every file it serves into memory at start, and idles near 200MB.
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: VITE_CONSOLE_PROFILE, v: self-hosted}
+            # The console calls the API on the address it was loaded from, which the
+            # gateway routes.
+            - {k: APPWRITE_ENDPOINT_SAME_ORIGIN, v: "true"}
+            - {k: VITE_GROWTH_ENDPOINT, v: "https://growth.appwrite.io/v1"}
+
+  # ── Realtime ─────────────────────────────────────────────────────────────
+  - name: realtime
+    title: Realtime
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: realtime
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -s -o /dev/null http://localhost/
+            interval: 20s
+            timeout: 5s
+            startPeriod: 60s
+            retries: 3
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: _APP_ENV, v: production}
+            - {k: _APP_OPENSSL_KEY_V1, v: "${secrets.OPENSSL_KEY}"}
+            - {k: _APP_CPU_NUM, v: "${{ params.cpuNum }}"}
+            - {k: _APP_USAGE_STATS, v: enabled}
+            - {k: _APP_OPTIONS_ABUSE, v: enabled}
+            - {k: _APP_DB_ADAPTER, v: postgresql}
+            - {k: _APP_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_DB_SCHEMA, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: _APP_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: _APP_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: _APP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        secrets:
+          OPENSSL_KEY:
+            value: "${{ params.opensslKey }}"
+
+  # ── Worker ───────────────────────────────────────────────────────────────
+  - name: worker
+    title: Worker
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Upstream's "combined" topology: every queue in one process. Its "separate" one
+          # is sixteen apps of this same image, one queue each.
+          command: worker
+        storage:
+          mounts:
+            /storage/uploads: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: uploads}}
+            /storage/imports: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: imports}}
+            /storage/cache: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: cache}}
+            /storage/config: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: config}}
+            /storage/certificates:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: certificates}
+            /storage/functions: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: functions}}
+            /storage/sites: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: sites}}
+            /storage/builds: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: builds}}
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: _APP_ENV, v: production}
+            - {k: _APP_OPENSSL_KEY_V1, v: "${secrets.OPENSSL_KEY}"}
+            - {k: _APP_CPU_NUM, v: "${{ params.cpuNum }}"}
+            # Upstream's values for the combined worker: one process, and a connection
+            # pool as large as the jobs all its queues may run at once.
+            - {k: _APP_WORKERS_NUM, v: "1"}
+            - {k: _APP_WORKER_MAX_COROUTINES, v: "78"}
+            - {k: _APP_DOMAIN, v: "${{ params.hostname }}"}
+            - {k: _APP_DOMAIN_TARGET_CNAME, v: "${{ params.hostname }}"}
+            - {k: _APP_OPTIONS_FORCE_HTTPS, v: disabled}
+            - {k: _APP_OPTIONS_ROUTER_FORCE_HTTPS, v: disabled}
+            - {k: _APP_DB_ADAPTER, v: postgresql}
+            - {k: _APP_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_DB_SCHEMA, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: _APP_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: _APP_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: _APP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - k: _APP_CONNECTIONS_DB_USAGE
+              v: >-
+                http://${{ deps.usage.ref.HIVEPAAS_USER }}:${{ deps.usage.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.usage.ref.HIVEPAAS_HOST }}:${{ deps.usage.ref.HIVEPAAS_PORT }}/${{
+                deps.usage.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: _APP_USAGE_STATS, v: enabled}
+            - {k: _APP_MIGRATION_HOST, v: "${{ comp.api.key }}"}
+            - {k: _APP_NOTIFICATIONS_TRACKING_SECRET, v: "${secrets.TRACKING_SECRET}"}
+            - {k: _APP_SYSTEM_EMAIL_NAME, v: "${{ params.emailName }}"}
+            - {k: _APP_SYSTEM_EMAIL_ADDRESS, v: "${{ params.emailAddress }}"}
+            - {k: _APP_SMTP_HOST, v: "${{ params.smtpHost }}"}
+            - {k: _APP_SMTP_PORT, v: "${{ params.smtpPort }}"}
+            - {k: _APP_SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+            - {k: _APP_SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+            - {k: _APP_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+            # Functions and Sites: the Executor runs them, the Orchestrator builds them.
+            - {k: _APP_EXECUTOR_HOST, v: "http://${{ comp.executor.key }}/v1"}
+            - {k: _APP_EXECUTOR_SECRET, v: "${secrets.EXECUTOR_SECRET}"}
+            - {k: _APP_JOBS_HOST, v: "http://${{ comp.orchestrator.key }}:8080"}
+            - {k: _APP_JOBS_SECRET, v: "${secrets.JOBS_SECRET}"}
+            # Where a build fetches its source and reports back from the env network.
+            - {k: _APP_JOBS_ENDPOINT, v: "http://${{ comp.api.key }}"}
+            # The volume every build mounts by name: the Orchestrator's Docker API gives the
+            # directory of /storage/builds for it, the one this app reads builds from.
+            - {k: _APP_BUILDS_VOLUME, v: appwrite-builds}
+            - {k: _APP_FUNCTIONS_RUNTIMES, v: "${{ params.functionsRuntimes }}"}
+            - {k: _APP_SITES_RUNTIMES, v: "${{ params.sitesRuntimes }}"}
+            - {k: _APP_DOMAIN_FUNCTIONS, v: "functions.${{ params.hostname }}"}
+            - {k: _APP_DOMAIN_SITES, v: "sites.${{ params.hostname }}"}
+            # The most a function, a site or a build may ask for, and so the most it is
+            # offered: the Docker API's limits below, which refuse anything more. Unset,
+            # Appwrite offers its largest, 8GB, and every build is refused.
+            - {k: _APP_COMPUTE_MEMORY, v: "4096"}
+            - {k: _APP_COMPUTE_CPUS, v: "2"}
+            - {k: _APP_COMPUTE_BUILD_TIMEOUT, v: "2700"}
+            - {k: _APP_FUNCTIONS_TIMEOUT, v: "900"}
+            - {k: _APP_SITES_TIMEOUT, v: "900"}
+        secrets:
+          OPENSSL_KEY:
+            value: "${{ params.opensslKey }}"
+          TRACKING_SECRET:
+            value: "${{ params.trackingSecret }}"
+          SMTP_PASSWORD:
+            value: "${{ params.smtpPassword }}"
+          EXECUTOR_SECRET:
+            value: "${{ params.executorSecret }}"
+          JOBS_SECRET:
+            value: "${{ params.jobsSecret }}"
+
+  # ── Scheduler ────────────────────────────────────────────────────────────
+  - name: scheduler
+    title: Scheduler
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Combined, as the worker: the function, execution and message schedules in one.
+          command: schedule
+        resources:
+          limits: {memory: 384MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: _APP_ENV, v: production}
+            - {k: _APP_OPENSSL_KEY_V1, v: "${secrets.OPENSSL_KEY}"}
+            - {k: _APP_CPU_NUM, v: "${{ params.cpuNum }}"}
+            - {k: _APP_WORKER_MAX_COROUTINES, v: "8"}
+            - {k: _APP_DOMAIN, v: "${{ params.hostname }}"}
+            - {k: _APP_OPTIONS_FORCE_HTTPS, v: disabled}
+            - {k: _APP_DB_ADAPTER, v: postgresql}
+            - {k: _APP_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_DB_SCHEMA, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: _APP_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: _APP_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: _APP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - k: _APP_CONNECTIONS_DB_USAGE
+              v: >-
+                http://${{ deps.usage.ref.HIVEPAAS_USER }}:${{ deps.usage.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.usage.ref.HIVEPAAS_HOST }}:${{ deps.usage.ref.HIVEPAAS_PORT }}/${{
+                deps.usage.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: _APP_USAGE_STATS, v: enabled}
+            - {k: _APP_MIGRATION_HOST, v: "${{ comp.api.key }}"}
+        secrets:
+          OPENSSL_KEY:
+            value: "${{ params.opensslKey }}"
+
+  # ── Maintenance ──────────────────────────────────────────────────────────
+  - name: maintenance
+    title: Maintenance
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: maintenance
+        resources:
+          limits: {memory: 384MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: _APP_ENV, v: production}
+            - {k: _APP_EDITION, v: self-hosted}
+            - {k: _APP_OPENSSL_KEY_V1, v: "${secrets.OPENSSL_KEY}"}
+            - {k: _APP_CPU_NUM, v: "${{ params.cpuNum }}"}
+            - {k: _APP_DOMAIN, v: "${{ params.hostname }}"}
+            - {k: _APP_DOMAIN_TARGET_CNAME, v: "${{ params.hostname }}"}
+            - {k: _APP_ROUTER_AUTO_CERTIFICATES, v: disabled}
+            - {k: _APP_DB_ADAPTER, v: postgresql}
+            - {k: _APP_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_DB_SCHEMA, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: _APP_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: _APP_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: _APP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        secrets:
+          OPENSSL_KEY:
+            value: "${{ params.opensslKey }}"
+
+  # ── Interval ─────────────────────────────────────────────────────────────
+  - name: interval
+    title: Interval
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: interval
+        resources:
+          limits: {memory: 384MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: _APP_ENV, v: production}
+            - {k: _APP_OPENSSL_KEY_V1, v: "${secrets.OPENSSL_KEY}"}
+            - {k: _APP_CPU_NUM, v: "${{ params.cpuNum }}"}
+            - {k: _APP_DOMAIN, v: "${{ params.hostname }}"}
+            - {k: _APP_DOMAIN_TARGET_CNAME, v: "${{ params.hostname }}"}
+            - {k: _APP_DB_ADAPTER, v: postgresql}
+            - {k: _APP_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_DB_SCHEMA, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: _APP_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: _APP_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: _APP_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: _APP_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: _APP_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        secrets:
+          OPENSSL_KEY:
+            value: "${{ params.opensslKey }}"
+
+  # ── Executor ─────────────────────────────────────────────────────────────
+  # Runs functions and sites, each in a runtime container of its own that it starts
+  # through the Docker API HivePaaS gives it, on its own network, where it reaches them.
+  - name: executor
+    title: Executor
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Its Docker client has the socket's path written in, where the Docker API is
+          # not: the link puts the one it is given there.
+          command: sh -c 'ln -sf /var/run/hivepaas/docker.sock /var/run/docker.sock && exec php app/http.php'
+        storage:
+          mounts:
+            /storage/builds: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: builds}}
+            /storage/functions: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: functions}}
+            /storage/sites: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: sites}}
+            # Where it unpacks each runtime's code and logs, and binds them from; upstream
+            # binds the node's own /tmp.
+            /tmp: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: executor}}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: >-
+              curl -fsS -o /dev/null -H "Authorization: Bearer $OPR_EXECUTOR_SECRET" http://localhost/v1/health
+            interval: 20s
+            timeout: 5s
+            # It pulls the runtime images before it answers.
+            startPeriod: 300s
+            retries: 5
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: DOCKER_HOST, v: "${HIVEPAAS_DOCKER_HOST}"}
+            # Its runtimes join the network HivePaaS gives its Docker API, which it is on too.
+            - {k: OPR_EXECUTOR_NETWORK, v: "${HIVEPAAS_DOCKER_NETWORK}"}
+            - {k: OPR_EXECUTOR_IMAGES, v: "${{ params.runtimeImages }}"}
+            - {k: OPR_EXECUTOR_RUNTIMES, v: "${{ params.functionsRuntimes }},${{ params.sitesRuntimes }}"}
+            - {k: OPR_EXECUTOR_SECRET, v: "${secrets.EXECUTOR_SECRET}"}
+            - {k: OPR_EXECUTOR_ENV, v: production}
+            - {k: OPR_EXECUTOR_RUNTIME_VERSIONS, v: v5}
+            - {k: OPR_EXECUTOR_INACTIVE_THRESHOLD, v: "60"}
+            - {k: OPR_EXECUTOR_MAINTENANCE_INTERVAL, v: "3600"}
+            - {k: OPR_EXECUTOR_CONNECTION_STORAGE, v: "local://localhost"}
+            - {k: OPEN_RUNTIMES_NFT, v: enabled}
+        secrets:
+          EXECUTOR_SECRET:
+            value: "${{ params.executorSecret }}"
+        dockerApi:
+          images: ["openruntimes/*"]
+          sharedDirs: [/tmp]
+          # networks: its own, which it checks for and connects itself to as it starts.
+          # exec: it runs commands in a runtime to read what it logged.
+          allow: [exec, networks]
+          limits: {containers: 50, memory: 4gb, cpus: 2}
+
+  # ── Orchestrator ─────────────────────────────────────────────────────────
+  # Runs every build of a function or a site: a sidecar that fetches the source from the
+  # API, and a worker that builds it into /storage/builds, both through the Docker API
+  # HivePaaS gives it, on the env network where they reach the API.
+  - name: orchestrator
+    title: Orchestrator
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /storage/builds: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: builds}}
+        container:
+          healthcheck:
+            enabled: true
+            # The image has no shell; the binary answers for itself.
+            mode: CMD
+            command: /ko-app/orchestrator -check-ready
+            interval: 20s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: DOCKER_HOST, v: "${HIVEPAAS_DOCKER_HOST}"}
+            - {k: ORCHESTRATOR_BACKEND, v: docker}
+            - {k: ORCHESTRATOR_NETWORK, v: "${HIVEPAAS_DOCKER_ENV_NETWORK}"}
+            - {k: DOCKER_NETWORK, v: "${HIVEPAAS_DOCKER_ENV_NETWORK}"}
+            - {k: ARTIFACT_ENDPOINT, v: "http://${{ comp.orchestrator.key }}:8080"}
+            # Upstream leaves its API open. Here every app of the env reaches it, so it
+            # takes the key the API and the Worker call it with.
+            - {k: API_KEY_FILE, v: /run/secrets/jobs-api-key}
+        secrets:
+          JOBS_SECRET:
+            value: "${{ params.jobsSecret }}"
+            swarmRef:
+              file: {name: /run/secrets/jobs-api-key, mode: 444}
+        dockerApi:
+          images: ["openruntimes/*", "ghcr.io/open-runtimes/orchestrator/job-sidecar"]
+          sharedDirs: [/storage/builds]
+          # What Appwrite names the builds volume: the directory above, the one the API,
+          # the Worker and the Executor read builds from.
+          sharedVolumes: {appwrite-builds: /storage/builds}
+          # Builds fetch their source from the API, and report to the Orchestrator.
+          networks: [env]
+          # volumes: a workspace volume of its own for every build.
+          allow: [volumes]
+          limits: {containers: 20, memory: 4gb, cpus: 2}
+
+  # ── Geo ──────────────────────────────────────────────────────────────────
+  - name: geo
+    title: Geo
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: >-
+              php -r "exit(json_decode(file_get_contents('http://localhost/v1/health'))->status === 'ok' ? 0 : 1);"
+            interval: 20s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: appwrite, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: GEO_SECRET, v: "${secrets.GEO_SECRET}"}
+        secrets:
+          GEO_SECRET:
+            value: "${{ params.geoSecret }}"

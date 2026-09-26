@@ -761,6 +761,147 @@
       }
     },
     {
+      "name": "appwrite",
+      "file": {
+        "path": "templates/appwrite.yaml",
+        "sha256": "7e436729ec494477fc8bd17d648d0fd2cb821297b966e0b7ddc40130ce44782e"
+      },
+      "icon": {
+        "path": "icons/appwrite.svg",
+        "sha256": "53aa5bb095e01b3e9f1295bbb9ae2b7708606db4d272cfbc6508878ccdaa18e9"
+      },
+      "title": "Appwrite",
+      "tagline": "Auth, databases, storage, messaging and realtime behind one API and console",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "document",
+        "identity",
+        "object-storage",
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "baas",
+        "backend as a service",
+        "firebase alternative",
+        "appwrite console"
+      ],
+      "license": "BSD-3-Clause",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "appwrite-postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Cache and queues",
+          "template": "redis"
+        },
+        {
+          "name": "usage",
+          "title": "Usage statistics",
+          "template": "clickhouse"
+        }
+      ],
+      "components": [
+        {
+          "name": "gw",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "api",
+          "title": "API"
+        },
+        {
+          "name": "console",
+          "title": "Console"
+        },
+        {
+          "name": "realtime",
+          "title": "Realtime"
+        },
+        {
+          "name": "worker",
+          "title": "Worker"
+        },
+        {
+          "name": "scheduler",
+          "title": "Scheduler"
+        },
+        {
+          "name": "maintenance",
+          "title": "Maintenance"
+        },
+        {
+          "name": "interval",
+          "title": "Interval"
+        },
+        {
+          "name": "executor",
+          "title": "Executor"
+        },
+        {
+          "name": "orchestrator",
+          "title": "Orchestrator"
+        },
+        {
+          "name": "geo",
+          "title": "Geo"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.3",
+          "release": "2.3.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      },
+      "requiresDockerApi": true
+    },
+    {
+      "name": "appwrite-postgres",
+      "file": {
+        "path": "templates/appwrite-postgres.yaml",
+        "sha256": "3b8e8c48747d179fccb088a467d5caac3b6171120ce7a8a456da2d05ac2381b4"
+      },
+      "icon": {
+        "path": "icons/postgres.svg",
+        "sha256": "bc45b1c56d0b1501dea387dbec4fda450d2ebc35244a620791815509d8c41dba"
+      },
+      "title": "PostgreSQL (Appwrite)",
+      "tagline": "PostgreSQL with PostGIS and pgvector, built by Appwrite for their own stack",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "geospatial",
+        "vector",
+        "open-source"
+      ],
+      "license": "MIT",
+      "internal": true,
+      "versions": [
+        {
+          "name": "18",
+          "release": "18.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "audiobookshelf",
       "file": {
         "path": "templates/audiobookshelf.yaml",

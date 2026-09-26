@@ -1,0 +1,102 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: appwrite-postgres
+  title: PostgreSQL (Appwrite)
+  tagline: PostgreSQL with PostGIS and pgvector, built by Appwrite for their own stack
+  description: |
+    This is `appwrite/postgres`: the official PostgreSQL image with PostGIS and pgvector
+    added. Appwrite enables both, and `pg_trgm`, in its database on its first start - its
+    spatial and vector attributes are built on them - and refuses to start against a
+    PostgreSQL that does not have them. It is not meant to be picked on its own - it is what
+    the **Appwrite** template uses as its database.
+  categories: [databases/sql]
+  tags: [sql, relational, geospatial, vector, open-source]
+  icon: icons/postgres.svg
+  links:
+    website: https://appwrite.io
+    documentation: https://appwrite.io/docs/advanced/self-hosting
+    source: https://github.com/appwrite/docker-postgres
+  license: MIT
+  # Not offered on its own: it exists for the Appwrite template to depend on. See
+  # docs/superpowers/specs/2026-09-22-app-template-components-design.md §7 in the hivepaas
+  # repository.
+  internal: true
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: appwrite
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: appwrite
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on.
+    type: volume
+
+versions:
+  # The image's own version is Appwrite's, not PostgreSQL's: 0.1.0 is PostgreSQL 18.3.
+  # It is the one Appwrite's own installation pins.
+  - name: "18"
+    release: "18.3"
+    default: true
+    image: appwrite/postgres:0.1.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # From 18 on, the image declares its volume at /var/lib/postgresql and keeps
+        # each major's data in its own directory under it.
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        # The user the image creates is a superuser, which is what Appwrite needs: PostGIS
+        # is not an extension an ordinary owner may create.
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+    routing:
+      port: 5432
