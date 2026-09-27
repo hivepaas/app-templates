@@ -62,6 +62,10 @@ dependencies:
     title: Redis
     template: redis
     version: "8.10"
+    params:
+      # It holds AFFiNE's job queue, so evicting a key would lose work rather than a
+      # cached value: Redis refuses writes when it is full instead.
+      evictionPolicy: noeviction
 
 versions:
   - name: "0.27"
@@ -74,9 +78,11 @@ app:
     source:
       activeMethod: image
       imageSource: {image: "${{ image }}"}
+      # Migrations first, then the server: 0.27's entry point is dist/main.js, the
+      # image's own command.
       command: >-
         sh -c 'node ./scripts/self-host-predeploy.js &&
-        exec node ./dist/index.js'
+        exec node ./dist/main.js'
     storage:
       mounts:
         /root/.affine/storage:
