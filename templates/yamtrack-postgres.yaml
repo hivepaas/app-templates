@@ -1,0 +1,101 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: yamtrack-postgres
+  title: Yamtrack with PostgreSQL
+  tagline: A media tracker, keeping its records in a PostgreSQL database
+  description: |
+    This is [Yamtrack](yamtrack), with its data stored in a PostgreSQL database
+    rather than SQLite. It tracks movies, TV shows, anime, manga, video games,
+    books and comics with multi-user support and third-party sync integrations.
+
+    **This template creates three apps**
+
+    - **Yamtrack**, running the web interface and API
+    - **a PostgreSQL database** for persistent records, named with `-db`
+    - **a Redis cache** for queues and session management, named with `-cache`
+  categories: [webapps/media]
+  tags: [sql, tasks, open-source]
+  aliases: [media-tracker, entertainment, trakt, tracker, yamtrack postgres]
+  icon: icons/yamtrack.png
+  links:
+    website: https://fuzzygrim.github.io/Yamtrack
+    documentation: https://fuzzygrim.github.io/Yamtrack
+    source: https://github.com/FuzzyGrim/Yamtrack
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: secret
+    title: Secret key
+    description: What signs the session tokens. Leave empty to generate one.
+    type: secret
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: yamtrack
+      username: yamtrack
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "0.26"
+    release: "0.26.3"
+    default: true
+    image: ghcr.io/fuzzygrim/yamtrack:0.26.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: yamtrack
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: UTC}
+        - {k: SECRET, v: "${secrets.SECRET}"}
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+    secrets:
+      SECRET:
+        value: "${{ params.secret }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1,0 +1,145 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gramps-web
+  title: Gramps Web
+  tagline: Collaborative genealogy server for your family tree
+  description: |
+    Gramps Web is a self-hosted web app for collaborative genealogy, allowing you
+    to browse, edit, and share your family history data from any device. It
+    features interactive family trees, media management, search indexing, and
+    bidirectional synchronization with the Gramps desktop application.
+
+    **This template sets up**
+
+    - **Gramps Web**, running the web API and embedded Celery background worker
+    - **a persistent data volume** for databases, media, caches, and search indexes
+    - **a Redis cache** for task queues and background processing
+  categories: [webapps/knowledge]
+  tags: [collaboration, documents, open-source]
+  aliases: [genealogy, family-tree, gramps, ancestry, family]
+  icon: icons/gramps-web.png
+  links:
+    website: https://grampsweb.org
+    documentation: https://grampsweb.org/docs/
+    source: https://github.com/gramps-project/gramps-web
+  license: AGPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: treeName
+    title: Tree name
+    description: The default name of your genealogy tree.
+    type: string
+    default: "My Family Tree"
+  - name: secretKey
+    title: Secret key
+    description: Cryptographic secret for signing sessions. Leave empty to generate one.
+    type: secret
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume family tree files, media, and search indexes are kept on.
+    type: volume
+
+dependencies:
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "25.7"
+    release: "25.7.0"
+    default: true
+    image: ghcr.io/gramps-project/grampsweb:25.7.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: >-
+        sh -c 'celery -A gramps_webapi.celery worker --loglevel=INFO --concurrency=2 &
+        exec gunicorn -w 4 -b 0.0.0.0:5000 gramps_webapi.wsgi:app --timeout 120 --limit-request-line 8190'
+    storage:
+      mounts:
+        /root/.gramps/grampsdb:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: db}
+        /app/users:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: users}
+        /app/indexdir:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: indexdir}
+        /app/thumbnail_cache:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: thumbnail_cache}
+        /app/cache:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: cache}
+        /app/secret:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: secret}
+        /app/media:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: media}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/5000' || exit 1"
+        interval: 15s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gramps-web
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: GRAMPSWEB_TREE, v: "${{ params.treeName }}"}
+        - {k: GRAMPSWEB_SECRET_KEY, v: "${secrets.GRAMPSWEB_SECRET_KEY}"}
+        - k: GRAMPSWEB_CELERY_CONFIG__broker_url
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/0
+        - k: GRAMPSWEB_CELERY_CONFIG__result_backend
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/0
+    secrets:
+      GRAMPSWEB_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

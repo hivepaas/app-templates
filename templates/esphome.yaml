@@ -1,0 +1,75 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: esphome
+  title: ESPHome
+  tagline: Control ESP8266 and ESP32 boards with simple YAML configuration files
+  description: |
+    ESPHome is a system that lets you control your ESP8266 and ESP32 boards
+    through simple and powerful YAML configuration files, and control them
+    remotely through Home Automation systems like Home Assistant.
+
+    **This template sets up**
+
+    - ESPHome dashboard web interface running on port 6052
+    - A persistent volume keeping all device YAML configurations and compiled firmware
+    - Configurable memory limits
+  categories: [webapps/automation]
+  tags: [automation, iot, open-source]
+  aliases: [esp, esp32, esp8266, smart home, home automation, firmware]
+  icon: icons/esphome.svg
+  links:
+    website: https://esphome.io
+    documentation: https://esphome.io/guides/getting_started_command_line#docker
+    source: https://github.com/esphome/esphome
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: Compiling firmware for ESP32/ESP8266 takes significant CPU and memory.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: configVolume
+    title: Configuration volume
+    description: The volume device configurations and build files are kept on.
+    type: volume
+
+versions:
+  - name: "2026.9"
+    release: "2026.9.0"
+    default: true
+    image: ghcr.io/esphome/esphome:2026.9.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.configVolume }}"}
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: esphome
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 6052
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

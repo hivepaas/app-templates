@@ -1,0 +1,113 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: affine
+  title: AFFiNE
+  tagline: A workspace for notes, whiteboards and docs that stays yours
+  description: |
+    AFFiNE is a next-generation collaborative workspace that merges docs,
+    whiteboards and database tables in one canvas. It is a local-first,
+    privacy-focused alternative to Notion and Miro.
+
+    **This template creates three apps**
+
+    - **AFFiNE**, running the web interface, sync engine and migration scripts
+    - **a PostgreSQL database** for structured data, named with `-db`
+    - **a Redis cache** for real-time collaboration and background queues, named with `-cache`
+
+    **After the first deployment**
+
+    Open the app to register your initial administrator account and set up
+    your first collaborative workspace.
+  categories: [webapps/knowledge]
+  tags: [whiteboard, notes, collaboration, open-source]
+  aliases: [notes, notion alternative, miro alternative, knowledge base, whiteboard]
+  icon: icons/affine.svg
+  links:
+    website: https://affine.pro
+    documentation: https://docs.affine.pro/
+    source: https://github.com/toeverything/AFFiNE
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume documents, attachments, and configurations are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "18"
+    params:
+      dbName: affine
+      username: affine
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "0.27"
+    release: "0.27.4"
+    default: true
+    image: ghcr.io/toeverything/affine:0.27.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: >-
+        sh -c 'node ./scripts/self-host-predeploy.js &&
+        exec node ./dist/index.js'
+    storage:
+      mounts:
+        /root/.affine/storage:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: storage}
+        /root/.affine/config:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: affine
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: REDIS_SERVER_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+        - {k: REDIS_SERVER_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        - {k: REDIS_SERVER_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable
+        - {k: AFFINE_INDEXER_ENABLED, v: "false"}
+    routing:
+      port: 3010
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

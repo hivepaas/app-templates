@@ -1,0 +1,80 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: imgcompress
+  title: ImgCompress
+  tagline: A lightweight and simple web image compressor
+  description: |
+    ImgCompress is a self-hosted tool for compressing images in the browser.
+    It supports multiple image formats, batch processing, and customizable
+    compression settings with a simple web interface.
+
+    **This template sets up**
+
+    - ImgCompress running on port 5000
+    - Health checks on container healthcheck script
+    - Configurable memory limits
+  categories: [webapps/documents]
+  tags: [files, open-source]
+  aliases: [image-compressor, image-optimizer, tinypng, compressor]
+  icon: icons/imgcompress.png
+  links:
+    website: https://github.com/karimz1/imgcompress
+    documentation: https://github.com/karimz1/imgcompress
+    source: https://github.com/karimz1/imgcompress
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+versions:
+  - name: "0.9"
+    release: "0.9.0"
+    default: true
+    image: karimz1/imgcompress:0.9.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD
+        command: python /container/healthcheck.py
+        interval: 30s
+        timeout: 10s
+        startPeriod: 15s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: imgcompress
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DISABLE_LOGO, v: "false"}
+        - {k: DISABLE_STORAGE_MANAGEMENT, v: "false"}
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

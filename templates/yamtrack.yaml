@@ -1,0 +1,96 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: yamtrack
+  title: Yamtrack
+  tagline: A media tracker for movies, shows, games, books and comics
+  description: |
+    Yamtrack is a self-hosted media tracker for everything you watch, read or play:
+    movies, television, anime, manga, video games, books and comics. It features
+    a unified dashboard, sync integrations with external services like Trakt,
+    Simkl, AniList, Plex and Jellyfin, and multi-user support.
+
+    **This template sets up**
+
+    - **Yamtrack**, with an SQLite database on a persistent volume
+    - **a Redis cache** for background tasks and session state
+  categories: [webapps/media]
+  tags: [tasks, open-source]
+  aliases: [media-tracker, entertainment, trakt, tracker]
+  icon: icons/yamtrack.png
+  links:
+    website: https://fuzzygrim.github.io/Yamtrack
+    documentation: https://fuzzygrim.github.io/Yamtrack
+    source: https://github.com/FuzzyGrim/Yamtrack
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: secret
+    title: Secret key
+    description: What signs the session tokens. Leave empty to generate one.
+    type: secret
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the SQLite database is kept on.
+    type: volume
+
+dependencies:
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "0.26"
+    release: "0.26.3"
+    default: true
+    image: ghcr.io/fuzzygrim/yamtrack:0.26.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /yamtrack/db: {type: volume, source: "${{ params.dataVolume }}"}
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: yamtrack
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: UTC}
+        - {k: SECRET, v: "${secrets.SECRET}"}
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
+    secrets:
+      SECRET:
+        value: "${{ params.secret }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

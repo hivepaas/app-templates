@@ -1,0 +1,87 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: convertx
+  title: ConvertX
+  tagline: Self-hosted multi-format file converter supporting over 1,000 formats
+  description: |
+    ConvertX is an open-source, self-hosted file conversion platform that runs
+    locally on your infrastructure. It supports over 1,000 file formats across
+    documents, images, audio, video, and archives using tools like FFmpeg,
+    LibreOffice, ImageMagick, Pandoc, and Calibre.
+
+    **This template sets up**
+
+    - **ConvertX**, with a persistent volume for temporary files and conversions
+    - Web interface on port 3000
+    - A cryptographic secret key for session management
+  categories: [webapps/documents]
+  tags: [files, documents, open-source]
+  aliases: [file-converter, convert, converter, media-converter, pdf-converter]
+  icon: icons/convertx.svg
+  links:
+    website: https://github.com/C4illin/ConvertX
+    documentation: https://github.com/C4illin/ConvertX
+    source: https://github.com/C4illin/ConvertX
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: jwtSecret
+    title: JWT secret
+    description: What signs user session tokens. Leave empty to generate one.
+    type: secret
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: Converting large media or document files can be memory-intensive.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume converted files, uploads and internal database are kept on.
+    type: volume
+
+versions:
+  - name: "0.19"
+    release: "0.19.0"
+    default: true
+    image: ghcr.io/c4illin/convertx:v0.19.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: convertx
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

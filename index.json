@@ -607,6 +607,58 @@
       }
     },
     {
+      "name": "affine",
+      "file": {
+        "path": "templates/affine.yaml",
+        "sha256": "c1303c35edb8598664499c69527a5a6715eec0ac4c10c13b9f035b20d8578053"
+      },
+      "icon": {
+        "path": "icons/affine.svg",
+        "sha256": "92c92b9ef8b167398764f258df5cbe9af69d49bc45585ec573279af2ee8187a1"
+      },
+      "title": "AFFiNE",
+      "tagline": "A workspace for notes, whiteboards and docs that stays yours",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "whiteboard",
+        "notes",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "notes",
+        "notion alternative",
+        "miro alternative",
+        "knowledge base",
+        "whiteboard"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.27",
+          "release": "0.27.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "alertmanager",
       "file": {
         "path": "templates/alertmanager.yaml",
@@ -638,6 +690,65 @@
         {
           "name": "0.28",
           "release": "0.28.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "alexandrie",
+      "file": {
+        "path": "templates/alexandrie.yaml",
+        "sha256": "9530f6db3239a7c83acf131ee27eaf7e349b8f1812750665682b9ca90c689e1d"
+      },
+      "icon": {
+        "path": "icons/alexandrie.svg",
+        "sha256": "43938cb80265362ced0f77fe123a582b191fc6db8713649462dea63cbd831587"
+      },
+      "title": "Alexandrie",
+      "tagline": "An open-source knowledge base and collaborative Markdown workspace",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "collaboration",
+        "notes",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "wiki",
+        "knowledge base",
+        "notion alternative",
+        "obsidian alternative",
+        "notes",
+        "alexandrie"
+      ],
+      "license": "AGPL-3.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "components": [
+        {
+          "name": "frontend",
+          "title": "Frontend",
+          "primary": true
+        },
+        {
+          "name": "backend",
+          "title": "Backend"
+        }
+      ],
+      "versions": [
+        {
+          "name": "8.14",
+          "release": "8.14.2",
           "default": true
         }
       ],
@@ -1769,6 +1880,45 @@
       }
     },
     {
+      "name": "convertx",
+      "file": {
+        "path": "templates/convertx.yaml",
+        "sha256": "bc48826d5c0594085ea2269638441bb3146e319a2e88dd25ddb7a01866d34cc3"
+      },
+      "icon": {
+        "path": "icons/convertx.svg",
+        "sha256": "1e1b94b606cad0b903a705317535e51ebef83ff03ab6de767d40f6bafa6c2da5"
+      },
+      "title": "ConvertX",
+      "tagline": "Self-hosted multi-format file converter supporting over 1,000 formats",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "files",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "file-converter",
+        "convert",
+        "converter",
+        "media-converter",
+        "pdf-converter"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.19",
+          "release": "0.19.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "copyparty",
       "file": {
         "path": "templates/copyparty.yaml",
@@ -2463,6 +2613,46 @@
         {
           "name": "1.12",
           "release": "1.12.28",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "esphome",
+      "file": {
+        "path": "templates/esphome.yaml",
+        "sha256": "4eabc0787ab52fa42e21ab28bc99413241621088b99cc437d728f35a4a333627"
+      },
+      "icon": {
+        "path": "icons/esphome.svg",
+        "sha256": "4884fb566871c7588fd6c1efcac551ae2bccc5b2b7915362b98528d1508aac7e"
+      },
+      "title": "ESPHome",
+      "tagline": "Control ESP8266 and ESP32 boards with simple YAML configuration files",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation",
+        "iot",
+        "open-source"
+      ],
+      "aliases": [
+        "esp",
+        "esp32",
+        "esp8266",
+        "smart home",
+        "home automation",
+        "firmware"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "2026.9",
+          "release": "2026.9.0",
           "default": true
         }
       ],
@@ -4091,6 +4281,52 @@
       }
     },
     {
+      "name": "gramps-web",
+      "file": {
+        "path": "templates/gramps-web.yaml",
+        "sha256": "e5458749ebb5b92f2bc4dc7657aa36c5d6a7329b0aa7e0b47d4413b9f1276f3c"
+      },
+      "icon": {
+        "path": "icons/gramps-web.png",
+        "sha256": "d0d2a4c6185d0f57b3ec21540ade7ede12a24fec1b79c1e6fc3980c658121c4b"
+      },
+      "title": "Gramps Web",
+      "tagline": "Collaborative genealogy server for your family tree",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "collaboration",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "genealogy",
+        "family-tree",
+        "gramps",
+        "ancestry",
+        "family"
+      ],
+      "license": "AGPL-3.0-or-later",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "25.7",
+          "release": "25.7.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "grav",
       "file": {
         "path": "templates/grav.yaml",
@@ -4638,6 +4874,43 @@
         {
           "name": "1.4",
           "release": "1.4.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "imgcompress",
+      "file": {
+        "path": "templates/imgcompress.yaml",
+        "sha256": "a557f81244a97fca072c5ceff30f4e3756c508c5a20c9743f21e22666e84cde1"
+      },
+      "icon": {
+        "path": "icons/imgcompress.png",
+        "sha256": "c73d5b8c9263c6cb3bb60c8b1ed48130d721cc388b836ab2252d5ac74cfe88bd"
+      },
+      "title": "ImgCompress",
+      "tagline": "A lightweight and simple web image compressor",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "image-compressor",
+        "image-optimizer",
+        "tinypng",
+        "compressor"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.9",
+          "release": "0.9.0",
           "default": true
         }
       ],
@@ -5842,6 +6115,48 @@
         {
           "name": "0.8",
           "release": "0.8.7",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "libreoffice",
+      "file": {
+        "path": "templates/libreoffice.yaml",
+        "sha256": "35ac9f73d547bf2413d2e4fc7c6e68344f9859a7bc1c9cd47572dd1323f3e298"
+      },
+      "icon": {
+        "path": "icons/libreoffice.svg",
+        "sha256": "865890340e369cafc9369a8e6ec70fbfac10a9d5862af04dc10dc764509eb855"
+      },
+      "title": "LibreOffice",
+      "tagline": "The complete open-source office suite running in your browser",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "spreadsheet",
+        "open-source"
+      ],
+      "aliases": [
+        "office",
+        "word",
+        "excel",
+        "powerpoint",
+        "documents",
+        "spreadsheet",
+        "writer",
+        "calc"
+      ],
+      "license": "MPL-2.0",
+      "versions": [
+        {
+          "name": "25.8",
+          "release": "25.8.7",
           "default": true
         }
       ],
@@ -12320,6 +12635,101 @@
         {
           "name": "7.1",
           "release": "7.1.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "yamtrack",
+      "file": {
+        "path": "templates/yamtrack.yaml",
+        "sha256": "9c070231c353588f51221b8488469bb0e0bbc687c2a20f53a14c084c02734207"
+      },
+      "icon": {
+        "path": "icons/yamtrack.png",
+        "sha256": "5ab32340a3ccf36c4be0b18a7a38b55b1a99adc9e29a638fbc0510d271fd670c"
+      },
+      "title": "Yamtrack",
+      "tagline": "A media tracker for movies, shows, games, books and comics",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "media-tracker",
+        "entertainment",
+        "trakt",
+        "tracker"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.26",
+          "release": "0.26.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "yamtrack-postgres",
+      "file": {
+        "path": "templates/yamtrack-postgres.yaml",
+        "sha256": "05e2a06dafbb69ed7ee310c561dffeb0c6324d94e3b03ed7a88f2efb05c25b3d"
+      },
+      "icon": {
+        "path": "icons/yamtrack.png",
+        "sha256": "5ab32340a3ccf36c4be0b18a7a38b55b1a99adc9e29a638fbc0510d271fd670c"
+      },
+      "title": "Yamtrack with PostgreSQL",
+      "tagline": "A media tracker, keeping its records in a PostgreSQL database",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "sql",
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "media-tracker",
+        "entertainment",
+        "trakt",
+        "tracker",
+        "yamtrack postgres"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.26",
+          "release": "0.26.3",
           "default": true
         }
       ],

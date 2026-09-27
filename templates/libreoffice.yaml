@@ -1,0 +1,86 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: libreoffice
+  title: LibreOffice
+  tagline: The complete open-source office suite running in your browser
+  description: |
+    LibreOffice is a powerful, free and open-source personal productivity suite
+    giving you Writer (word processing), Calc (spreadsheets), Impress (presentations),
+    Draw (vector graphics), Math (formula editor), and Base (databases).
+
+    This container runs the full desktop application in a browser window via
+    web streaming without installing software on client machines.
+
+    **This template sets up**
+
+    - LibreOffice desktop suite running in the browser on port 3000
+    - A persistent volume keeping your documents, templates and settings
+    - Configurable memory limits
+  categories: [webapps/documents]
+  tags: [documents, spreadsheet, open-source]
+  aliases: [office, word, excel, powerpoint, documents, spreadsheet, writer, calc]
+  icon: icons/libreoffice.svg
+  links:
+    website: https://www.libreoffice.org
+    documentation: https://docs.linuxserver.io/images/docker-libreoffice/
+    source: https://github.com/linuxserver/docker-libreoffice
+  license: MPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: Running an office suite in a virtual desktop uses noticeable memory.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Storage volume
+    description: The volume documents, templates, and application settings are kept on.
+    type: volume
+
+versions:
+  - name: "25.8"
+    release: "25.8.7"
+    default: true
+    image: lscr.io/linuxserver/libreoffice:25.8.7.3-r0-ls3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself.
+      init: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: libreoffice
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: UTC}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
