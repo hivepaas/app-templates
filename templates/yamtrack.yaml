@@ -15,6 +15,25 @@ metadata:
 
     - **Yamtrack**, with an SQLite database on a persistent volume
     - **a Redis cache** for background tasks and session state
+
+    **Signing in**
+
+    There is no default account and no administrator to create: open the app and register
+    one at `/signup/` - the sign-in page links to it. Every account is an ordinary user who
+    tracks their own media; the first one has no special rights.
+
+    **Close registration once your accounts exist**
+
+    While registration is on, which it is by default, anyone who can reach the address can
+    make an account. Once everyone who should have one does, add the env var
+    `REGISTRATION` with the value `False` in the app's env vars, and redeploy.
+
+    **The admin interface is off**
+
+    Django's admin - raw access to every table - is disabled, and day-to-day use never
+    needs it. To open it at `/admin/`, set `ADMIN_ENABLED` to `True`, then give an account
+    staff rights from a shell in the app's container:
+    `python manage.py shell -c "from django.contrib.auth import get_user_model; get_user_model().objects.filter(username='you').update(is_staff=True, is_superuser=True)"`
   categories: [webapps/media]
   tags: [tasks, open-source]
   aliases: [media-tracker, entertainment, trakt, tracker]

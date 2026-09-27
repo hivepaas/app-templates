@@ -12646,7 +12646,7 @@
       "name": "yamtrack",
       "file": {
         "path": "templates/yamtrack.yaml",
-        "sha256": "9c070231c353588f51221b8488469bb0e0bbc687c2a20f53a14c084c02734207"
+        "sha256": "9b1c6cc33112886f6c85baec8e99961bcbe4139cc3f84c09fb0363e51f66ccba"
       },
       "icon": {
         "path": "icons/yamtrack.png",
