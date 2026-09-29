@@ -1,0 +1,167 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: hatchet
+  title: Hatchet
+  tagline: Background tasks and durable workflows for your apps, with a dashboard
+  description: |
+    Hatchet runs your app's background work: a task queue with retries, timeouts,
+    concurrency and rate limits, workflows of several steps that survive a restart, cron
+    and scheduled runs, and events that start them. Your code runs in your own workers,
+    written with its SDKs for Python, TypeScript, Go and Ruby; Hatchet hands them the
+    work and shows every run in its dashboard.
+
+    **This template creates two apps**
+
+    - **Hatchet Lite**: the engine, its API and the dashboard in one container, the
+      deployment Hatchet makes for small and medium volumes. Postgres is its queue as
+      well as its database.
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **Signing in**
+
+    Sign in with the administrator email and password; the password is under the app's
+    Secrets. Sign-up is closed: invite the others from the dashboard. The account is
+    created on the first start only, so change its password in the dashboard afterwards,
+    not in the Secrets.
+
+    **Connecting workers**
+
+    Create an API token in the dashboard, under the tenant's settings, and give it to the
+    worker as `HATCHET_CLIENT_TOKEN`, with `HATCHET_CLIENT_TLS_STRATEGY=none`. The token
+    tells the worker where Hatchet is: this app's gRPC port, 7077, on the project network.
+    So the workers are apps of the same project, and the port is not exposed publicly.
+
+    A token is tied to the app's address. Settle the domain before creating tokens: after
+    changing it, create them again.
+
+    **What to keep**
+
+    Hatchet's encryption and signing keys are generated on the first start, on the config
+    volume. Keep it with the database: without the keys, the tokens and the secrets
+    Hatchet stored stop working.
+  categories: [webapps/automation, webapps/dev-tools]
+  tags: [open-source]
+  aliases: [task-queue, workflows, background-jobs, durable-execution, celery-alternative, temporal-alternative, hatchet-lite]
+  icon: icons/hatchet.svg
+  links:
+    website: https://hatchet.run
+    documentation: https://docs.hatchet.run/self-hosting
+    source: https://github.com/hatchet-dev/hatchet
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address of the dashboard. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The first account, created on the first start. It is also what you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      Leave empty to generate one; it is kept under the app's Secrets. Hatchet wants 8 to
+      64 characters, with a lowercase letter, an uppercase letter and a digit.
+    type: secret
+    minLength: 12
+    # Long, so that a generated one lacks a digit or a case once in thousands of draws;
+    # the start command below refuses one that does, with a message saying why.
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: configVolume
+    title: Config volume
+    description: The volume Hatchet's generated keys are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: hatchet
+      username: hatchet
+
+versions:
+  - name: "0.107"
+    release: "v0.107.2"
+    default: true
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.107.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Hatchet refuses to start without an address and a cookie domain, which the app
+      # has none of until it has a domain: it then answers as localhost. And the
+      # administrator's password is checked here, as Hatchet would check it only after
+      # creating everything else, and then start with no account to sign in with.
+      command: >-
+        bash -c 'if [ -z "$SERVER_URL" ]; then export SERVER_URL=http://localhost:8888; fi;
+        if [ -z "$SERVER_AUTH_COOKIE_DOMAIN" ]; then export SERVER_AUTH_COOKIE_DOMAIN=localhost; fi;
+        if ! printf %s "$ADMIN_PASSWORD" | grep -q "[a-z]" || ! printf %s "$ADMIN_PASSWORD" | grep -q "[A-Z]" || ! printf %s "$ADMIN_PASSWORD" | grep -q "[0-9]";
+        then echo "ADMIN_PASSWORD needs a lowercase letter, an uppercase letter and a digit" >&2; exit 1; fi;
+        exec ./entrypoint.sh'
+    storage:
+      mounts:
+        # database.yaml and server.yaml, with the keys the first start generates. Later
+        # starts keep them, and take the settings below from the environment.
+        /config: {type: volume, source: "${{ params.configVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8888/api/ready
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: hatchet
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DATABASE_URL, v: "postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable"}
+        # The dashboard's address, which the tokens are issued for.
+        - {k: SERVER_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: SERVER_AUTH_COOKIE_DOMAIN, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: SERVER_AUTH_COOKIE_INSECURE, v: "f"}
+        - {k: SERVER_AUTH_SET_EMAIL_VERIFIED, v: "t"}
+        - {k: SERVER_ALLOW_SIGNUP, v: "f"}
+        # Workers connect over gRPC, unencrypted, on the project network: the address
+        # the tokens give them is this app's host there.
+        - {k: SERVER_GRPC_BIND_ADDRESS, v: "0.0.0.0"}
+        - {k: SERVER_GRPC_PORT, v: "7077"}
+        - {k: SERVER_GRPC_INSECURE, v: "t"}
+        - {k: SERVER_GRPC_BROADCAST_ADDRESS, v: "${HIVEPAAS_HOST}:7077"}
+        - {k: SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS, v: "localhost:7077"}
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8888
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

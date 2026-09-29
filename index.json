@@ -4469,6 +4469,53 @@
       }
     },
     {
+      "name": "hatchet",
+      "file": {
+        "path": "templates/hatchet.yaml",
+        "sha256": "4ff67157a69abaf4dc794f291ce488b1e02d733ad451d75514d89fd276f07f61"
+      },
+      "icon": {
+        "path": "icons/hatchet.svg",
+        "sha256": "35002c24350cb87cf7ed529192d93a695eef32ad86e967337b34cfe4f0ba2825"
+      },
+      "title": "Hatchet",
+      "tagline": "Background tasks and durable workflows for your apps, with a dashboard",
+      "categories": [
+        "webapps/automation",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "task-queue",
+        "workflows",
+        "background-jobs",
+        "durable-execution",
+        "celery-alternative",
+        "temporal-alternative",
+        "hatchet-lite"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.107",
+          "release": "v0.107.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "headscale",
       "file": {
         "path": "templates/headscale.yaml",
