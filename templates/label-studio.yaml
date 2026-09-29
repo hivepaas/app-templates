@@ -1,0 +1,150 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: label-studio
+  title: Label Studio
+  tagline: Label images, text, audio, video and time series for training data
+  description: |
+    Label Studio is a data labeling tool: bounding boxes and segmentation on images,
+    named entities and classification on text, transcription and diarization on audio,
+    key point and object tracking on video. Projects have templates for each, several
+    people can label the same project, and the output exports in the formats training
+    pipelines expect.
+
+    **What this template sets up**
+
+    - Label Studio, run through uwsgi rather than its own development server
+    - a volume for uploaded media and exports
+    - the first account, created on the first start
+
+    **Signing in**
+
+    Sign in with the administrator email and password; the password is under the app's
+    Secrets. New sign-ups are open to anyone who reaches the page by default - turn that
+    off in Organization settings once you have signed in, unless you mean to keep it open.
+
+    **What survives a redeployment**
+
+    Project data and settings are in the database. Uploaded files, and anything exported,
+    are on the volume - keep it with the database.
+  categories: [webapps/ai, webapps/dev-tools]
+  tags: [ai, open-source]
+  aliases: [labeling, annotation, data-labeling, training-data, labelbox-alternative, scale-ai-alternative]
+  icon: icons/label-studio.svg
+  links:
+    website: https://labelstud.io
+    documentation: https://labelstud.io/guide
+    source: https://github.com/HumanSignal/label-studio
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The first account, created on the first start. It is also what you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Signs sessions and cookies. Leave empty to generate one; changing it later signs
+      everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded media and exports are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: labelstudio
+      username: labelstudio
+
+versions:
+  - name: "1.23"
+    release: "1.23.2"
+    default: true
+    image: heartexlabs/label-studio:1.23.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The default command runs Django's own development server, which the image warns
+      # against using as-is. This runs the same WSGI app through uwsgi instead - the
+      # production path the project's own docker-compose puts behind nginx, which serves
+      # static files fine on its own and needs no separate reverse proxy here.
+      command: pyuwsgi --ini /label-studio/deploy/uwsgi.ini
+    storage:
+      mounts:
+        /label-studio/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: label-studio
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DJANGO_DB, v: "default"}
+        - {k: POSTGRE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: POSTGRE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: POSTGRE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: LABEL_STUDIO_HOST, v: "${HIVEPAAS_APP_URL}"}
+        # Seeds the first account. Once it exists, changing these does nothing further.
+        - {k: LABEL_STUDIO_USERNAME, v: "${{ params.adminEmail }}"}
+        - {k: LABEL_STUDIO_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        # A fixed key, so sessions survive a restart and it is never written, generated,
+        # to the data volume.
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

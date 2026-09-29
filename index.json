@@ -5954,6 +5954,53 @@
       }
     },
     {
+      "name": "label-studio",
+      "file": {
+        "path": "templates/label-studio.yaml",
+        "sha256": "38e0c91da14d533909f7aeb22edfe831691cf0fb5ae98c19a26df4dc3cf91eaa"
+      },
+      "icon": {
+        "path": "icons/label-studio.svg",
+        "sha256": "0abab2fa894d11b91a7ca22a51fb297e35c18ad5f0efeb5e17d21623eaeb2346"
+      },
+      "title": "Label Studio",
+      "tagline": "Label images, text, audio, video and time series for training data",
+      "categories": [
+        "webapps/ai",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "labeling",
+        "annotation",
+        "data-labeling",
+        "training-data",
+        "labelbox-alternative",
+        "scale-ai-alternative"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.23",
+          "release": "1.23.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "langflow",
       "file": {
         "path": "templates/langflow.yaml",
