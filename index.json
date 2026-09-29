@@ -7696,6 +7696,53 @@
       }
     },
     {
+      "name": "moodle",
+      "file": {
+        "path": "templates/moodle.yaml",
+        "sha256": "30b040e922709f86e5b431cd5b3df140d2d733761f79fe06c9302de078fa8a7c"
+      },
+      "icon": {
+        "path": "icons/moodle.svg",
+        "sha256": "6d8502c882d30238fc650fc556b0e0e5f555002744d42bf818ded70f1872a7b1"
+      },
+      "title": "Moodle",
+      "tagline": "Courses, assignments, quizzes and grades for a class, a school or a company",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "lms",
+        "e-learning",
+        "elearning",
+        "courses",
+        "school",
+        "classroom",
+        "learning management"
+      ],
+      "license": "GPL-3.0-or-later",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5.2",
+          "release": "5.2.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mosquitto",
       "file": {
         "path": "templates/mosquitto.yaml",

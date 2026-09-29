@@ -1,0 +1,153 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: moodle
+  title: Moodle
+  tagline: Courses, assignments, quizzes and grades for a class, a school or a company
+  description: |
+    Moodle is a learning management system: courses built from pages, files, forums,
+    assignments and quizzes, enrolment and roles, a gradebook, and a calendar of
+    deadlines. It is the LMS behind a large share of universities and schools running
+    their own, rather than a hosted one.
+
+    **This template creates two apps**
+
+    - **Moodle**, on a volume for uploaded files, course backups and generated content
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    The image is the community-maintained `alpine-moodle`, chosen because Moodle
+    publishes no image of its own: nginx and PHP-FPM in one container, built fresh for
+    each Moodle release, and small - about 100MB.
+
+    **The first account**
+
+    The administrator account below is created on the first start; sign in with it once
+    the app is up. `RUN_CRON_TASKS` keeps Moodle's own scheduled tasks running inside the
+    container - notifications, digests, cleanup - so nothing external has to call cron.
+
+    **What survives a redeployment**
+
+    The database, and the volume with uploaded files and course backups. Moodle's own
+    code is the image, not on the volume: an upgrade is choosing a newer version here, not
+    a step inside the app.
+  categories: [webapps/knowledge]
+  tags: [collaboration, open-source]
+  aliases: [lms, e-learning, elearning, courses, school, classroom, learning management]
+  icon: icons/moodle.svg
+  links:
+    website: https://moodle.org
+    documentation: https://docs.moodle.org
+    source: https://github.com/moodle/moodle
+  license: GPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings. Moodle checks this strictly: once set, changing it later has to
+      happen here, not by editing the site inside Moodle.
+    type: domain
+    optional: true
+  - name: siteName
+    title: Site name
+    type: string
+    default: Moodle
+    maxLength: 100
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-z0-9._-]{2,100}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: The container's own limit; PHP's memory_limit inside it is set well under this.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files, course backups and caches are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: moodle
+      username: moodle
+
+versions:
+  - name: "5.2"
+    release: "5.2.3"
+    default: true
+    image: erseco/alpine-moodle:v5.2.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/moodledata: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: php-fpm answering directly, nothing to do with a domain.
+        command: curl --silent --fail http://127.0.0.1:8080/fpm-ping
+        interval: 15s
+        timeout: 10s
+        # The first start installs the database and every plugin's tables.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: moodle
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_TYPE, v: pgsql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Moodle checks the exact address it is reached at against this - a mismatch, or a
+        # port in it, sends every page back to itself instead of where it meant to go.
+        - {k: SITE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: SSLPROXY, v: "true"}
+        - {k: MOODLE_SITENAME, v: "${{ params.siteName }}"}
+        - {k: MOODLE_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: MOODLE_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: MOODLE_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: RUN_CRON_TASKS, v: "true"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
