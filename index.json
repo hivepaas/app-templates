@@ -1249,6 +1249,48 @@
       }
     },
     {
+      "name": "bentopdf",
+      "file": {
+        "path": "templates/bentopdf.yaml",
+        "sha256": "4d32866aa51da91e647e6847bcce583480045787c6964c3584cedbefdb83a0d6"
+      },
+      "icon": {
+        "path": "icons/bentopdf.svg",
+        "sha256": "7a87d12034df59510f51d4570b8f0cdd43839446bd9d751c76db981e9c0fd3f3"
+      },
+      "title": "BentoPDF",
+      "tagline": "Merge, split, compress, sign and convert PDFs in the browser, on your own server",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "files",
+        "open-source",
+        "privacy"
+      ],
+      "aliases": [
+        "pdf",
+        "pdf-tools",
+        "merge-pdf",
+        "compress-pdf",
+        "ilovepdf",
+        "smallpdf",
+        "stirling-pdf-alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2.8",
+          "release": "2.8.8",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "beszel",
       "file": {
         "path": "templates/beszel.yaml",

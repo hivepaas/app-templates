@@ -1,0 +1,93 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: bentopdf
+  title: BentoPDF
+  tagline: Merge, split, compress, sign and convert PDFs in the browser, on your own server
+  description: |
+    BentoPDF is a PDF toolbox of more than a hundred tools: merge, split and reorder pages,
+    compress, rotate and crop, fill forms and sign, add watermarks and page numbers, protect
+    and unlock, redact, run OCR, and convert between PDF and images, Office documents and
+    text.
+
+    **Your files stay in the browser**
+
+    Every tool runs in the browser that opens the page: the server only serves the page, and
+    a PDF is never uploaded to it, nor anywhere else. The heavier tools, such as OCR,
+    compression and some conversions, load their engines from the public jsDelivr CDN the
+    first time they are used, so the browser needs internet access for them.
+
+    **There is nothing to configure**
+
+    This is a static page: no database, no volume, no account. It holds no state of its own,
+    so a restart loses nothing and an upgrade is a redeploy.
+
+    **Keeping it to your team**
+
+    There is no login, because the app has none. If it is exposed publicly, put basic
+    authentication in front of it in the app's routing settings, or leave it on the project
+    network and reach it from inside.
+  categories: [webapps/documents]
+  tags: [documents, files, open-source, privacy]
+  aliases: [pdf, pdf-tools, merge-pdf, compress-pdf, ilovepdf, smallpdf, stirling-pdf-alternative]
+  icon: icons/bentopdf.svg
+  links:
+    website: https://bentopdf.com
+    documentation: https://bentopdf.com/docs/self-hosting
+    source: https://github.com/alam00000/bentopdf
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: An nginx serving static files needs very little; the PDFs are worked on in the browser.
+    type: size
+    default: 128MB
+    min: 64MB
+
+# The simple build: the same tools, without bentopdf.com's own landing page and marketing.
+versions:
+  - name: "2.8"
+    release: "2.8.8"
+    default: true
+    image: bentopdfteam/bentopdf-simple:2.8.8
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The page itself. There is nothing behind it to be half-ready.
+        command: wget -q -O /dev/null http://127.0.0.1:8080/
+        interval: 20s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: bentopdf
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      # nginx runs as a user that cannot bind a port below 1024.
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
