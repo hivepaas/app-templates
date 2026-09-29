@@ -5174,6 +5174,63 @@
       }
     },
     {
+      "name": "invoice-ninja",
+      "file": {
+        "path": "templates/invoice-ninja.yaml",
+        "sha256": "caf1d45a5992555a177af7d47a0f9db7e42258fd8485b307fa449cd1f88872a8"
+      },
+      "icon": {
+        "path": "icons/invoice-ninja.svg",
+        "sha256": "e91b51af21ef1f80e0b61ca7a6acb7bea84ac3ea221a06d5d2e76c282412eae5"
+      },
+      "title": "Invoice Ninja",
+      "tagline": "Invoices, quotes, expenses and payments, with client and vendor portals",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "open-source"
+      ],
+      "aliases": [
+        "invoicing",
+        "billing",
+        "quotes",
+        "invoices",
+        "freshbooks alternative",
+        "quickbooks alternative"
+      ],
+      "license": "Elastic-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "components": [
+        {
+          "name": "app",
+          "title": "Application"
+        },
+        {
+          "name": "web",
+          "title": "Web server",
+          "primary": true
+        }
+      ],
+      "versions": [
+        {
+          "name": "5.13",
+          "release": "5.13.43",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "it-tools",
       "file": {
         "path": "templates/it-tools.yaml",

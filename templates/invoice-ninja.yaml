@@ -1,0 +1,229 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: invoice-ninja
+  title: Invoice Ninja
+  tagline: Invoices, quotes, expenses and payments, with client and vendor portals
+  description: |
+    Invoice Ninja is invoicing and billing: recurring invoices, quotes that turn into
+    invoices, expense tracking, time tracking, and a client portal where customers view
+    invoices, pay online and approve quotes. It has over fifty payment gateways, and tax
+    and PDF templates for many countries.
+
+    **This template creates two apps**
+
+    - **Invoice Ninja**, on a volume for uploaded files and generated PDFs
+    - **a MariaDB database** for it, named after the app with `-db` added
+
+    Under the hood the app runs as two components: the PHP application itself, and the
+    nginx that serves it - the split the project's own docker-compose uses, kept behind
+    one routable address.
+
+    **The first account**
+
+    The first start creates the account you give it below; sign in with it once the app
+    is up. Anybody who reaches the app before you configure this signs in as whoever it
+    was set to, so this template requires the password rather than defaulting one.
+
+    **What survives a redeployment**
+
+    Everything: the database, and the volume with uploaded files, logos and generated
+    PDFs.
+  categories: [webapps/business]
+  tags: [business-intelligence, open-source]
+  aliases: [invoicing, billing, quotes, invoices, freshbooks alternative, quickbooks alternative]
+  icon: icons/invoice-ninja.svg
+  links:
+    website: https://www.invoiceninja.com
+    documentation: https://invoiceninja.github.io/docs
+    source: https://github.com/invoiceninja/invoiceninja
+  license: Elastic-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The first account, created on the first start. It is also what you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: appKey
+    title: Application key
+    description: >-
+      Encrypts sessions and stored credentials. Leave empty to generate one; changing it
+      later makes everything it encrypted unreadable.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: What the PHP application may use; nginx needs very little on top.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files and generated PDFs are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: ninja
+      username: ninja
+
+versions:
+  - name: "5.13"
+    release: "5.13.43"
+    default: true
+    components:
+      app: {image: "invoiceninja/invoiceninja-debian:5.13.43"}
+      web: {image: "nginx:1.30.5-alpine"}
+
+components:
+  # ── Application ────────────────────────────────────────────────────────
+  - name: app
+    title: Application
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/www/html/public: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: public}}
+            /var/www/html/storage: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: storage}}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image's own check: it talks to php-fpm directly, without nginx in front.
+            command: >-
+              REMOTE_ADDR=127.0.0.1 REQUEST_URI=/health REQUEST_METHOD=GET
+              SCRIPT_FILENAME=/var/www/html/public/index.php cgi-fcgi -bind -connect 127.0.0.1:9000
+              | grep -q '"status":"ok"'
+            interval: 20s
+            timeout: 10s
+            # The first start migrates the database and creates the account.
+            startPeriod: 180s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: invoiceninja, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: APP_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+            - {k: APP_ENV, v: production}
+            # TLS is terminated in front of the app.
+            - {k: REQUIRE_HTTPS, v: "true"}
+            - {k: TRUSTED_PROXIES, v: "*"}
+            - {k: IN_USER_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: IN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+            # Neither a session nor a jobs table is among the app's own migrations, so the
+            # database-backed drivers the image defaults to have nothing to read or write
+            # to; these need no extra table and no Redis.
+            - {k: SESSION_DRIVER, v: file}
+            - {k: CACHE_DRIVER, v: file}
+            - {k: QUEUE_CONNECTION, v: database}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+          APP_KEY:
+            value: "${{ params.appKey }}"
+
+  # ── Web server ─────────────────────────────────────────────────────────
+  - name: web
+    title: Web server
+    primary: true
+    needs: [app]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/www/html/public: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: public}}
+            /var/www/html/storage: {type: volume, source: "${{ params.dataVolume }}", volumeOptions: {subpath: storage}}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget -q -O /dev/null http://127.0.0.1/health
+            interval: 15s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+        resources:
+          limits: {memory: 128MB}
+      settings:
+        kind: {category: webapp, engine: invoiceninja, version: "${{ version.name }}", webapp: {}}
+        configFiles:
+          NGINX_CONF:
+            # The project's own nginx config for the split setup, with the upstream
+            # pointed at the application component's app key rather than a compose
+            # service name.
+            content: |
+              server {
+                  listen 80 default_server;
+                  server_name _;
+                  root /var/www/html/public;
+
+                  add_header X-Frame-Options "SAMEORIGIN";
+                  add_header X-Content-Type-Options "nosniff";
+
+                  index index.php;
+                  charset utf-8;
+
+                  location / {
+                      try_files $uri $uri/ /index.php?$query_string;
+                  }
+
+                  location = /favicon.ico { access_log off; log_not_found off; }
+                  location = /robots.txt  { access_log off; log_not_found off; }
+
+                  error_page 404 /index.php;
+
+                  location ~ \.php$ {
+                      fastcgi_pass ${{ comp.app.key }}:9000;
+                      fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+                      include fastcgi_params;
+                  }
+
+                  location ~ /\.(?!well-known).* {
+                      deny all;
+                  }
+              }
+            swarmRef:
+              file: {name: /etc/nginx/conf.d/default.conf, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
