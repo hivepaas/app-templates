@@ -6877,6 +6877,58 @@
       }
     },
     {
+      "name": "marimo",
+      "file": {
+        "path": "templates/marimo.yaml",
+        "sha256": "5359b85afc4168d184ebe8147ae83096fe479a2b311b66e53c1945b7bba1bff7"
+      },
+      "icon": {
+        "path": "icons/marimo.svg",
+        "sha256": "49d3feac9c73248b42932e9cd70c93139806adc34467c596547f425f93095500"
+      },
+      "title": "marimo",
+      "tagline": "A reactive Python notebook - edit a cell, and every cell it affects reruns",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "open-source"
+      ],
+      "aliases": [
+        "notebook",
+        "jupyter-alternative",
+        "reactive-notebook",
+        "python",
+        "data science"
+      ],
+      "license": "Apache-2.0",
+      "variants": [
+        {
+          "name": "standard",
+          "default": true
+        },
+        {
+          "name": "data"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.24",
+          "release": "0.24.0",
+          "default": true,
+          "variants": [
+            "standard",
+            "data"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "matomo",
       "file": {
         "path": "templates/matomo.yaml",

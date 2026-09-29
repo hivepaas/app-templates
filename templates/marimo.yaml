@@ -1,0 +1,136 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: marimo
+  title: marimo
+  tagline: A reactive Python notebook - edit a cell, and every cell it affects reruns
+  description: |
+    marimo is a Python notebook stored as a plain `.py` file. Cells form a dependency
+    graph rather than a run order: change one, and every cell that depends on it reruns
+    automatically, so the notebook can never drift from what is on screen the way a
+    Jupyter notebook can after cells are run out of order. Notebooks can also run as
+    apps, with sliders and other UI elements replacing raw code for whoever opens them.
+
+    **This template sets up**
+
+    - marimo's own editor, for one person, behind a token
+    - a volume for the notebooks
+    - a memory limit you choose
+
+    **Signing in**
+
+    Open the address with `?access_token=<the token>` once, or paste the token into the
+    sign-in page - it is under the app's Secrets. Anyone with the token can run code in
+    the container, so treat it as a password.
+
+    **Two variants**
+
+    - **Standard**: bare marimo, ready for `pip install` or `uv add`.
+    - **With data packages**: also carries NumPy, pandas, Altair and the SQL and
+      language-server extras, for a notebook that plots and queries data right away.
+
+    **What survives a redeployment**
+
+    Only the notebook files on the volume. Packages installed by hand, in either variant,
+    live in the container and are gone after a redeployment. A notebook that declares its
+    packages inline (`marimo edit --sandbox`, or the "Package management" panel) avoids
+    this, at the cost of installing them again, from the network, on every start.
+  categories: [webapps/dev-tools, webapps/ai]
+  tags: [ai, open-source]
+  aliases: [notebook, jupyter-alternative, reactive-notebook, python, data science]
+  icon: icons/marimo.svg
+  links:
+    website: https://marimo.io
+    documentation: https://docs.marimo.io
+    source: https://github.com/marimo-team/marimo
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: token
+    title: Token
+    description: What you sign in with. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 24
+    generate: {length: 48, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: Everything the notebooks load into memory counts against this.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Notebook volume
+    description: The volume the notebook files are kept on.
+    type: volume
+
+variants:
+  - name: standard
+    title: Standard
+    description: Bare marimo, ready for `pip install` or `uv add`.
+    default: true
+  - name: data
+    title: With data packages
+    description: Also carries NumPy, pandas, Altair and the SQL and language-server extras.
+
+versions:
+  - name: "0.24"
+    release: "0.24.0"
+    default: true
+    images:
+      standard: ghcr.io/marimo-team/marimo:0.24.0
+      data: ghcr.io/marimo-team/marimo:0.24.0-data
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own default is `marimo edit --no-token`: no password at all. This
+      # turns that into the token sign-in the description promises, and opens the
+      # volume - not the image's read-only tutorials - as the notebook directory.
+      command: >-
+        sh -c 'exec marimo edit --token --token-password "$MARIMO_TOKEN" -p 8080
+        --host 0.0.0.0 --headless /app/data'
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /health answers with no token needed, so this checks the server, not the
+        # sign-in.
+        command: python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"
+        interval: 15s
+        timeout: 5s
+        startPeriod: 15s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: marimo
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MARIMO_TOKEN, v: "${secrets.TOKEN}"}
+    secrets:
+      TOKEN:
+        value: "${{ params.token }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
