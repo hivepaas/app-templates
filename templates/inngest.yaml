@@ -1,0 +1,137 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: inngest
+  title: Inngest
+  tagline: Background tasks and durable workflows for your apps, with a dashboard
+  description: |
+    Inngest runs your app's background work: functions triggered by events or a schedule,
+    that retry, sleep, run steps in parallel and survive a restart, with concurrency and
+    rate limits. Your code runs in your own app, written with its SDKs for TypeScript,
+    Python, Go or Java; Inngest hands it the work over HTTP and shows every run in its
+    dashboard.
+
+    **This template creates two apps**
+
+    - **Inngest**: the server, its API and the dashboard in one container
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    Postgres holds everything, including the queue, so there is nothing else to keep: a
+    restart loses no run and no registered app.
+
+    **The dashboard has no login**
+
+    Inngest does not ask for a password by itself. If it is exposed publicly, put basic
+    authentication in front of it in the app's routing settings, or leave it on the
+    project network and reach it from inside.
+
+    **Connecting your app**
+
+    Your app's Inngest client needs three things, as environment variables:
+
+    - `INNGEST_BASE_URL`: this app's address
+    - `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`: under this app's Secrets
+
+    Set `is_production` (or the SDK's equivalent) to true, so it uses `INNGEST_BASE_URL`
+    rather than looking for a local dev server. Once it is running, call `PUT` on its own
+    Inngest route (`/api/inngest` by default) to register it - most SDKs do this once on
+    startup. Do it again after moving the app or changing its address, so the server can
+    reach it at the new one.
+  categories: [webapps/automation, webapps/dev-tools]
+  tags: [open-source]
+  aliases: [task-queue, workflows, background-jobs, durable-execution, celery-alternative, hatchet-alternative, event-driven]
+  icon: icons/inngest.svg
+  links:
+    website: https://www.inngest.com
+    documentation: https://www.inngest.com/docs/self-hosting
+    source: https://github.com/inngest/inngest
+  license: SSPL-1.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address of the dashboard and where your apps reach it. Leave it empty to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: eventKey
+    title: Event key
+    description: >-
+      What your apps send events with, in the `INNGEST_EVENT_KEY` they are given. Leave
+      empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 16
+    generate: {length: 32, charset: hex}
+  - name: signingKey
+    title: Signing key
+    description: >-
+      Signs the requests between the server and your apps' `INNGEST_SIGNING_KEY`. Leave
+      empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: inngest
+      username: inngest
+
+versions:
+  - name: "1.45"
+    release: "v1.45.1"
+    default: true
+    image: inngest/inngest:v1.45.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: inngest start
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image ships no shell utility that speaks HTTP; this subcommand does the
+        # same probe `curl` would.
+        command: inngest alpha doctor healthcheck
+        interval: 15s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: inngest
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: INNGEST_POSTGRES_URI, v: "postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable"}
+        - {k: INNGEST_EVENT_KEY, v: "${secrets.EVENT_KEY}"}
+        - {k: INNGEST_SIGNING_KEY, v: "${secrets.SIGNING_KEY}"}
+    secrets:
+      EVENT_KEY:
+        value: "${{ params.eventKey }}"
+      SIGNING_KEY:
+        value: "${{ params.signingKey }}"
+    routing:
+      port: 8288
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

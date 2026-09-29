@@ -5127,6 +5127,53 @@
       }
     },
     {
+      "name": "inngest",
+      "file": {
+        "path": "templates/inngest.yaml",
+        "sha256": "13e8447076170f3ce7394e3b5c3c9ffd21fe299285040c82cae68559959b0558"
+      },
+      "icon": {
+        "path": "icons/inngest.svg",
+        "sha256": "2a8f9ec18a0571309146ef8e0b575139dd7562a9b4aaf4aa3125c61a27482fc3"
+      },
+      "title": "Inngest",
+      "tagline": "Background tasks and durable workflows for your apps, with a dashboard",
+      "categories": [
+        "webapps/automation",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "task-queue",
+        "workflows",
+        "background-jobs",
+        "durable-execution",
+        "celery-alternative",
+        "hatchet-alternative",
+        "event-driven"
+      ],
+      "license": "SSPL-1.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.45",
+          "release": "v1.45.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "it-tools",
       "file": {
         "path": "templates/it-tools.yaml",
