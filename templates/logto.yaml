@@ -1,0 +1,152 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: logto
+  title: Logto
+  tagline: Sign-in, users and access for your apps, over OpenID Connect and OAuth 2.0
+  description: |
+    Logto is an identity provider built for apps: it signs your users in with a password,
+    a one-time code, social logins or enterprise SSO, and hands your app a token. It
+    speaks OpenID Connect and OAuth 2.0, with multi-factor authentication, organizations,
+    and roles and permissions for your APIs.
+
+    **This template creates two apps**
+
+    - **Logto**, which answers at two addresses: the **domain**, where your apps and
+      users sign in, and the **admin domain**, where you manage Logto in its Admin
+      Console
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **The first administrator**
+
+    Open the admin domain once the app is up, and create the first account: it becomes
+    the administrator. Anybody who reaches the Admin Console before you do can create it,
+    so do this first.
+
+    **Addresses**
+
+    Point both domains at your servers before connecting any app to Logto. Tokens are
+    issued against the domain, which is what the apps trusting Logto check: settle it
+    when you create the app.
+
+    Logto follows the app's first domain, in its routing settings. The Admin Console's
+    domain is the one on port 3002; to give it one later, add a domain on container port
+    3002 in the routing settings, and set the environment variable `LOGTO_ADMIN_DOMAIN`
+    to it.
+
+    **Updates**
+
+    Each start seeds the database the first time, and applies the schema changes of a
+    newer version after an update: changing the version is all an update takes.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [auth, oidc, oauth, identity-provider, auth0-alternative, login]
+  icon: icons/logto.svg
+  links:
+    website: https://logto.io
+    documentation: https://docs.logto.io
+    source: https://github.com/logto-io/logto
+  license: MPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address your apps and users sign in at, such as auth.example.com: the issuer of
+      the tokens Logto signs. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminDomain
+    title: Admin domain
+    description: >-
+      The address of the Admin Console, such as auth-admin.example.com. Leave it empty to
+      add one later.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: logto
+      username: logto
+
+versions:
+  - name: "1.43"
+    release: "1.43.0"
+    default: true
+    image: svhd/logto:1.43.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is `npm run`, and Logto needs its database seeded before
+      # it starts, which no script of the image does. So this runs the `start` of the
+      # package.json mounted below, which seeds, applies the schema changes of a newer
+      # version, then starts Logto.
+      command: start --prefix /etc/hivepaas
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /api/status answers 204 once Logto serves.
+        command: wget -q -O /dev/null http://127.0.0.1:3001/api/status
+        interval: 15s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: logto
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DB_URL, v: "postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        # Where Logto is reached from outside, which it signs tokens and links with: the
+        # app's first domain, and nothing while it has none, when Logto answers as
+        # localhost.
+        - {k: ENDPOINT, v: "${HIVEPAAS_APP_URL}"}
+        # The Admin Console's domain. The start script below makes ADMIN_ENDPOINT of it,
+        # and leaves it unset while it is empty: an empty one is not a URL.
+        - {k: LOGTO_ADMIN_DOMAIN, v: "${{ params.adminDomain }}"}
+        # TLS is terminated in front of the app: Logto reads the original scheme and host
+        # from the headers the proxy sets.
+        - {k: TRUST_PROXY_HEADER, v: "1"}
+    configFiles:
+      package.json:
+        # `npm run start --prefix /etc/hivepaas` runs this. `--swe` skips the seeding of a
+        # database that has it already, and a database already at the image's version
+        # has no schema changes to apply, so a restart only starts Logto.
+        content: |
+          {
+            "private": true,
+            "scripts": {
+              "start": "cd /etc/logto && if [ -n \"$LOGTO_ADMIN_DOMAIN\" ]; then export ADMIN_ENDPOINT=\"https://$LOGTO_ADMIN_DOMAIN\"; fi && npm run cli db seed -- --swe && npm run cli db alteration deploy -- latest && npm start"
+            }
+          }
+        swarmRef:
+          file: {name: /etc/hivepaas/package.json, mode: 444}
+    routing:
+      port: 3001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+        # The Admin Console is Logto's second port.
+        - {domain: "${{ params.adminDomain }}", enabled: true, forceHttps: true, containerPort: 3002}

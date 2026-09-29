@@ -6365,6 +6365,53 @@
       }
     },
     {
+      "name": "logto",
+      "file": {
+        "path": "templates/logto.yaml",
+        "sha256": "f96e2a4980321efd338a2c316317519ffc565567842b6897d9af6f2fe8f4c42c"
+      },
+      "icon": {
+        "path": "icons/logto.svg",
+        "sha256": "1efb63d55ac7184bcfdb549a7daf6ddf5e4e548173c1e033e50e4e36200e5962"
+      },
+      "title": "Logto",
+      "tagline": "Sign-in, users and access for your apps, over OpenID Connect and OAuth 2.0",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "auth",
+        "oidc",
+        "oauth",
+        "identity-provider",
+        "auth0-alternative",
+        "login"
+      ],
+      "license": "MPL-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.43",
+          "release": "1.43.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "loki",
       "file": {
         "path": "templates/loki.yaml",
