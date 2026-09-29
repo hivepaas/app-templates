@@ -1,0 +1,219 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kuzzle
+  title: Kuzzle
+  tagline: A ready-made backend - storage, search, real-time and users over one API
+  description: |
+    Kuzzle is a backend your front ends and devices talk to directly: document storage
+    with full-text and geo search, real-time subscriptions to changes, users with roles
+    and profiles, and a Redis-style key-value store - over HTTP, WebSocket and MQTT, with
+    SDKs for JavaScript, Dart, Kotlin, C# and more. Extend it with plugins, or build your
+    own application on its framework.
+
+    **This template creates two apps**
+
+    - **Kuzzle**, with **Elasticsearch** beside it as a second component: Kuzzle's own
+      Elasticsearch 7 image, which is where every document is stored and searched
+    - **a Redis** for it, named after the app with `-cache` added: sessions, the
+      cluster's state, and the data of Kuzzle's key-value API
+
+    **Locked down on the first start**
+
+    A new Kuzzle lets anyone do anything until an administrator exists. The first start
+    creates the administrator below and, in the same call, restricts anonymous users to
+    signing in; the app is not reported healthy - and so gets no traffic - until that has
+    happened.
+
+    **Connecting**
+
+    The API is at the app's address, for HTTP and WebSocket both; point an SDK at it on
+    port 443 with TLS. Sign in with the administrator to create users, roles and indexes,
+    or use the [Kuzzle Admin Console](https://next-console.kuzzle.io), which runs in the
+    browser and connects to your address.
+
+    **Memory**
+
+    Elasticsearch takes most of it: its Java heap, and as much again for the file cache.
+    Keep its heap at about half its memory limit.
+  categories: [webapps/dev-tools, webapps/low-code]
+  tags: [document, full-text, identity, mqtt, open-source]
+  aliases: [backend as a service, baas, realtime, firebase alternative, iot backend]
+  icon: icons/kuzzle.png
+  links:
+    website: https://kuzzle.io
+    documentation: https://docs.kuzzle.io/core/2/guides/getting-started/run-kuzzle/
+    source: https://github.com/kuzzleio/kuzzle
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the API answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._@-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: authSecret
+    title: Token secret
+    description: >-
+      Signs the tokens users are given at sign-in. Leave empty to generate one; changing it
+      signs everyone out.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Kuzzle memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: esMemoryLimit
+    title: Elasticsearch memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: esHeapSize
+    title: Elasticsearch Java heap
+    description: >-
+      About half the Elasticsearch memory limit; the rest is for the file cache and the
+      process itself.
+    type: string
+    default: 1g
+    pattern: '^[0-9]+[mg]$'
+  - name: esVolume
+    title: Elasticsearch volume
+    description: The volume every stored document and index is kept on.
+    type: volume
+
+dependencies:
+  - name: cache
+    title: Cache and key-value store
+    template: redis
+    version: "8.10"
+    params:
+      # Kuzzle's key-value API stores users' data here, not only a cache: Redis refuses
+      # writes when it is full rather than evicting a key someone stored.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "2.56"
+    release: "2.56.0"
+    default: true
+    components:
+      kuzzle: {image: "kuzzleio/kuzzle:2.56.0"}
+      # The Elasticsearch image Kuzzle's own releases pin, with the plugins it relies on.
+      es: {image: "kuzzleio/elasticsearch:7.17.26"}
+
+components:
+  # ── Kuzzle ─────────────────────────────────────────────────────────────
+  - name: kuzzle
+    title: Kuzzle
+    primary: true
+    needs: [es]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Starts the server, and beside it creates the first administrator once the API
+          # answers. `reset=true` restricts the anonymous and default roles in the same
+          # call. On later starts an administrator exists, anonymous users may no longer
+          # call this, and it is refused: nothing changes.
+          command: >-
+            sh -c '(until curl -fsS -o /dev/null http://127.0.0.1:7512/_healthcheck; do sleep 2; done;
+            curl -sS -o /dev/null -w "createFirstAdmin: %{http_code}\n"
+            -X POST "http://127.0.0.1:7512/_createFirstAdmin?reset=true" -H "Content-Type: application/json"
+            -d "{\"credentials\":{\"local\":{\"username\":\"$KUZZLE_ADMIN_USERNAME\",\"password\":\"$KUZZLE_ADMIN_PASSWORD\"}}}") &
+            exec node ./bin/start-kuzzle-server'
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # Serving, and no longer open to everyone: before the first administrator
+            # exists, anonymous users may ask, and are told there is none.
+            command: >-
+              curl -fsS -o /dev/null http://127.0.0.1:7512/_healthcheck &&
+              ! curl -s http://127.0.0.1:7512/_adminExists | grep -q '"exists":false'
+            interval: 10s
+            timeout: 5s
+            startPeriod: 120s
+            retries: 6
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: kuzzle, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: NODE_ENV, v: production}
+            - {k: kuzzle_services__storageEngine__client__node, v: "http://${{ comp.es.key }}:9200"}
+            - {k: kuzzle_services__internalCache__node__host, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: kuzzle_services__internalCache__node__port, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: kuzzle_services__internalCache__options__password, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: kuzzle_services__memoryStorage__node__host, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: kuzzle_services__memoryStorage__node__port, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: kuzzle_services__memoryStorage__options__password, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            # Without it Kuzzle signs tokens with a seed it generates, which it warns is not
+            # for production.
+            - {k: kuzzle_security__authToken__secret, v: "${secrets.AUTH_SECRET}"}
+            - {k: KUZZLE_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+            - {k: KUZZLE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+          AUTH_SECRET:
+            value: "${{ params.authSecret }}"
+        routing:
+          port: 7512
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Elasticsearch ──────────────────────────────────────────────────────
+  - name: es
+    title: Elasticsearch
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /usr/share/elasticsearch/data: {type: volume, source: "${{ params.esVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fsS -o /dev/null "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s"
+            interval: 15s
+            timeout: 10s
+            startPeriod: 120s
+            retries: 8
+        resources:
+          limits: {memory: "${{ params.esMemoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: kuzzle, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # One node that is its own cluster, rather than one waiting for peers. It has no
+            # routing and no password: only Kuzzle, on the project network, reaches it.
+            - {k: discovery.type, v: single-node}
+            - {k: ES_JAVA_OPTS, v: "-Xms${{ params.esHeapSize }} -Xmx${{ params.esHeapSize }}"}
+            # Locking the heap into RAM needs a privilege a container here does not get.
+            - {k: bootstrap.memory_lock, v: "false"}
+            # Read index files rather than memory-map them: mapping needs vm.max_map_count
+            # raised on the host, which nothing in an app template can do.
+            - {k: node.store.allow_mmap, v: "false"}

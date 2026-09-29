@@ -6011,6 +6011,66 @@
       }
     },
     {
+      "name": "kuzzle",
+      "file": {
+        "path": "templates/kuzzle.yaml",
+        "sha256": "2fb79d9440f9246bcdc17a706aca96d6b755a4a579fe0e91058a3596c3d62584"
+      },
+      "icon": {
+        "path": "icons/kuzzle.png",
+        "sha256": "3e3f1fcc170514ed219648e0028560c208307fe6a3546cc14a8b426711a24ad3"
+      },
+      "title": "Kuzzle",
+      "tagline": "A ready-made backend - storage, search, real-time and users over one API",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "document",
+        "full-text",
+        "identity",
+        "mqtt",
+        "open-source"
+      ],
+      "aliases": [
+        "backend as a service",
+        "baas",
+        "realtime",
+        "firebase alternative",
+        "iot backend"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Cache and key-value store",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "kuzzle",
+          "title": "Kuzzle",
+          "primary": true
+        },
+        {
+          "name": "es",
+          "title": "Elasticsearch"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.56",
+          "release": "2.56.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "label-studio",
       "file": {
         "path": "templates/label-studio.yaml",
