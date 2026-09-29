@@ -698,65 +698,6 @@
       }
     },
     {
-      "name": "alexandrie",
-      "file": {
-        "path": "templates/alexandrie.yaml",
-        "sha256": "9530f6db3239a7c83acf131ee27eaf7e349b8f1812750665682b9ca90c689e1d"
-      },
-      "icon": {
-        "path": "icons/alexandrie.svg",
-        "sha256": "43938cb80265362ced0f77fe123a582b191fc6db8713649462dea63cbd831587"
-      },
-      "title": "Alexandrie",
-      "tagline": "An open-source knowledge base and collaborative Markdown workspace",
-      "categories": [
-        "webapps/knowledge"
-      ],
-      "tags": [
-        "collaboration",
-        "notes",
-        "documents",
-        "open-source"
-      ],
-      "aliases": [
-        "wiki",
-        "knowledge base",
-        "notion alternative",
-        "obsidian alternative",
-        "notes",
-        "alexandrie"
-      ],
-      "license": "AGPL-3.0-or-later",
-      "dependencies": [
-        {
-          "name": "db",
-          "title": "Database",
-          "template": "mariadb"
-        }
-      ],
-      "components": [
-        {
-          "name": "frontend",
-          "title": "Frontend",
-          "primary": true
-        },
-        {
-          "name": "backend",
-          "title": "Backend"
-        }
-      ],
-      "versions": [
-        {
-          "name": "8.14",
-          "release": "8.14.2",
-          "default": true
-        }
-      ],
-      "requires": {
-        "versionCode": "v000001"
-      }
-    },
-    {
       "name": "anythingllm",
       "file": {
         "path": "templates/anythingllm.yaml",
