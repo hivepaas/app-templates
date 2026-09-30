@@ -13630,6 +13630,73 @@
       }
     },
     {
+      "name": "typebot",
+      "file": {
+        "path": "templates/typebot.yaml",
+        "sha256": "1c6c9ddbecba586c79c5c22e11646a3482eaef8ed4ac461244b552933f3439ea"
+      },
+      "icon": {
+        "path": "icons/typebot.svg",
+        "sha256": "546102581ea2bc872ac073812fe1616d7574acd54894515ab131e903ba9f56ec"
+      },
+      "title": "Typebot",
+      "tagline": "Build chatbots and conversational forms visually, embed them anywhere",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "chat",
+        "automation"
+      ],
+      "aliases": [
+        "chatbot builder",
+        "conversational forms",
+        "typeform alternative",
+        "landbot alternative",
+        "whatsapp bot",
+        "forms"
+      ],
+      "license": "FSL-1.1-Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "gateway",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "builder",
+          "title": "Builder"
+        },
+        {
+          "name": "viewer",
+          "title": "Viewer"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.19",
+          "release": "3.19.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "typesense",
       "file": {
         "path": "templates/typesense.yaml",
