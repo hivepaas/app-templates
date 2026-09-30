@@ -9695,6 +9695,47 @@
       }
     },
     {
+      "name": "pairdrop",
+      "file": {
+        "path": "templates/pairdrop.yaml",
+        "sha256": "a5e368da93fa3ceb89448fc87ab076fb175cede6410592e432393779a5a0ea7d"
+      },
+      "icon": {
+        "path": "icons/pairdrop.png",
+        "sha256": "482c89e80baeacb8276037a4344d0aba01c2717415e2f0ffa79a18526bc46ad8"
+      },
+      "title": "PairDrop",
+      "tagline": "AirDrop in the browser - send files between devices, peer to peer",
+      "categories": [
+        "storage/files"
+      ],
+      "tags": [
+        "file-transfer",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "airdrop alternative",
+        "snapdrop",
+        "file sharing",
+        "send files",
+        "p2p",
+        "webrtc",
+        "local share"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.11",
+          "release": "1.11.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "paperless-ngx",
       "file": {
         "path": "templates/paperless-ngx.yaml",

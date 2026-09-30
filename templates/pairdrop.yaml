@@ -1,0 +1,113 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: pairdrop
+  title: PairDrop
+  tagline: AirDrop in the browser - send files between devices, peer to peer
+  description: |
+    PairDrop sends files and text between devices from the browser, in the spirit of
+    Apple's AirDrop: devices on the same network see each other, others pair once with a
+    code or join a temporary public room. Files go directly between the browsers over
+    WebRTC; this server only introduces them. It installs as an app on phones and
+    desktops.
+
+    **This template creates one app**
+
+    PairDrop, with no storage and no accounts.
+
+    **Between different networks: a TURN server**
+
+    Browsers find a direct path with the public STUN server in `rtc_config.json`. When
+    that fails - devices on different networks behind strict NATs - they need a TURN
+    server to relay through: add yours to `rtc_config.json` in the app's config files,
+    with its `urls`, `username` and `credential`.
+
+    **Fallback through the server**
+
+    With the WebSocket fallback on, devices that cannot connect directly - behind a VPN
+    that blocks WebRTC, for example - send files through this server instead. The server
+    can then read them, and carries their traffic.
+  categories: [storage/files]
+  tags: [file-transfer, privacy, open-source]
+  aliases: [airdrop alternative, snapdrop, file sharing, send files, p2p, webrtc, local share]
+  icon: icons/pairdrop.png
+  links:
+    website: https://pairdrop.net
+    documentation: https://github.com/schlagmichdoch/PairDrop/blob/master/docs/host-your-own.md
+    source: https://github.com/schlagmichdoch/PairDrop
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address PairDrop answers at. Browsers use WebRTC only over HTTPS: leave it empty
+      only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: wsFallback
+    title: Fallback through the server
+    type: select
+    default: "false"
+    options:
+      - {value: "false", title: "Off - files only go directly between devices"}
+      - {value: "true", title: "On - through the server when a direct connection fails"}
+
+versions:
+  - name: "1.11"
+    release: "1.11.2"
+    default: true
+    image: ghcr.io/schlagmichdoch/pairdrop:v1.11.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: wget --quiet --tries=1 --spider http://localhost:3000
+        interval: 30s
+        timeout: 10s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: 256MB}
+  settings:
+    kind:
+      category: webapp
+      engine: pairdrop
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: WS_FALLBACK, v: "${{ params.wsFallback }}"}
+        - {k: RTC_CONFIG, v: /hivepaas/rtc_config.json}
+        # Requests come through one proxy, HivePaaS's router: the client's address - which
+        # decides who sees whom as on the same network - is the last one it adds, and rate
+        # limiting counts per client.
+        - {k: RATE_LIMIT, v: "1"}
+    configFiles:
+      rtc_config.json:
+        # To add a TURN server, append to iceServers:
+        #   {"urls": "turn:turn.example.com:3478", "username": "...", "credential": "..."}
+        content: |
+          {
+            "sdpSemantics": "unified-plan",
+            "iceServers": [
+              {"urls": "stun:stun.l.google.com:19302"}
+            ]
+          }
+        swarmRef:
+          file: {name: /hivepaas/rtc_config.json, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
