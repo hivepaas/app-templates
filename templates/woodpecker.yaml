@@ -1,0 +1,230 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: woodpecker
+  title: Woodpecker CI
+  tagline: A simple CI/CD engine for Gitea, Forgejo, GitHub and GitLab, pipelines in YAML
+  description: |
+    Woodpecker is a CI/CD engine: a `.woodpecker.yaml` in a repository describes steps,
+    each a container, and Woodpecker runs them on every push, pull request, tag or
+    schedule. It is a community fork of Drone, and it signs in and reads repositories
+    through the forge they live on.
+
+    **This template creates one app, as two components**
+
+    - **the server**, with the web UI and the pipeline queue, on a volume for its SQLite
+      database
+    - **an agent**, which runs the pipelines: every step is a container it starts
+      through the Docker API
+
+    **The agent is given the Docker API**
+
+    It reaches it through HivePaaS rather than the host's socket: steps run any image,
+    but with no privileges, no path of the host and no host network, at most 20
+    containers at once with 4 GB and two CPUs each. A step that needs `privileged` does
+    not run here. Creating this app needs Write permission on the Cluster module.
+
+    **Before deploying: an OAuth application on the forge**
+
+    Woodpecker has no accounts of its own. On the forge, create an OAuth application
+    with the redirect URL `https://<this app's domain>/authorize`, and give its client
+    ID and secret below. The domain is needed from the start: the forge sends users back
+    to it and sends webhooks to it, and the server does not start without one.
+
+    **Who may use it**
+
+    Only the forge users named as administrators below sign in at first. Open it to more
+    people - everyone, or members of some organizations - with `WOODPECKER_OPEN` and
+    `WOODPECKER_ORGS` on the server component.
+
+    **What steps can reach**
+
+    Each pipeline runs on a network of its own, not the project's: steps clone from the
+    forge's public address, so the forge has to be reachable over the internet.
+  categories: [webapps/dev-tools]
+  tags: [git, containers, testing, open-source]
+  aliases: [ci, cd, continuous integration, drone, pipelines, github actions alternative]
+  icon: icons/woodpecker.svg
+  links:
+    website: https://woodpecker-ci.org
+    documentation: https://woodpecker-ci.org/docs/administration/configuration/forges/overview
+    source: https://github.com/woodpecker-ci/woodpecker
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Woodpecker answers at. The server does not start without one: the forge
+      redirects users and sends webhooks here.
+    type: domain
+    optional: true
+  - name: forge
+    title: Forge
+    type: select
+    default: GITEA
+    options:
+      - {value: GITEA, title: Gitea}
+      - {value: FORGEJO, title: Forgejo}
+      - {value: GITHUB, title: GitHub}
+      - {value: GITLAB, title: GitLab}
+  - name: forgeUrl
+    title: Forge address
+    description: >-
+      The forge's public address, scheme and all - https://git.example.com. For GitHub,
+      https://github.com.
+    type: string
+    default: https://github.com
+    pattern: '^https?://[^\s/?#]+(/[^\s?#]*)?$'
+  - name: oauthClientId
+    title: OAuth client ID
+    description: Of the OAuth application created on the forge for Woodpecker.
+    type: secret
+  - name: oauthClientSecret
+    title: OAuth client secret
+    type: secret
+  - name: admins
+    title: Administrators
+    description: >-
+      Forge usernames, comma-separated, who administer Woodpecker. Name at least one: with
+      nobody here, and the server not opened to others, no one can sign in.
+    type: string
+    optional: true
+  - name: agentSecret
+    title: Agent secret
+    description: What the agent authenticates to the server with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: grpcSecret
+    title: gRPC secret
+    description: Signs the agents' sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: parallelWorkflows
+    title: Workflows at once
+    description: How many workflows the agent runs in parallel.
+    type: int
+    default: 2
+    min: 1
+    max: 20
+  - name: dataVolume
+    title: Server volume
+    description: The volume the server's SQLite database is kept on.
+    type: volume
+  - name: agentVolume
+    title: Agent volume
+    description: The volume the agent keeps the identity it registered with on.
+    type: volume
+
+versions:
+  - name: "3.18"
+    release: "3.18.1"
+    default: true
+    components:
+      server: {image: "woodpeckerci/woodpecker-server:v3.18.1"}
+      agent: {image: "woodpeckerci/woodpecker-agent:v3.18.1"}
+
+components:
+  # ── Server ─────────────────────────────────────────────────────────────
+  - name: server
+    title: Server
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/lib/woodpecker: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            # The image's own check.
+            command: /bin/woodpecker-server ping
+            interval: 30s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: woodpecker, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: WOODPECKER_HOST, v: "${HIVEPAAS_APP_URL}"}
+            - {k: WOODPECKER_AGENT_SECRET, v: "${secrets.AGENT_SECRET}"}
+            - {k: WOODPECKER_GRPC_SECRET, v: "${secrets.GRPC_SECRET}"}
+            - {k: WOODPECKER_ADMIN, v: "${{ params.admins }}"}
+            - {k: WOODPECKER_OPEN, v: "false"}
+            # WOODPECKER_GITEA=true, WOODPECKER_GITEA_URL and so on: the forge's name is
+            # part of each variable's.
+            - {k: "WOODPECKER_${{ params.forge }}", v: "true"}
+            - {k: "WOODPECKER_${{ params.forge }}_URL", v: "${{ params.forgeUrl }}"}
+            - {k: "WOODPECKER_${{ params.forge }}_CLIENT", v: "${secrets.OAUTH_CLIENT_ID}"}
+            - {k: "WOODPECKER_${{ params.forge }}_SECRET", v: "${secrets.OAUTH_CLIENT_SECRET}"}
+        secrets:
+          AGENT_SECRET:
+            value: "${{ params.agentSecret }}"
+          GRPC_SECRET:
+            value: "${{ params.grpcSecret }}"
+          OAUTH_CLIENT_ID:
+            value: "${{ params.oauthClientId }}"
+          OAUTH_CLIENT_SECRET:
+            value: "${{ params.oauthClientSecret }}"
+        routing:
+          port: 8000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Agent ──────────────────────────────────────────────────────────────
+  - name: agent
+    title: Agent
+    needs: [server]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/lib/woodpecker-agent: {type: volume, source: "${{ params.agentVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            # The image's own check.
+            command: /bin/woodpecker-agent ping
+            interval: 30s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: woodpecker, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # The server's gRPC port, on the project network.
+            - {k: WOODPECKER_SERVER, v: "${{ comp.server.key }}:9000"}
+            - {k: WOODPECKER_AGENT_SECRET, v: "${secrets.AGENT_SECRET}"}
+            # Kept on the volume: the identity the agent registered with, so a restart is
+            # the same agent rather than a new one.
+            - {k: WOODPECKER_AGENT_CONFIG_FILE, v: /var/lib/woodpecker-agent/agent.conf}
+            - {k: WOODPECKER_BACKEND, v: docker}
+            - {k: WOODPECKER_MAX_WORKFLOWS, v: "${{ params.parallelWorkflows }}"}
+            - {k: DOCKER_HOST, v: "${HIVEPAAS_DOCKER_HOST}"}
+        secrets:
+          AGENT_SECRET:
+            value: "${{ params.agentSecret }}"
+        dockerApi:
+          images: ["*"]
+          allow: [exec, files, volumes, networks]
+          limits: {containers: 20, memory: 4gb, cpus: 2}

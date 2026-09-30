@@ -13533,6 +13533,59 @@
       }
     },
     {
+      "name": "woodpecker",
+      "file": {
+        "path": "templates/woodpecker.yaml",
+        "sha256": "a7391b57bd9e0574d7bfeb13684876f9a6cf54b9e62f94c3c439af0486c9bd18"
+      },
+      "icon": {
+        "path": "icons/woodpecker.svg",
+        "sha256": "051165016a8bb11fb53be009bb153a56d88f59970278a80ff3b99968e7ffe966"
+      },
+      "title": "Woodpecker CI",
+      "tagline": "A simple CI/CD engine for Gitea, Forgejo, GitHub and GitLab, pipelines in YAML",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "containers",
+        "testing",
+        "open-source"
+      ],
+      "aliases": [
+        "ci",
+        "cd",
+        "continuous integration",
+        "drone",
+        "pipelines",
+        "github actions alternative"
+      ],
+      "license": "Apache-2.0",
+      "components": [
+        {
+          "name": "server",
+          "title": "Server",
+          "primary": true
+        },
+        {
+          "name": "agent",
+          "title": "Agent"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.18",
+          "release": "3.18.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      },
+      "requiresDockerApi": true
+    },
+    {
       "name": "wordpress",
       "file": {
         "path": "templates/wordpress.yaml",
