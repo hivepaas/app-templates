@@ -7582,6 +7582,78 @@
       }
     },
     {
+      "name": "mastodon",
+      "file": {
+        "path": "templates/mastodon.yaml",
+        "sha256": "bb66e703d0364bf024a5dd3408cc558c70c7961a2c8dc8cb4578efc6ab29762d"
+      },
+      "icon": {
+        "path": "icons/mastodon.svg",
+        "sha256": "30ee8689a434f1e8f2ab9f9e136858be6810d01860282c2c4649f4bba4cf4a06"
+      },
+      "title": "Mastodon",
+      "tagline": "Your own server on the fediverse - decentralised social networking",
+      "categories": [
+        "webapps/social"
+      ],
+      "tags": [
+        "chat",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "fediverse",
+        "activitypub",
+        "twitter alternative",
+        "x alternative",
+        "social network",
+        "microblogging",
+        "toot"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "gateway",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "web",
+          "title": "Web"
+        },
+        {
+          "name": "streaming",
+          "title": "Streaming"
+        },
+        {
+          "name": "sidekiq",
+          "title": "Sidekiq"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.7",
+          "release": "4.7.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "matomo",
       "file": {
         "path": "templates/matomo.yaml",
