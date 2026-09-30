@@ -9770,6 +9770,75 @@
       }
     },
     {
+      "name": "plane",
+      "file": {
+        "path": "templates/plane.yaml",
+        "sha256": "51b1f9131c992122772a4eca46c28d8f589ca800211d68c7056a2293cf3f4e5e"
+      },
+      "icon": {
+        "path": "icons/plane.svg",
+        "sha256": "985e5ecddc3d0506f1d9c6ed71299420ce29d77e5afcfa112c6f06e3e6080248"
+      },
+      "title": "Plane",
+      "tagline": "Issues, cycles and docs for software teams, in the spirit of Linear and Jira",
+      "categories": [
+        "webapps/project-management"
+      ],
+      "tags": [
+        "project-management",
+        "tasks",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "jira alternative",
+        "linear alternative",
+        "issue tracker",
+        "project management",
+        "kanban",
+        "sprints"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        },
+        {
+          "name": "mq",
+          "title": "Job queue",
+          "template": "rabbitmq"
+        }
+      ],
+      "components": [
+        {
+          "name": "plane",
+          "title": "Plane",
+          "primary": true
+        },
+        {
+          "name": "s3",
+          "title": "S3 store"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.4",
+          "release": "1.4.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "planka",
       "file": {
         "path": "templates/planka.yaml",

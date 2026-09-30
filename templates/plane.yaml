@@ -1,0 +1,436 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: plane
+  title: Plane
+  tagline: Issues, cycles and docs for software teams, in the spirit of Linear and Jira
+  description: |
+    Plane is project management for software teams: work items with states, priorities
+    and estimates, cycles and modules, list, kanban, calendar and Gantt views, pages for
+    docs and specs, intake of requests from outside, and analytics - with an API and
+    webhooks.
+
+    **This template creates four apps**
+
+    - **Plane**, as two components: Plane's all-in-one image - web app, API, workers,
+      realtime server and its own reverse proxy, in one container - and an S3 store for
+      attachments (RustFS), on a volume, reached only through Plane
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Redis**, named after the app with `-cache` added
+    - **a RabbitMQ** for background jobs, named after the app with `-mq` added
+
+    **Files go through Plane's own address**
+
+    Uploads and downloads use signed links to `https://<Plane's domain>/uploads/...`,
+    which Plane's proxy passes to the S3 store: it needs no domain of its own. This needs
+    Plane to have its domain, served over HTTPS.
+
+    **The first start creates the instance administrator**
+
+    Whoever opened a new Plane first would be asked to set up the instance and become its
+    administrator. This template does that step itself, with the values below, and turns
+    public sign-up off: invite people from a workspace, or open sign-up in the instance
+    admin pages at `/god-mode`.
+
+    **Memory**
+
+    Plane's container runs seven processes and takes about 1.3GB at rest.
+  categories: [webapps/project-management]
+  tags: [project-management, tasks, collaboration, open-source]
+  aliases: [jira alternative, linear alternative, issue tracker, project management, kanban, sprints]
+  icon: icons/plane.svg
+  links:
+    website: https://plane.so
+    documentation: https://developers.plane.so/self-hosting/overview
+    source: https://github.com/makeplane/plane
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Plane answers at. Uploads need it: leave it empty only to add one later,
+      in the routing settings of the Plane component.
+    type: domain
+    optional: true
+  - name: companyName
+    title: Company name
+    description: The instance's name.
+    type: string
+    default: My Company
+    maxLength: 100
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Administrator
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: Django's secret key, which signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: liveSecretKey
+    title: Realtime server secret
+    description: Shared by the API and the realtime server. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: s3SecretKey
+    title: S3 secret key
+    description: What Plane signs its requests to the S3 store with. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 40}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: s3Volume
+    title: Attachments volume
+    description: The volume the S3 store keeps uploaded files on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: plane
+      username: plane
+  - name: cache
+    title: Cache
+    template: redis
+    version: "8.10"
+  - name: mq
+    title: Job queue
+    template: rabbitmq
+    version: "4.3"
+    params:
+      username: plane
+      vhost: plane
+
+versions:
+  - name: "1.4"
+    release: "1.4.2"
+    default: true
+    components:
+      plane: {image: "makeplane/plane-aio-community:v1.4.2"}
+      s3: {image: "rustfs/rustfs:1.0.0"}
+
+components:
+  # ── Plane ──────────────────────────────────────────────────────────────
+  - name: plane
+    title: Plane
+    primary: true
+    needs: [s3]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # The image's start.sh writes its own environment file and forces files to go
+          # to S3 directly, which would need the S3 store on a public address of its own.
+          # This starts the image's processes itself instead, from the environment below,
+          # with uploads through Plane's proxy. Beside them, once migrated: the instance
+          # administrator, and the cache cleared so that pages see it.
+          command: >-
+            sh -c '(cd /app/backend && python manage.py wait_for_migrations &&
+            python manage.py shell < /hivepaas/bootstrap.py && python manage.py clear_cache) &
+            exec /usr/local/bin/supervisord -c /hivepaas/supervisor.conf'
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fsS -o /dev/null http://127.0.0.1:80/api/instances/
+            interval: 20s
+            timeout: 10s
+            # The first start applies several hundred migrations.
+            startPeriod: 300s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: plane, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: WEB_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: CORS_ALLOWED_ORIGINS, v: "${HIVEPAAS_APP_URL}"}
+            - {k: APP_DOMAIN, v: "${HIVEPAAS_DOMAIN}"}
+            # Plane's own proxy listens on plain HTTP; TLS is HivePaaS's.
+            - {k: SITE_ADDRESS, v: ":80"}
+            - {k: API_BASE_URL, v: "http://localhost:3004"}
+            - {k: DEBUG, v: "0"}
+            - k: DATABASE_URL
+              v: >-
+                postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - k: REDIS_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{ deps.cache.ref.HIVEPAAS_HOST }}:${{
+                deps.cache.ref.HIVEPAAS_PORT }}/
+            - k: AMQP_URL
+              v: >-
+                amqp://${{ deps.mq.ref.HIVEPAAS_USER }}:${{ deps.mq.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.mq.ref.HIVEPAAS_HOST }}:${{ deps.mq.ref.HIVEPAAS_PORT }}/${{
+                deps.mq.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - {k: LIVE_SERVER_SECRET_KEY, v: "${secrets.LIVE_SECRET_KEY}"}
+            # The first value of the instance setting; it can be changed at /god-mode.
+            - {k: ENABLE_SIGNUP, v: "0"}
+            # Signed links point at Plane's own address, over HTTPS, and its proxy passes
+            # /uploads on to the S3 store.
+            - {k: USE_MINIO, v: "1"}
+            - {k: MINIO_ENDPOINT_SSL, v: "1"}
+            - {k: AWS_REGION, v: us-east-1}
+            - {k: AWS_ACCESS_KEY_ID, v: plane}
+            - {k: AWS_SECRET_ACCESS_KEY, v: "${secrets.S3_SECRET_KEY}"}
+            - {k: AWS_S3_ENDPOINT_URL, v: "http://${{ comp.s3.key }}:9000"}
+            - {k: AWS_S3_BUCKET_NAME, v: uploads}
+            - {k: BUCKET_NAME, v: uploads}
+            - {k: FILE_SIZE_LIMIT, v: "5242880"}
+            - {k: GUNICORN_WORKERS, v: "1"}
+            - {k: API_KEY_RATE_LIMIT, v: 60/minute}
+            - {k: APP_RELEASE, v: "v${{ version.release }}"}
+            - {k: APP_VERSION, v: "v${{ version.release }}"}
+            - {k: PLANE_COMPANY_NAME, v: "${{ params.companyName }}"}
+            - {k: PLANE_ADMIN_NAME, v: "${{ params.adminName }}"}
+            - {k: PLANE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: PLANE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+          LIVE_SECRET_KEY:
+            value: "${{ params.liveSecretKey }}"
+          S3_SECRET_KEY:
+            value: "${{ params.s3SecretKey }}"
+        configFiles:
+          Caddyfile:
+            # The image's own, with one route added: /uploads to the S3 store.
+            content: |
+              (plane_proxy) {
+                request_body {
+                  max_size {$FILE_SIZE_LIMIT}
+                }
+
+                handle /uploads* {
+                  reverse_proxy ${{ comp.s3.key }}:9000
+                }
+
+                handle /spaces/* {
+                  reverse_proxy localhost:3002
+                }
+
+                handle /live/* {
+                  reverse_proxy localhost:3005
+                }
+                handle /api/* {
+                  reverse_proxy localhost:3004
+                }
+
+                handle /auth/* {
+                  reverse_proxy localhost:3004
+                }
+
+                handle_path /god-mode* {
+                  root * /app/admin
+                  try_files {path} {path}/ /index.html
+                  file_server
+                }
+                handle_path /* {
+                  root * /app/web
+                  try_files {path} {path}/ /index.html
+                  file_server
+                }
+              }
+
+              {
+                servers {
+                  max_header_size 25MB
+                  client_ip_headers X-Forwarded-For X-Real-IP
+                  trusted_proxies static private_ranges
+                }
+              }
+
+              {$SITE_ADDRESS} {
+                import plane_proxy
+              }
+            swarmRef:
+              file: {name: /app/proxy/Caddyfile, mode: 444}
+          supervisor.conf:
+            # The image's programs, with their output to the container's rather than to
+            # files in /app/logs, where the app's logs would never show it.
+            content: |
+              [supervisord]
+              user=root
+              nodaemon=true
+              logfile=/dev/null
+              logfile_maxbytes=0
+
+              [program:migrator]
+              directory=/app/backend
+              command=sh -c "./bin/docker-entrypoint-migrator.sh"
+              autorestart=unexpected
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              priority=10
+
+              [program:space]
+              directory=/app/space/apps/space
+              command=sh -c "npx react-router-serve ./build/server/index.js"
+              autorestart=true
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              environment=PORT=3002,HOSTNAME=0.0.0.0
+              priority=15
+
+              [program:api]
+              directory=/app/backend
+              command=sh -c "./bin/docker-entrypoint-api.sh"
+              autorestart=true
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              environment=PORT=3004,HOSTNAME=0.0.0.0
+              priority=15
+
+              [program:worker]
+              directory=/app/backend
+              command=sh -c "./bin/docker-entrypoint-worker.sh"
+              autorestart=true
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              priority=20
+
+              [program:beat]
+              directory=/app/backend
+              command=sh -c "./bin/docker-entrypoint-beat.sh"
+              autorestart=true
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              priority=20
+
+              [program:live]
+              command=sh -c "node /app/live/apps/live"
+              autorestart=true
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              environment=PORT=3005,HOSTNAME=0.0.0.0
+              priority=20
+
+              [program:proxy]
+              directory=/app/proxy
+              command=sh -c "caddy run --config /app/proxy/Caddyfile"
+              autorestart=true
+              stdout_logfile=/dev/stdout
+              stdout_logfile_maxbytes=0
+              redirect_stderr=true
+              priority=20
+            swarmRef:
+              file: {name: /hivepaas/supervisor.conf, mode: 444}
+          bootstrap.py:
+            # What the instance setup page does, once, while there is no instance
+            # administrator: the account, its role, and the instance marked set up.
+            content: |
+              import os
+              import time
+              import uuid
+
+              from django.contrib.auth.hashers import make_password
+              from django.db import transaction
+
+              from plane.db.models import Profile, User
+              from plane.license.models import Instance, InstanceAdmin
+
+              # The API registers the instance as it starts; wait for that.
+              while Instance.objects.first() is None:
+                  time.sleep(3)
+
+              with transaction.atomic():
+                  instance = Instance.objects.select_for_update().first()
+                  if not instance.is_setup_done and not InstanceAdmin.objects.exists():
+                      email = os.environ["PLANE_ADMIN_EMAIL"].strip().lower()
+                      user = User.objects.filter(email=email).first()
+                      if user is None:
+                          user = User.objects.create(
+                              first_name=os.environ["PLANE_ADMIN_NAME"],
+                              email=email,
+                              username=uuid.uuid4().hex,
+                              password=make_password(os.environ["PLANE_ADMIN_PASSWORD"]),
+                              is_password_autoset=False,
+                              is_active=True,
+                          )
+                          Profile.objects.create(user=user, company_name=os.environ["PLANE_COMPANY_NAME"])
+                      InstanceAdmin.objects.create(user=user, instance=instance)
+                      instance.is_setup_done = True
+                      instance.instance_name = os.environ["PLANE_COMPANY_NAME"]
+                      instance.is_telemetry_enabled = False
+                      instance.save()
+                      print("hivepaas: instance administrator created")
+            swarmRef:
+              file: {name: /hivepaas/bootstrap.py, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── S3 store ───────────────────────────────────────────────────────────
+  - name: s3
+    title: S3 store
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /data: {type: volume, source: "${{ params.s3Volume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fsS -o /dev/null http://127.0.0.1:9000/health
+            interval: 20s
+            timeout: 10s
+            startPeriod: 45s
+            retries: 5
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: plane, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: RUSTFS_VOLUMES, v: /data}
+            - {k: RUSTFS_ADDRESS, v: "0.0.0.0:9000"}
+            - {k: RUSTFS_ACCESS_KEY, v: plane}
+            - {k: RUSTFS_SECRET_KEY, v: "${secrets.S3_SECRET_KEY}"}
+            # No console: Plane is the only client, and nothing routes to it.
+            - {k: RUSTFS_CONSOLE_ENABLE, v: "false"}
+        secrets:
+          S3_SECRET_KEY:
+            value: "${{ params.s3SecretKey }}"
