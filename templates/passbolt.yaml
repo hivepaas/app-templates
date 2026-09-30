@@ -1,0 +1,206 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: passbolt
+  title: Passbolt
+  tagline: A password manager for teams, end-to-end encrypted with OpenPGP
+  description: |
+    Passbolt keeps a team's passwords, encrypted end to end with OpenPGP: each secret is
+    encrypted in the browser for each person it is shared with, so the server never sees
+    it. It shares by user and by group, keeps folders, tags, TOTP codes and notes, and has
+    browser extensions, mobile and desktop apps, a CLI and an API.
+
+    **This template creates two apps**
+
+    - **Passbolt** Community Edition, with its server keys on a volume
+    - **a MariaDB database**, named after the app with `-db` added
+
+    **The first start registers the administrator**
+
+    The administrator below is registered and sent an email with a link that finishes the
+    setup - in the Passbolt browser extension, which creates their key. The link is also in
+    this app's log. There is no public sign-up: the administrator invites everyone else.
+
+    **Email is needed**
+
+    Invitations and notifications go by email: give an SMTP server below.
+
+    **A domain, over HTTPS**
+
+    Passbolt's links, and its browser extension, use the app's address: give it a domain.
+
+    **Keep the volume**
+
+    The server's OpenPGP key is on the volume; without it, nothing stored can be read by
+    the clients again.
+  categories: [webapps/security]
+  tags: [passwords, secrets, collaboration, open-source]
+  aliases: [password manager, team passwords, 1password alternative, bitwarden alternative, lastpass alternative, openpgp]
+  icon: icons/passbolt.svg
+  links:
+    website: https://www.passbolt.com
+    documentation: https://www.passbolt.com/docs/hosting/install/ce/docker/
+    source: https://github.com/passbolt/passbolt_api
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Passbolt answers at. Its links and its browser extension use it: leave it
+      empty only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The setup link is sent to it.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminFirstName
+    title: Administrator first name
+    type: string
+    default: Admin
+    maxLength: 60
+  - name: adminLastName
+    title: Administrator last name
+    type: string
+    default: User
+    maxLength: 60
+  - name: smtpHost
+    title: SMTP host
+    description: For TLS from the first byte, usually on port 465, write it as `ssl://smtp.example.com`.
+    type: string
+    default: smtp.example.com
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpStarttls
+    title: STARTTLS
+    type: select
+    default: TLS
+    options:
+      - {value: TLS, title: "Yes - usually port 587"}
+      - {value: NO_TLS, title: "No - no TLS, or TLS from the first byte with ssl://"}
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: Sender address
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: dataVolume
+    title: Data volume
+    description: The volume the server's OpenPGP key and the token signing keys are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: passbolt
+      username: passbolt
+
+versions:
+  - name: "5.16"
+    release: "5.16.0-1"
+    default: true
+    image: passbolt/passbolt:5.16.0-1-ce-non-root
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # As Passbolt's own Compose file does: wait for the database, then the image's start -
+      # which creates the keys and the schema the first time - with the administrator
+      # registered beside it.
+      command: >-
+        sh -c '/usr/bin/wait-for.sh -t 0 "$DATASOURCES_DEFAULT_HOST:$DATASOURCES_DEFAULT_PORT" --
+        sh -c "sh /hivepaas/bootstrap.sh & exec /docker-entrypoint.sh"'
+    storage:
+      mounts:
+        /etc/passbolt/gpg:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: gpg}
+        /etc/passbolt/jwt:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: jwt}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8080/healthcheck/status.json
+        interval: 30s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: 512MB}
+  settings:
+    kind:
+      category: webapp
+      engine: passbolt
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_FULL_BASE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: DATASOURCES_DEFAULT_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATASOURCES_DEFAULT_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATASOURCES_DEFAULT_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATASOURCES_DEFAULT_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DATASOURCES_DEFAULT_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: EMAIL_TRANSPORT_DEFAULT_HOST, v: "${{ params.smtpHost }}"}
+        - {k: EMAIL_TRANSPORT_DEFAULT_PORT, v: "${{ params.smtpPort }}"}
+        # EMAIL_TRANSPORT_DEFAULT_TLS for STARTTLS. Passbolt reads it as is - any value,
+        # "false" included, turns STARTTLS on - so without, the variable is one it ignores.
+        - {k: "EMAIL_TRANSPORT_DEFAULT_${{ params.smtpStarttls }}", v: "true"}
+        - {k: EMAIL_TRANSPORT_DEFAULT_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: EMAIL_TRANSPORT_DEFAULT_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: EMAIL_DEFAULT_FROM, v: "${{ params.smtpFromEmail }}"}
+        - {k: PASSBOLT_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: PASSBOLT_ADMIN_FIRST_NAME, v: "${{ params.adminFirstName }}"}
+        - {k: PASSBOLT_ADMIN_LAST_NAME, v: "${{ params.adminLastName }}"}
+    secrets:
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    configFiles:
+      bootstrap.sh:
+        content: |
+          # Once the server answers: the administrator, registered once - a marker on the volume
+          # keeps it from being tried again. Passbolt emails them the link that finishes the setup
+          # in the browser extension; it is in this app's log too.
+          [ -f /etc/passbolt/gpg/.hivepaas-admin ] && exit 0
+          until curl -fs -o /dev/null http://127.0.0.1:8080/healthcheck/status.json; do sleep 5; done
+          out=$(/usr/share/php/passbolt/bin/cake passbolt register_user -r admin \
+            -u "$PASSBOLT_ADMIN_EMAIL" -f "$PASSBOLT_ADMIN_FIRST_NAME" -l "$PASSBOLT_ADMIN_LAST_NAME" 2>&1)
+          case "$out" in
+            *"User saved successfully"*|*"already in use"*)
+              touch /etc/passbolt/gpg/.hivepaas-admin
+              printf '%s\n' "$out" | grep -E "https?://" | sed 's/^/hivepaas: administrator setup link: /' ;;
+            *) printf 'hivepaas: could not register the administrator:\n%s\n' "$out" ;;
+          esac
+        swarmRef:
+          file: {name: /hivepaas/bootstrap.sh, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -10073,6 +10073,54 @@
       }
     },
     {
+      "name": "passbolt",
+      "file": {
+        "path": "templates/passbolt.yaml",
+        "sha256": "247b8cdd63d908acc93cb995f5ba972a4d237a5ac0e42f8960bae20252d74ce1"
+      },
+      "icon": {
+        "path": "icons/passbolt.svg",
+        "sha256": "30fa13a31d2fdcd150df68f47b90323d3a1d57c4b78b73f8901f80c3be906c8e"
+      },
+      "title": "Passbolt",
+      "tagline": "A password manager for teams, end-to-end encrypted with OpenPGP",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "passwords",
+        "secrets",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "password manager",
+        "team passwords",
+        "1password alternative",
+        "bitwarden alternative",
+        "lastpass alternative",
+        "openpgp"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5.16",
+          "release": "5.16.0-1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "penpot",
       "file": {
         "path": "templates/penpot.yaml",
