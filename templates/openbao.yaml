@@ -74,9 +74,12 @@ parameters:
     type: volume
 
 versions:
+  - name: "2.7"
+    release: "2.7.0"
+    default: true
+    image: openbao/openbao:2.7.0
   - name: "2.6"
     release: "2.6.2"
-    default: true
     image: openbao/openbao:2.6.2
 
 app:

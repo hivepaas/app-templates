@@ -9303,7 +9303,7 @@
       "name": "openbao",
       "file": {
         "path": "templates/openbao.yaml",
-        "sha256": "3d9d41572606ae649ef7a0c3410c36e8d0e5a417edbf02bc313f4e51d25aa209"
+        "sha256": "9aa51b9c7d314c4cf6afea790c92ae265c23892adfcb4095d17f7abb0ab464f8"
       },
       "icon": {
         "path": "icons/openbao.svg",
@@ -9328,9 +9328,13 @@
       "license": "MPL-2.0",
       "versions": [
         {
-          "name": "2.6",
-          "release": "2.6.2",
+          "name": "2.7",
+          "release": "2.7.0",
           "default": true
+        },
+        {
+          "name": "2.6",
+          "release": "2.6.2"
         }
       ],
       "requires": {
