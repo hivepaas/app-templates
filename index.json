@@ -12079,6 +12079,59 @@
       }
     },
     {
+      "name": "termix",
+      "file": {
+        "path": "templates/termix.yaml",
+        "sha256": "9b44556735292e1fe3c67edfff205da0f034e0666828c717fbc15a6302fef300"
+      },
+      "icon": {
+        "path": "icons/termix.svg",
+        "sha256": "dafa1fd0b86d688f3921b8a967dfb530a94bfea1f072b45a97a2a918e325cd71"
+      },
+      "title": "Termix",
+      "tagline": "SSH terminals, tunnels, files and remote desktops, in the browser",
+      "categories": [
+        "webapps/networking",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "ssh",
+        "web ssh",
+        "terminal",
+        "rdp",
+        "vnc",
+        "sftp",
+        "server management",
+        "termius alternative"
+      ],
+      "license": "Apache-2.0",
+      "components": [
+        {
+          "name": "termix",
+          "title": "Termix",
+          "primary": true
+        },
+        {
+          "name": "guacd",
+          "title": "guacd"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.8",
+          "release": "2.8.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "terraria",
       "file": {
         "path": "templates/terraria.yaml",

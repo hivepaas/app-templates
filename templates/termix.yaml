@@ -1,0 +1,195 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: termix
+  title: Termix
+  tagline: SSH terminals, tunnels, files and remote desktops, in the browser
+  description: |
+    Termix is a server management page: SSH terminals in split panes and tabs, SSH
+    tunnels, a file manager over SFTP, server stats, and RDP, VNC and Telnet sessions -
+    with hosts, keys and credentials kept encrypted and shared with the people you choose.
+
+    **This template creates one app, as two components**
+
+    - **Termix**, on a volume for its database, keys and uploads
+    - **guacd**, the Apache Guacamole daemon that Termix drives RDP, VNC and Telnet
+      sessions through, on the same volume for session recordings
+
+    **The first start creates the administrator, then closes sign-up**
+
+    Termix makes whoever registers first its administrator, and leaves registration open
+    after that. On the first start this template creates the administrator below, then
+    turns registration off; the app is not reported healthy - and so gets no traffic -
+    until both are done. Invite the others, or turn registration back on, in the admin
+    settings.
+
+    **Keys**
+
+    Termix generates its encryption keys on the first start and keeps them on the
+    volume, beside the encrypted database: back them up together.
+
+    **Usage statistics are off**
+
+    Termix sends an anonymous heartbeat by default. `ENABLE_TELEMETRY` is set to false.
+  categories: [webapps/networking, webapps/dev-tools]
+  tags: [networking, open-source]
+  aliases: [ssh, web ssh, terminal, rdp, vnc, sftp, server management, termius alternative]
+  icon: icons/termix.svg
+  links:
+    website: https://termix.site
+    documentation: https://docs.termix.site
+    source: https://github.com/Termix-SSH/Termix
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Termix answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database, its keys, uploads and session recordings are kept on.
+    type: volume
+
+versions:
+  - name: "2.8"
+    release: "2.8.0"
+    default: true
+    components:
+      termix: {image: "ghcr.io/lukegus/termix:2.8.0"}
+      guacd: {image: "guacamole/guacd:1.6.0"}
+
+components:
+  # ── Termix ─────────────────────────────────────────────────────────────
+  - name: termix
+    title: Termix
+    primary: true
+    needs: [guacd]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Runs the bootstrap below beside the image's own start script.
+          command: sh -c 'node /hivepaas/bootstrap.mjs & exec /entrypoint.sh'
+        storage:
+          mounts:
+            /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # Serving, and with an administrator: until the bootstrap has created one,
+            # whoever registered first would become it.
+            command: >-
+              wget -q -O - http://127.0.0.1:8080/users/setup-required |
+              grep -q '"setup_required":false'
+            interval: 10s
+            timeout: 5s
+            startPeriod: 60s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: termix, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: PORT, v: "8080"}
+            - {k: GUACD_HOST, v: "${{ comp.guacd.key }}"}
+            - {k: GUACD_TUNNEL_HOST, v: "${{ comp.termix.key }}"}
+            # Paths on guacd's side, where the same volume is mounted at /termix-data.
+            - {k: GUACD_RECORDING_PATH, v: /termix-data/session_recordings/guacamole}
+            - {k: GUACD_DRIVE_PATH, v: /termix-data/rdp-drive}
+            - {k: ENABLE_TELEMETRY, v: "false"}
+            - {k: TERMIX_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+            - {k: TERMIX_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+        configFiles:
+          bootstrap.mjs:
+            # Only while Termix has no user at all: creates the administrator, signs in
+            # as it and turns registration off. On any later start there is a user, and
+            # it exits at once.
+            content: |
+              const base = "http://127.0.0.1:8080";
+              const username = process.env.TERMIX_ADMIN_USERNAME;
+              const password = process.env.TERMIX_ADMIN_PASSWORD;
+              const call = (path, method, body, cookie) =>
+                fetch(base + path, {
+                  method,
+                  headers: { "Content-Type": "application/json", ...(cookie ? { cookie } : {}) },
+                  body: body && JSON.stringify(body),
+                });
+
+              for (;;) {
+                try {
+                  const res = await call("/users/setup-required", "GET");
+                  if (res.ok) {
+                    if (!(await res.json()).setup_required) process.exit(0);
+                    break;
+                  }
+                } catch {}
+                await new Promise((r) => setTimeout(r, 2000));
+              }
+              let res = await call("/users/create", "POST", { username, password });
+              console.log("hivepaas bootstrap: administrator", username, "created:", res.status);
+              res = await call("/users/login", "POST", { username, password });
+              const cookie = (res.headers.get("set-cookie") || "").split(";")[0];
+              res = await call("/users/registration-allowed", "PATCH", { allowed: false }, cookie);
+              console.log("hivepaas bootstrap: registration closed:", res.status);
+            swarmRef:
+              file: {name: /hivepaas/bootstrap.mjs, mode: 444}
+        routing:
+          port: 8080
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── guacd ──────────────────────────────────────────────────────────────
+  - name: guacd
+    title: guacd
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /termix-data: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image's own check, with an interval shorter than its five minutes.
+            command: nc -z 127.0.0.1 4822
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: termix, version: "${{ version.name }}", webapp: {}}
