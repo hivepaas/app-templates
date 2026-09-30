@@ -1,0 +1,121 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: openobserve
+  title: OpenObserve
+  tagline: Logs, metrics and traces in one place, searched with SQL, stored in Parquet
+  description: |
+    OpenObserve is an observability platform in the spirit of Elasticsearch, Datadog and
+    Splunk: it takes logs, metrics and traces - over OpenTelemetry, or APIs compatible with
+    Elasticsearch, Loki and Prometheus remote write - stores them compressed in Parquet, and
+    lets you search them with SQL or PromQL, build dashboards, and set alerts.
+
+    **This template creates one app**
+
+    OpenObserve as a single node, with its data and its metadata database on a volume.
+
+    **Sending data**
+
+    Clients authenticate with the root user's email and password, or with the ingestion
+    tokens shown in the app under Data Sources. Over HTTPS, at this app's address:
+
+    - OpenTelemetry: `/api/default/v1/logs`, `/api/default/v1/metrics`,
+      `/api/default/v1/traces`
+    - Elasticsearch bulk: `/api/default/_bulk`
+    - JSON: `/api/default/<stream>/_json`
+
+    OpenTelemetry over gRPC (port 5081) is not published.
+
+    **The root user**
+
+    It is created on the first start from the values below; change its password
+    afterwards in the app, not here.
+  categories: [observability/monitoring]
+  tags: [monitoring, metrics, analytics, open-source]
+  aliases: [logs, log management, observability, elasticsearch alternative, datadog alternative, splunk alternative, opentelemetry, traces]
+  icon: icons/openobserve.svg
+  links:
+    website: https://openobserve.ai
+    documentation: https://openobserve.ai/docs/
+    source: https://github.com/openobserve/openobserve
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the web interface and the ingestion APIs answer at. Leave it empty to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Root user's email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Root user's password
+    description: >-
+      OpenObserve requires a special character, so the password is this value with `!` added
+      at the end - the whole of it is under the app's Secrets. It needs upper- and lowercase
+      letters and a digit too. Leave empty to generate one.
+    type: secret
+    minLength: 12
+    # Long, so that a generated one lacks a digit or a case once in thousands of draws.
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: It takes about 300MB at rest; searches over large ranges take more.
+    type: size
+    default: 2GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the ingested data, its write-ahead log and the metadata database are kept on.
+    type: volume
+
+versions:
+  - name: "1.0"
+    release: "1.0.4"
+    default: true
+    image: openobserve/openobserve:v1.0.4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        # The image has no shell and no HTTP client to ask /healthz with.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: openobserve
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ZO_DATA_DIR, v: /data}
+        - {k: ZO_ROOT_USER_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ZO_ROOT_USER_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        # For the links in alerts.
+        - {k: ZO_WEB_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: ZO_TELEMETRY, v: "false"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}!"
+    routing:
+      port: 5080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

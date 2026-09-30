@@ -9477,6 +9477,49 @@
       }
     },
     {
+      "name": "openobserve",
+      "file": {
+        "path": "templates/openobserve.yaml",
+        "sha256": "1062b8c3af93db23141b0e403c1142528963b86877ee0b9de696c9774f3d3816"
+      },
+      "icon": {
+        "path": "icons/openobserve.svg",
+        "sha256": "82c32e142ed6a8a22ca5bb4bf61957bd126b7c9ffa27eac25bca2c61c8460cc1"
+      },
+      "title": "OpenObserve",
+      "tagline": "Logs, metrics and traces in one place, searched with SQL, stored in Parquet",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "metrics",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "logs",
+        "log management",
+        "observability",
+        "elasticsearch alternative",
+        "datadog alternative",
+        "splunk alternative",
+        "opentelemetry",
+        "traces"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.0",
+          "release": "1.0.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "openproject",
       "file": {
         "path": "templates/openproject.yaml",
