@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: etherpad
+  title: Etherpad
+  tagline: Real-time collaborative text editing, each author in their own colour
+  description: |
+    Etherpad is a collaborative editor: everyone with a pad's link writes in it at once,
+    each author's text in their own colour, with chat beside it, a timeslider that replays
+    every change, and import and export to Word, PDF, HTML and more. Hundreds of plugins
+    add headings, tables, comments, images and other features.
+
+    **This template creates two apps**
+
+    - **Etherpad**
+    - **a PostgreSQL database** for the pads, named after the app with `-db` added
+
+    **Who can write**
+
+    By default anyone with the address can open and create pads - that is Etherpad's
+    model: a pad is as private as its link. To require a login first, choose so below;
+    everyone then signs in as `user`, with the password below.
+
+    **Administration**
+
+    Sign in to `/admin` as `admin` with the password below, to install plugins and change
+    settings.
+  categories: [webapps/documents]
+  tags: [documents, collaboration, notes, open-source]
+  aliases: [collaborative editor, pad, etherpad lite, google docs alternative, real-time editing, notes]
+  icon: icons/etherpad.svg
+  links:
+    website: https://etherpad.org
+    documentation: https://docs.etherpad.org
+    source: https://github.com/ether/etherpad
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Etherpad answers at. Its sign-in uses it: leave it empty only to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: requireLogin
+    title: Access
+    type: select
+    default: "false"
+    options:
+      - {value: "false", title: "Open - anyone with a pad's address can write in it"}
+      - {value: "true", title: "Login first - as the user below"}
+  - name: adminPassword
+    title: Administrator password
+    description: Of the `admin` account, for `/admin`. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: userPassword
+    title: User password
+    description: Of the `user` account everyone signs in as when a login is required. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 16}
+  - name: adminClientSecret
+    title: Admin client secret
+    description: >-
+      Etherpad signs people in through an OpenID Connect provider of its own; these are its
+      two clients' secrets. Leave them empty to generate them.
+    type: secret
+    minLength: 32
+    generate: {length: 48, charset: hex}
+  - name: userClientSecret
+    title: User client secret
+    type: secret
+    minLength: 32
+    generate: {length: 48, charset: hex}
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: etherpad
+      username: etherpad
+
+versions:
+  - name: "3.3"
+    release: "3.3.6"
+    default: true
+    image: etherpad/etherpad:3.3.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Etherpad refuses to start without its sign-in's address: until the app has a
+      # domain, it takes localhost. Then the image's own start.
+      command: >-
+        sh -c 'if [ -z "$ETHERPAD_URL" ]; then ETHERPAD_URL=http://localhost:9001; fi;
+        export SSO_ISSUER="$ETHERPAD_URL" ADMIN_REDIRECT="$ETHERPAD_URL/admin/" USER_REDIRECT="$ETHERPAD_URL/";
+        cd src && exec node --require tsx/cjs node/server.ts'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check.
+        command: wget -qO- http://127.0.0.1:9001/health | grep -qE "pass|ok|up"
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: 512MB}
+  settings:
+    kind:
+      category: webapp
+      engine: etherpad
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ETHERPAD_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: DB_TYPE, v: postgres}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: USER_PASSWORD, v: "${secrets.USER_PASSWORD}"}
+        - {k: REQUIRE_AUTHENTICATION, v: "${{ params.requireLogin }}"}
+        # Left unset, both fall back to secrets published in Etherpad's settings file.
+        - {k: ADMIN_SECRET, v: "${secrets.ADMIN_CLIENT_SECRET}"}
+        - {k: USER_SECRET, v: "${secrets.USER_CLIENT_SECRET}"}
+        # Behind HivePaaS's router: the client's address and scheme are in its headers.
+        - {k: TRUST_PROXY, v: "true"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      USER_PASSWORD:
+        value: "${{ params.userPassword }}"
+      ADMIN_CLIENT_SECRET:
+        value: "${{ params.adminClientSecret }}"
+      USER_CLIENT_SECRET:
+        value: "${{ params.userClientSecret }}"
+    routing:
+      port: 9001
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

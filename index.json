@@ -3094,6 +3094,54 @@
       }
     },
     {
+      "name": "etherpad",
+      "file": {
+        "path": "templates/etherpad.yaml",
+        "sha256": "0c6ee92ab140e9d9732d5b2d2cd3ceebf9f986e26e68dbde5d2d472d51679e2a"
+      },
+      "icon": {
+        "path": "icons/etherpad.svg",
+        "sha256": "447f595d629205c191c2dee226042a667b7dfa860cca3a250de8b429392f9d9c"
+      },
+      "title": "Etherpad",
+      "tagline": "Real-time collaborative text editing, each author in their own colour",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "notes",
+        "open-source"
+      ],
+      "aliases": [
+        "collaborative editor",
+        "pad",
+        "etherpad lite",
+        "google docs alternative",
+        "real-time editing",
+        "notes"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.3",
+          "release": "3.3.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "evershop",
       "file": {
         "path": "templates/evershop.yaml",
