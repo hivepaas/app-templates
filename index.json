@@ -4959,6 +4959,53 @@
       }
     },
     {
+      "name": "growthbook",
+      "file": {
+        "path": "templates/growthbook.yaml",
+        "sha256": "c5d9824a493236c41cbcf17758d389cae9fd903982625a8eeb87de53466758b2"
+      },
+      "icon": {
+        "path": "icons/growthbook.png",
+        "sha256": "ca4853bb1f7866258abebce6a23c7d9544a3978a05f35843a69487ebdd409ce7"
+      },
+      "title": "GrowthBook",
+      "tagline": "Feature flags and A/B testing with a statistics engine, on your data warehouse",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "feature-flags",
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "feature flags",
+        "a/b testing",
+        "experimentation",
+        "launchdarkly alternative",
+        "optimizely alternative",
+        "split testing"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mongodb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5.1",
+          "release": "5.1.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "hatchet",
       "file": {
         "path": "templates/hatchet.yaml",

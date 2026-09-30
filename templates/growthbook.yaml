@@ -1,0 +1,233 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: growthbook
+  title: GrowthBook
+  tagline: Feature flags and A/B testing with a statistics engine, on your data warehouse
+  description: |
+    GrowthBook combines feature flags with experimentation: roll features out by targeting
+    rules and percentages, run A/B tests on them, and analyse the results with a Bayesian
+    or frequentist engine against metrics defined in your own warehouse or analytics -
+    BigQuery, Snowflake, Postgres, ClickHouse, Mixpanel and others - with SDKs for every
+    major language.
+
+    **This template creates two apps**
+
+    - **GrowthBook**, with uploaded images on a volume
+    - **a MongoDB database**, named after the app with `-db` added
+
+    **Two domains**
+
+    GrowthBook answers on two ports: the web app, and the API that the web app and the SDKs
+    call. Give both a domain below; the web app does not work without the API's.
+
+    **The first start creates the administrator**
+
+    A new GrowthBook lets whoever opens it first create the organisation and become its
+    administrator. This template does that step itself, with the values below, before the
+    app takes any traffic. Invite the rest of the team from Settings > Team.
+
+    **Email**
+
+    Invitations and password resets are sent by email once `EMAIL_ENABLED` and the
+    `EMAIL_*` environment variables are set; GrowthBook's
+    [documentation](https://docs.growthbook.io/self-host/env) lists them.
+  categories: [webapps/dev-tools]
+  tags: [feature-flags, analytics, open-source]
+  aliases: [feature flags, a/b testing, experimentation, launchdarkly alternative, optimizely alternative, split testing]
+  icon: icons/growthbook.png
+  links:
+    website: https://www.growthbook.io
+    documentation: https://docs.growthbook.io/self-host
+    source: https://github.com/growthbook/growthbook
+  # MIT, apart from the enterprise features, which need a license key.
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: Where the web app answers - `growthbook.example.com`.
+    type: domain
+    optional: true
+  - name: apiDomain
+    title: API domain
+    description: >-
+      Where the API answers - `growthbook-api.example.com`. The web app calls it from the
+      browser, and SDKs fetch their features from it.
+    type: domain
+    optional: true
+  - name: companyName
+    title: Organisation name
+    type: string
+    default: My Company
+    minLength: 3
+    maxLength: 100
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Administrator
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: jwtSecret
+    title: JWT secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      Encrypts the data source credentials GrowthBook stores. Leave empty to generate one,
+      keep it with the backups, and never change it.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Uploads volume
+    description: The volume images uploaded to features and experiments are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mongodb
+    version: "8.2"
+    params:
+      dbName: growthbook
+      username: growthbook
+
+versions:
+  - name: "5.1"
+    release: "5.1.0"
+    default: true
+    image: growthbook/growthbook:5.1.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: /usr/local/bin/node /hivepaas/start.mjs
+    storage:
+      mounts:
+        /usr/local/src/app/packages/back-end/uploads: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        # No shell in the image: node is called directly.
+        mode: CMD
+        command: /usr/local/bin/node /hivepaas/health.mjs
+        interval: 20s
+        timeout: 10s
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: growthbook
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NODE_ENV, v: production}
+        - k: MONGODB_URI
+          v: >-
+            mongodb://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?authSource=admin
+        - {k: APP_ORIGIN, v: "${HIVEPAAS_APP_URL}"}
+        - {k: API_HOST, v: "https://${{ params.apiDomain }}"}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        - {k: GROWTHBOOK_COMPANY_NAME, v: "${{ params.companyName }}"}
+        - {k: GROWTHBOOK_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: GROWTHBOOK_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: GROWTHBOOK_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      start.mjs:
+        content: |
+          // The image's own start, as a child process, with the administrator created beside it:
+          // the image has no shell to do this in.
+          import { spawn } from 'node:child_process';
+
+          const child = spawn('/usr/local/bin/node', ['scripts/run-apps.js', 'start', 'ecosystem.config.js'], {
+            stdio: 'inherit',
+          });
+          for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => child.kill(signal));
+          child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+
+          // A new installation lets whoever opens it first create the organisation and become its
+          // administrator. That is done here, once the API answers, with the values below - the
+          // health check keeps the app from traffic until it is.
+          const api = 'http://127.0.0.1:3100';
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          for (;;) {
+            try {
+              const res = await fetch(`${api}/auth/refresh`, { method: 'POST' });
+              const { newInstallation } = await res.json();
+              if (newInstallation) {
+                const created = await fetch(`${api}/auth/firsttime`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    email: process.env.GROWTHBOOK_ADMIN_EMAIL,
+                    name: process.env.GROWTHBOOK_ADMIN_NAME,
+                    password: process.env.GROWTHBOOK_ADMIN_PASSWORD,
+                    companyname: process.env.GROWTHBOOK_COMPANY_NAME,
+                  }),
+                });
+                console.log(`hivepaas: administrator and organisation: ${created.status} ${created.ok ? '' : await created.text()}`);
+              }
+              break;
+            } catch {
+              await sleep(3000);
+            }
+          }
+        swarmRef:
+          file: {name: /hivepaas/start.mjs, mode: 444}
+      health.mjs:
+        content: |
+          // Healthy once the API answers and the installation has its administrator: until then,
+          // whoever opened it could take that place.
+          try {
+            const health = await fetch('http://127.0.0.1:3100/healthcheck');
+            const { newInstallation } = await (await fetch('http://127.0.0.1:3100/auth/refresh', { method: 'POST' })).json();
+            process.exit(health.ok && newInstallation === false ? 0 : 1);
+          } catch {
+            process.exit(1);
+          }
+        swarmRef:
+          file: {name: /hivepaas/health.mjs, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+        - {domain: "${{ params.apiDomain }}", enabled: true, forceHttps: true, containerPort: 3100}
