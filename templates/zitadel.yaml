@@ -1,0 +1,304 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: zitadel
+  title: ZITADEL
+  tagline: Identity and access management - SSO, OIDC, SAML, passkeys, multi-tenant
+  description: |
+    ZITADEL is an identity provider: sign-in with passwords, passkeys, TOTP and social or
+    enterprise providers, single sign-on for your apps over OpenID Connect, OAuth 2 and
+    SAML, organisations and projects for B2B multi-tenancy, roles, service accounts,
+    actions, and a complete API - with an audit trail of every change.
+
+    **This template creates two apps**
+
+    - **ZITADEL**, as three components: the API server, which also serves the management
+      console; the login UI; and an nginx the domain points at, which routes between them
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    **The external domain is for good**
+
+    ZITADEL answers only for the domain it was set up with, and issues tokens under it.
+    Give it below, and give the gateway the same address as its domain.
+
+    **Signing in**
+
+    The first start creates the organisation and administrator below. Their login name is
+    `<username>@<organisation name in lower case>.<external domain>` - for instance
+    `admin@zitadel.auth.example.com`. The console is at `/ui/console`.
+
+    **Clients and gRPC**
+
+    Apps use OIDC, SAML, and the REST and Connect APIs, over HTTPS. Native gRPC clients,
+    which need HTTP/2 end to end, are not served.
+  categories: [webapps/security]
+  tags: [identity, sso, open-source]
+  aliases: [sso, oidc, saml, oauth, identity provider, idp, auth0 alternative, keycloak alternative, okta alternative, passkeys]
+  icon: icons/zitadel.svg
+  links:
+    website: https://zitadel.com
+    documentation: https://zitadel.com/docs/self-hosting/deploy/compose
+    source: https://github.com/zitadel/zitadel
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: externalDomain
+    title: External domain
+    description: >-
+      The domain ZITADEL answers for, which cannot change later - `auth.example.com`, and the
+      gateway's domain below too.
+    type: string
+    default: auth.example.com
+    pattern: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$'
+  - name: domain
+    title: Domain
+    description: >-
+      The address ZITADEL answers at - the external domain above. Leave it empty only to add
+      it later, in the gateway's routing settings.
+    type: domain
+    optional: true
+  - name: orgName
+    title: Organisation name
+    description: The first organisation, the administrator's.
+    type: string
+    default: ZITADEL
+    pattern: '^[A-Za-z0-9-]{1,64}$'
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-z0-9._-]{1,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      ZITADEL requires upper- and lowercase letters, a digit and a symbol, so the password is
+      this value with `!1aA` added at the end - the whole of it is under the API component's
+      Secrets. Leave empty to generate one. Used once, when the first start creates the account.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: masterKey
+    title: Master key
+    description: >-
+      Encrypts ZITADEL's keys and secrets in the database, exactly 32 characters. Leave empty
+      to generate one, keep it with the backups, and never change it.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: loginCookieSecret
+    title: Login session secret
+    description: Signs the login UI's session cookie. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: API memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Bootstrap volume
+    description: >-
+      The volume the login UI's access token is kept on - written by the API server on the
+      first start, read by the login UI.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: zitadel
+      username: zitadel
+
+versions:
+  - name: "4.19"
+    release: "4.19.3"
+    default: true
+    components:
+      gateway: {image: "nginx:1.30.5-alpine"}
+      api: {image: "ghcr.io/zitadel/zitadel:v4.19.3"}
+      login: {image: "ghcr.io/zitadel/zitadel-login:v4.19.3"}
+
+components:
+  # ── Gateway ────────────────────────────────────────────────────────────
+  - name: gateway
+    title: Gateway
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # A server of its own on the loopback: healthy while nginx runs.
+            command: wget -q -O /dev/null http://127.0.0.1:8081/
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 64MB}
+      settings:
+        kind: {category: webapp, engine: zitadel, version: "${{ version.name }}", webapp: {}}
+        configFiles:
+          default.conf:
+            # ZITADEL's own routes, from its Compose file.
+            content: |
+              map $http_x_forwarded_proto $forwarded_proto {
+                default $http_x_forwarded_proto;
+                "" $scheme;
+              }
+
+              server {
+                listen 80;
+                server_name _;
+                # Docker's resolver, asked at each request: a component that restarts, or is not up
+                # yet, is found again rather than failing nginx's start.
+                resolver 127.0.0.11 valid=30s ipv6=off;
+                set $api ${{ comp.api.key }}:8080;
+                set $login ${{ comp.login.key }}:3000;
+
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $forwarded_proto;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_buffering off;
+                proxy_read_timeout 300s;
+
+                # The login UI, and the root, which opens it.
+                location = / { rewrite ^ /ui/v2/login/ break; proxy_pass http://$login; }
+                location /ui/v2/login { proxy_pass http://$login; }
+                # /api/... is the API without the prefix.
+                location /api/ { rewrite ^/api/(.*)$ /$1 break; proxy_pass http://$api; }
+                # Everything else - the console, OIDC, SAML and the other APIs - is the API server's.
+                location / { proxy_pass http://$api; }
+              }
+
+              server {
+                listen 127.0.0.1:8081;
+                location / { return 204; }
+              }
+            swarmRef:
+              file: {name: /etc/nginx/conf.d/default.conf, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── API ────────────────────────────────────────────────────────────────
+  - name: api
+    title: API server
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Creates the schema and the first instance when the database is empty; then
+          # serves. The master key is read from ZITADEL_MASTERKEY.
+          command: start-from-init --masterkeyFromEnv
+        storage:
+          mounts:
+            /zitadel/bootstrap: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: /app/zitadel ready
+            interval: 15s
+            timeout: 30s
+            # The first start creates the schema and the instance.
+            startPeriod: 120s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: zitadel, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: ZITADEL_MASTERKEY, v: "${secrets.MASTER_KEY}"}
+            - {k: ZITADEL_PORT, v: "8080"}
+            - {k: ZITADEL_EXTERNALDOMAIN, v: "${{ params.externalDomain }}"}
+            # TLS ends at HivePaaS's router; the addresses ZITADEL builds are https on 443.
+            - {k: ZITADEL_EXTERNALPORT, v: "443"}
+            - {k: ZITADEL_EXTERNALSECURE, v: "true"}
+            - {k: ZITADEL_TLS_ENABLED, v: "false"}
+            - k: ZITADEL_DATABASE_POSTGRES_DSN
+              v: >-
+                postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_NAME, v: "${{ params.orgName }}"}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME, v: "${{ params.adminUsername }}"}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_ADDRESS, v: "${{ params.adminEmail }}"}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED, v: "true"}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED, v: "false"}
+            # The login UI's service account, and its token on the shared volume.
+            - {k: ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH, v: /zitadel/bootstrap/login-client.pat}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME, v: login-client}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME, v: Login client}
+            - {k: ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE, v: "2099-01-01T00:00:00Z"}
+            - {k: ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED, v: "true"}
+            - {k: ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI, v: "https://${{ params.externalDomain }}/ui/v2/login/"}
+            - {k: ZITADEL_OIDC_DEFAULTLOGINURLV2, v: "https://${{ params.externalDomain }}/ui/v2/login/login?authRequest="}
+            - {k: ZITADEL_OIDC_DEFAULTLOGOUTURLV2, v: "https://${{ params.externalDomain }}/ui/v2/login/logout?post_logout_redirect="}
+            - {k: ZITADEL_SAML_DEFAULTLOGINURLV2, v: "https://${{ params.externalDomain }}/ui/v2/login/login?samlRequest="}
+        secrets:
+          MASTER_KEY:
+            value: "${{ params.masterKey }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}!1aA"
+
+  # ── Login UI ───────────────────────────────────────────────────────────
+  - name: login
+    title: Login UI
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /zitadel/bootstrap: {type: volume, source: "${{ params.dataVolume }}", readOnly: true}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image's own check.
+            command: node /app/healthcheck.mjs http://localhost:3000/ui/v2/login/healthy
+            interval: 15s
+            timeout: 30s
+            startPeriod: 60s
+            retries: 5
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: zitadel, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: ZITADEL_API_URL, v: "http://${{ comp.api.key }}:8080"}
+            - {k: NEXT_PUBLIC_BASE_PATH, v: /ui/v2/login}
+            - {k: ZITADEL_SERVICE_USER_TOKEN_FILE, v: /zitadel/bootstrap/login-client.pat}
+            - {k: ZITADEL_SESSION_COOKIE_SECRET, v: "${secrets.LOGIN_COOKIE_SECRET}"}
+            # It calls the API server directly, as if from the external domain.
+            - {k: CUSTOM_REQUEST_HEADERS, v: "Host:${{ params.externalDomain }},X-Forwarded-Proto:https"}
+        secrets:
+          LOGIN_COOKIE_SECRET:
+            value: "${{ params.loginCookieSecret }}"

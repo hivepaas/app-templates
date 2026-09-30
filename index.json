@@ -14930,6 +14930,72 @@
       }
     },
     {
+      "name": "zitadel",
+      "file": {
+        "path": "templates/zitadel.yaml",
+        "sha256": "0c95d688de93d2b7ffdcb7d38aaa18924e1654d251f14bcf912f8f224916d3d2"
+      },
+      "icon": {
+        "path": "icons/zitadel.svg",
+        "sha256": "c868bfb25a9a363c12a63dc3c1fc5ffe8eb187bc3a0c0c545e1afe2c8b74ef62"
+      },
+      "title": "ZITADEL",
+      "tagline": "Identity and access management - SSO, OIDC, SAML, passkeys, multi-tenant",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "identity",
+        "sso",
+        "open-source"
+      ],
+      "aliases": [
+        "sso",
+        "oidc",
+        "saml",
+        "oauth",
+        "identity provider",
+        "idp",
+        "auth0 alternative",
+        "keycloak alternative",
+        "okta alternative",
+        "passkeys"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "components": [
+        {
+          "name": "gateway",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "api",
+          "title": "API server"
+        },
+        {
+          "name": "login",
+          "title": "Login UI"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.19",
+          "release": "4.19.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "zot",
       "file": {
         "path": "templates/zot.yaml",
