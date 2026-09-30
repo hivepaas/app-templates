@@ -1,0 +1,227 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: seafile
+  title: Seafile
+  tagline: Fast file sync and share, with libraries and client-side encryption
+  description: |
+    Seafile syncs and shares files: libraries synced by desktop and mobile clients with
+    block-level deduplication, so large files and many of them sync fast; share links and
+    upload links, groups, file history and trash, online preview and editing, and
+    libraries encrypted on the client with a password the server never sees.
+
+    **This template creates two apps**
+
+    - **Seafile** Community Edition, as two components: the Seafile server - file server,
+      web interface and its nginx - with its data on a volume; and a MariaDB for its three
+      databases, on the same volume
+    - **a Redis** for its cache, named after the app with `-cache` added
+
+    Seafile creates its three databases itself on the first start, which needs MariaDB's
+    root password - so the database runs inside this app rather than as a MariaDB app.
+
+    **The server name is for good**
+
+    Seafile writes the address below into its configuration on the first start; links and
+    the clients use it. Give the app the same address as its domain.
+
+    **Signing in**
+
+    The administrator below is created on the first start; sign-up is off - add users in
+    the System Admin pages.
+  categories: [storage/files]
+  tags: [files, file-transfer, collaboration, open-source]
+  aliases: [file sync, dropbox alternative, nextcloud alternative, file sharing, cloud storage, sync]
+  icon: icons/seafile.svg
+  links:
+    website: https://www.seafile.com
+    documentation: https://manual.seafile.com/13.0/setup/setup_ce_by_docker/
+    source: https://github.com/haiwen/seafile-server
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: serverHostname
+    title: Server name
+    description: >-
+      The address Seafile answers at, written into its configuration on the first start -
+      `files.example.com`, and the domain below too.
+    type: string
+    default: files.example.com
+    pattern: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$'
+  - name: domain
+    title: Domain
+    description: >-
+      The address Seafile answers at - the server name above. Leave it empty only to add it
+      later, in the routing settings of the Seafile component.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the Seafile component's Secrets.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: dbPassword
+    title: Database password
+    description: Of the MariaDB user Seafile connects as. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: dbRootPassword
+    title: MariaDB root password
+    description: Used by Seafile to create its databases on the first start. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: jwtKey
+    title: JWT key
+    description: Signs the tokens between Seafile's parts. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: timeZone
+    title: Time zone
+    type: string
+    default: Etc/UTC
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume the files, Seafile's configuration and logs, and the MariaDB databases are
+      kept on, each in a directory of its own.
+    type: volume
+
+dependencies:
+  - name: cache
+    title: Cache
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "13.0"
+    release: "13.0.28"
+    default: true
+    components:
+      seafile: {image: "seafileltd/seafile-mc:13.0.28"}
+      db: {image: "mariadb:11.8.9-noble"}
+
+components:
+  # ── Seafile ────────────────────────────────────────────────────────────
+  - name: seafile
+    title: Seafile
+    primary: true
+    needs: [db]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /shared:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: seafile}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fs -o /dev/null http://127.0.0.1/api2/ping/
+            interval: 30s
+            timeout: 10s
+            # The first start creates the databases and the configuration.
+            startPeriod: 180s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: seafile, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: SEAFILE_SERVER_HOSTNAME, v: "${{ params.serverHostname }}"}
+            - {k: SEAFILE_SERVER_PROTOCOL, v: https}
+            - {k: SITE_ROOT, v: /}
+            - {k: TIME_ZONE, v: "${{ params.timeZone }}"}
+            - {k: SEAFILE_MYSQL_DB_HOST, v: "${{ comp.db.key }}"}
+            - {k: SEAFILE_MYSQL_DB_PORT, v: "3306"}
+            - {k: SEAFILE_MYSQL_DB_USER, v: seafile}
+            - {k: SEAFILE_MYSQL_DB_PASSWORD, v: "${secrets.DB_PASSWORD}"}
+            - {k: INIT_SEAFILE_MYSQL_ROOT_PASSWORD, v: "${secrets.DB_ROOT_PASSWORD}"}
+            - {k: SEAFILE_MYSQL_DB_CCNET_DB_NAME, v: ccnet_db}
+            - {k: SEAFILE_MYSQL_DB_SEAFILE_DB_NAME, v: seafile_db}
+            - {k: SEAFILE_MYSQL_DB_SEAHUB_DB_NAME, v: seahub_db}
+            - {k: INIT_SEAFILE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: INIT_SEAFILE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+            - {k: JWT_PRIVATE_KEY, v: "${secrets.JWT_KEY}"}
+            - {k: SEAFILE_LOG_TO_STDOUT, v: "true"}
+            - {k: ENABLE_GO_FILESERVER, v: "true"}
+            # SeaDoc, the notification server and the AI features are separate servers,
+            # not part of this template.
+            - {k: ENABLE_SEADOC, v: "false"}
+            - {k: ENABLE_NOTIFICATION_SERVER, v: "false"}
+            - {k: ENABLE_SEAFILE_AI, v: "false"}
+            - {k: CACHE_PROVIDER, v: redis}
+            - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+        secrets:
+          DB_PASSWORD:
+            value: "${{ params.dbPassword }}"
+          DB_ROOT_PASSWORD:
+            value: "${{ params.dbRootPassword }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+          JWT_KEY:
+            value: "${{ params.jwtKey }}"
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── MariaDB ────────────────────────────────────────────────────────────
+  - name: db
+    title: MariaDB
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/lib/mysql:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: mysql}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: healthcheck.sh --connect --innodb_initialized
+            interval: 15s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 5
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: seafile, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: MARIADB_ROOT_PASSWORD, v: "${secrets.DB_ROOT_PASSWORD}"}
+            - {k: MARIADB_AUTO_UPGRADE, v: "1"}
+        secrets:
+          DB_ROOT_PASSWORD:
+            value: "${{ params.dbRootPassword }}"

@@ -12241,6 +12241,65 @@
       }
     },
     {
+      "name": "seafile",
+      "file": {
+        "path": "templates/seafile.yaml",
+        "sha256": "a9e3d2c8dc4c18f96651e3a2ed74a40943bf6c1a0661a5c70de947ad18fd6041"
+      },
+      "icon": {
+        "path": "icons/seafile.svg",
+        "sha256": "4d6027dfe22737fc508c8c6c1908844de2991b8f65a63836a7c25bcd9307460d"
+      },
+      "title": "Seafile",
+      "tagline": "Fast file sync and share, with libraries and client-side encryption",
+      "categories": [
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "file-transfer",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "file sync",
+        "dropbox alternative",
+        "nextcloud alternative",
+        "file sharing",
+        "cloud storage",
+        "sync"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "seafile",
+          "title": "Seafile",
+          "primary": true
+        },
+        {
+          "name": "db",
+          "title": "MariaDB"
+        }
+      ],
+      "versions": [
+        {
+          "name": "13.0",
+          "release": "13.0.28",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "searxng",
       "file": {
         "path": "templates/searxng.yaml",
