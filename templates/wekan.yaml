@@ -50,7 +50,7 @@ dependencies:
   - name: db
     title: Database
     template: mongodb
-    version: "8.0"
+    version: "8.2"
     params:
       dbName: wekan
       username: wekan

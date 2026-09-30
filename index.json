@@ -6582,7 +6582,7 @@
       "name": "librechat",
       "file": {
         "path": "templates/librechat.yaml",
-        "sha256": "0ba140ade7948e555b95c4e57a8c9273aa1c64645c0f88898057bb96a714a653"
+        "sha256": "dab8ae8ca498eaed843e45f245505537e1b36bc1384a172f0861a2e8d80b7ff7"
       },
       "icon": {
         "path": "icons/librechat.svg",
@@ -13650,7 +13650,7 @@
       "name": "wekan",
       "file": {
         "path": "templates/wekan.yaml",
-        "sha256": "9e8e76731c5eda9a43598c3095cd65b622b73926caaae9cf1b666e08f3830641"
+        "sha256": "6da54823dd6d1db8bda6b3bcd3169db2da5162d17f6f5c91a6bb1aba8e3c61ae"
       },
       "icon": {
         "path": "icons/wekan.svg",
