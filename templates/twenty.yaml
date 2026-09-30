@@ -1,0 +1,210 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: twenty
+  title: Twenty
+  tagline: A CRM you shape yourself - companies, people, deals, and your own objects
+  description: |
+    Twenty is an open-source CRM in the spirit of Salesforce and HubSpot: companies,
+    people and opportunities out of the box, custom objects and fields for the rest,
+    kanban and table views, email and calendar sync with Google and Microsoft,
+    workflows, and a GraphQL and REST API for everything.
+
+    **This template creates three apps**
+
+    - **Twenty**, as two components sharing one volume: the server, which serves the
+      web app and the API, and the worker, which runs the background jobs - email and
+      calendar sync, workflows, imports
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Redis** for the job queue, named after the app with `-cache` added
+
+    **The first person to sign up owns it**
+
+    Open the address once the app is up and sign up: that creates the workspace, and you
+    are its administrator. After that, no one else can create one - they join by
+    invitation, from Settings > Members. Anyone who reaches the address before you can
+    take that first step, so do it right away.
+
+    **Email, and signing in with Google or Microsoft**
+
+    Both are set with environment variables on both components - `EMAIL_*` for sending,
+    `AUTH_GOOGLE_*` and `AUTH_MICROSOFT_*` for signing in and syncing. The
+    [self-hosting docs](https://docs.twenty.com/developers/self-hosting/setup) list them.
+
+    **Memory**
+
+    The server and the worker take about 700MB each at rest.
+  categories: [webapps/business]
+  tags: [business-intelligence, collaboration, open-source]
+  aliases: [crm, salesforce alternative, hubspot alternative, customer relationship management, sales pipeline]
+  icon: icons/twenty.svg
+  links:
+    website: https://twenty.com
+    documentation: https://docs.twenty.com/developers/self-hosting/docker-compose
+    source: https://github.com/twentyhq/twenty
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Twenty answers at. Leave it empty to add one later, in the app's routing
+      settings; links in emails and the sign-in callbacks are built from it.
+    type: domain
+    optional: true
+  - name: appSecret
+    title: App secret
+    description: >-
+      Signs sessions and encrypts stored credentials, such as connected mailboxes. Leave
+      empty to generate one, and keep it with the backups: without it those credentials
+      cannot be read.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: serverMemoryLimit
+    title: Server memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: workerMemoryLimit
+    title: Worker memory limit
+    type: size
+    default: 1GB
+    min: 768MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files and attachments are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: twenty
+      username: twenty
+  - name: cache
+    title: Job queue
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the job queue: Redis refuses writes when full rather than evict a job.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "2.43"
+    release: "2.43.0"
+    default: true
+    components:
+      server: {image: "twentycrm/twenty:v2.43.0"}
+      worker: {image: "twentycrm/twenty:v2.43.0"}
+
+components:
+  # ── Server ─────────────────────────────────────────────────────────────
+  - name: server
+    title: Server
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Twenty refuses to start - migrations included - with an empty SERVER_URL,
+          # which is what the app has until it has a domain. The image's entry point
+          # migrates before the command runs, so it is told to skip that (the two
+          # DISABLE_* variables below), and this sets a stand-in address and runs the
+          # entry point again, with both steps back on.
+          command: >-
+            sh -c 'export SERVER_URL="${SERVER_URL:-http://localhost:3000}";
+            DISABLE_DB_MIGRATIONS=false DISABLE_CRON_JOBS_REGISTRATION=false
+            exec /app/entrypoint.sh node dist/main'
+        storage:
+          mounts:
+            /app/packages/twenty-server/.local-storage: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fsS -o /dev/null http://127.0.0.1:3000/healthz
+            interval: 15s
+            timeout: 10s
+            # The first start creates the whole schema.
+            startPeriod: 300s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.serverMemoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: twenty, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: NODE_PORT, v: "3000"}
+            - {k: SERVER_URL, v: "${HIVEPAAS_APP_URL}"}
+            - k: PG_DATABASE_URL
+              v: >-
+                postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - k: REDIS_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{ deps.cache.ref.HIVEPAAS_HOST }}:${{
+                deps.cache.ref.HIVEPAAS_PORT }}
+            - {k: APP_SECRET, v: "${secrets.APP_SECRET}"}
+            # Off for the image's first pass only: the command above turns them back on.
+            - {k: DISABLE_DB_MIGRATIONS, v: "true"}
+            - {k: DISABLE_CRON_JOBS_REGISTRATION, v: "true"}
+        secrets:
+          APP_SECRET:
+            value: "${{ params.appSecret }}"
+        routing:
+          port: 3000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Worker ─────────────────────────────────────────────────────────────
+  - name: worker
+    title: Worker
+    needs: [server]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # The same stand-in address as the server's; migrations and cron jobs stay the
+          # server's alone.
+          command: >-
+            sh -c 'export SERVER_URL="${SERVER_URL:-http://localhost:3000}"; exec yarn worker:prod'
+        storage:
+          mounts:
+            /app/packages/twenty-server/.local-storage: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            # It serves nothing to ask; a worker that dies is restarted.
+            enabled: false
+        resources:
+          limits: {memory: "${{ params.workerMemoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: twenty, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # The server's address: this component has no domain of its own.
+            - {k: SERVER_URL, v: "${${{ comp.server.key }}.HIVEPAAS_APP_URL}"}
+            - k: PG_DATABASE_URL
+              v: >-
+                postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - k: REDIS_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{ deps.cache.ref.HIVEPAAS_HOST }}:${{
+                deps.cache.ref.HIVEPAAS_PORT }}
+            - {k: APP_SECRET, v: "${secrets.APP_SECRET}"}
+            - {k: DISABLE_DB_MIGRATIONS, v: "true"}
+            - {k: DISABLE_CRON_JOBS_REGISTRATION, v: "true"}
+        secrets:
+          APP_SECRET:
+            value: "${{ params.appSecret }}"

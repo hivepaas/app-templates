@@ -12292,6 +12292,68 @@
       }
     },
     {
+      "name": "twenty",
+      "file": {
+        "path": "templates/twenty.yaml",
+        "sha256": "b42f415516e6d6d7add43813c68860070801cd2cc452f52094fee47f39325c47"
+      },
+      "icon": {
+        "path": "icons/twenty.svg",
+        "sha256": "b49c96ad8e993e199b2424b6542a6b158001d5d958604da63340c9ae22bad7eb"
+      },
+      "title": "Twenty",
+      "tagline": "A CRM you shape yourself - companies, people, deals, and your own objects",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "crm",
+        "salesforce alternative",
+        "hubspot alternative",
+        "customer relationship management",
+        "sales pipeline"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Job queue",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "server",
+          "title": "Server",
+          "primary": true
+        },
+        {
+          "name": "worker",
+          "title": "Worker"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.43",
+          "release": "2.43.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "typesense",
       "file": {
         "path": "templates/typesense.yaml",
