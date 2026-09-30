@@ -1,0 +1,243 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: flipt
+  title: Flipt
+  tagline: Git-native feature flags - toggles, rollouts and segments, with SDKs
+  description: |
+    Flipt is a feature flag platform: boolean and variant flags, percentage rollouts,
+    segments matched on context, and evaluation over REST, gRPC or OpenFeature, with SDKs
+    for Go, Node, Python, Java, Ruby, Rust, the browser and more. Flipt 2 keeps flags in
+    Git: every change in the UI is a commit.
+
+    **This template creates one app**
+
+    Flipt, with its flags in a Git repository on a volume. No database is needed.
+
+    **Sign-in: GitHub or OIDC**
+
+    People sign in to the UI with GitHub or with an OIDC provider - Google, Microsoft
+    Entra, Keycloak, Authentik, Zitadel and others. Create an OAuth application there with
+    the callback address:
+
+    - GitHub: `https://<this app's domain>/auth/v1/method/github/callback`
+    - OIDC: `https://<this app's domain>/auth/v1/method/oidc/sso/callback`
+
+    Say who may sign in: with GitHub, members of the organizations below; with OIDC,
+    emails matching the pattern below - or everyone the provider knows, if it is your own.
+
+    **Clients use a token**
+
+    Your servers and SDKs send the client token below as `Authorization: Bearer <token>`;
+    it is kept under the app's Secrets.
+
+    **Keeping flags in your own repository**
+
+    To keep them in GitHub, GitLab or any Git server instead - and review changes as pull
+    requests - add a `remote` and credentials to the storage section of `config.yml`;
+    Flipt's [documentation](https://docs.flipt.io/v2/configuration/storage) describes them.
+  categories: [webapps/dev-tools]
+  tags: [feature-flags, git, open-source]
+  aliases: [feature flags, feature toggles, launchdarkly alternative, unleash alternative, openfeature, rollouts]
+  icon: icons/flipt.svg
+  links:
+    website: https://www.flipt.io
+    documentation: https://docs.flipt.io/v2
+    source: https://github.com/flipt-io/flipt
+  # Flipt 2 is under the Fair Core License, which turns into MIT two years after each
+  # release; its paid features need a license key.
+  license: FCL-1.0-MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Flipt answers at. Signing in to the UI needs it: leave it empty only to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: signIn
+    title: Sign-in
+    type: select
+    default: GITHUB
+    options:
+      - {value: GITHUB, title: GitHub}
+      - {value: OIDC, title: "OIDC - Google, Entra, Keycloak, Authentik and others"}
+  - name: oauthClientId
+    title: OAuth client ID
+    description: Of the OAuth application created at GitHub or the OIDC provider.
+    type: secret
+  - name: oauthClientSecret
+    title: OAuth client secret
+    type: secret
+  - name: githubOrganizations
+    title: GitHub organizations
+    description: >-
+      For GitHub sign-in: the organizations whose members may sign in, separated by spaces.
+      Flipt does not start with GitHub sign-in and none named - anyone on GitHub could.
+    type: string
+    optional: true
+  - name: oidcIssuer
+    title: OIDC issuer
+    description: >-
+      For OIDC sign-in: the provider's issuer address - https://accounts.google.com, or your
+      Keycloak realm's address, for example.
+    type: string
+    optional: true
+  - name: oidcEmailMatches
+    title: Allowed emails
+    description: >-
+      For OIDC sign-in: regular expressions, separated by spaces, of the emails that may sign
+      in - `^.*@example\.com$` for a company. Leave empty to let in everyone the provider
+      signs in.
+    type: string
+    optional: true
+  - name: clientToken
+    title: Client token
+    description: What your servers and SDKs authenticate with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: csrfKey
+    title: CSRF key
+    description: Signs the UI's session protection. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: dataVolume
+    title: Data volume
+    description: The volume the flags' Git repository is kept on.
+    type: volume
+
+versions:
+  - name: "2.13"
+    release: "2.13.0"
+    default: true
+    image: flipt/flipt:v2.13.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Flipt refuses to start without a cookie domain: until the app has a domain, it
+      # starts with localhost, and the API works. And the sign-in chosen is checked first.
+      command: >-
+        sh -c 'if [ -z "$FLIPT_SESSION_DOMAIN" ]; then export FLIPT_SESSION_DOMAIN=localhost FLIPT_URL=http://localhost:8080; fi;
+        if [ "$FLIPT_SIGN_IN" = GITHUB ] && [ -z "$FLIPT_GITHUB_ORGS" ]; then
+        echo "hivepaas: GitHub sign-in needs the organizations allowed to sign in" >&2; exit 1; fi;
+        if [ "$FLIPT_SIGN_IN" = OIDC ] && [ -z "$FLIPT_OIDC_ISSUER" ]; then
+        echo "hivepaas: OIDC sign-in needs the issuer address" >&2; exit 1; fi;
+        exec /flipt server --config /etc/flipt/config.yml'
+    storage:
+      mounts:
+        /var/opt/flipt: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8080/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 3
+    resources:
+      limits: {memory: 256MB}
+  settings:
+    kind:
+      category: webapp
+      engine: flipt
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: FLIPT_SIGN_IN, v: "${{ params.signIn }}"}
+        # FLIPT_AUTHENTICATION_METHODS_GITHUB_ENABLED or ..._OIDC_ENABLED: Flipt reads its
+        # settings from variables named after them, over config.yml.
+        - {k: "FLIPT_AUTHENTICATION_METHODS_${{ params.signIn }}_ENABLED", v: "true"}
+        - {k: FLIPT_SESSION_DOMAIN, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: FLIPT_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: FLIPT_CSRF_KEY, v: "${secrets.CSRF_KEY}"}
+        - {k: FLIPT_CLIENT_TOKEN, v: "${secrets.CLIENT_TOKEN}"}
+        - {k: FLIPT_OAUTH_CLIENT_ID, v: "${secrets.OAUTH_CLIENT_ID}"}
+        - {k: FLIPT_OAUTH_CLIENT_SECRET, v: "${secrets.OAUTH_CLIENT_SECRET}"}
+        - {k: FLIPT_GITHUB_ORGS, v: "${{ params.githubOrganizations }}"}
+        - {k: FLIPT_OIDC_ISSUER, v: "${{ params.oidcIssuer }}"}
+        - {k: FLIPT_OIDC_EMAIL_MATCHES, v: "${{ params.oidcEmailMatches }}"}
+    secrets:
+      CSRF_KEY:
+        value: "${{ params.csrfKey }}"
+      CLIENT_TOKEN:
+        value: "${{ params.clientToken }}"
+      OAUTH_CLIENT_ID:
+        value: "${{ params.oauthClientId }}"
+      OAUTH_CLIENT_SECRET:
+        value: "${{ params.oauthClientSecret }}"
+    configFiles:
+      config.yml:
+        # Settings with ${env:...} are read from the environment variables above.
+        content: |
+          meta:
+            check_for_updates: false
+            telemetry_enabled: false
+          log:
+            level: INFO
+            encoding: json
+          # Flags live in a Git repository on the volume: every change is a commit.
+          storage:
+            default:
+              backend:
+                type: local
+                path: /var/opt/flipt
+          environments:
+            default:
+              name: default
+              storage: default
+              default: true
+          authentication:
+            required: true
+            session:
+              domain: ${env:FLIPT_SESSION_DOMAIN}
+              secure: true
+              csrf:
+                key: ${env:FLIPT_CSRF_KEY}
+                secure: true
+            methods:
+              # For servers and SDKs: evaluation, and the API.
+              token:
+                enabled: true
+                storage:
+                  tokens:
+                    client:
+                      credential: ${env:FLIPT_CLIENT_TOKEN}
+                      metadata:
+                        purpose: clients
+              # For people, in the UI: the one chosen is turned on by its environment variable.
+              github:
+                enabled: false
+                client_id: ${env:FLIPT_OAUTH_CLIENT_ID}
+                client_secret: ${env:FLIPT_OAUTH_CLIENT_SECRET}
+                redirect_address: ${env:FLIPT_URL}
+                scopes: [user:email, read:org]
+                allowed_organizations: ${env:FLIPT_GITHUB_ORGS}
+              oidc:
+                enabled: false
+                providers:
+                  sso:
+                    issuer_url: ${env:FLIPT_OIDC_ISSUER}
+                    client_id: ${env:FLIPT_OAUTH_CLIENT_ID}
+                    client_secret: ${env:FLIPT_OAUTH_CLIENT_SECRET}
+                    redirect_address: ${env:FLIPT_URL}
+                    scopes: [openid, email, profile]
+                    use_pkce: true
+                email_matches: ${env:FLIPT_OIDC_EMAIL_MATCHES}
+        swarmRef:
+          file: {name: /etc/flipt/config.yml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

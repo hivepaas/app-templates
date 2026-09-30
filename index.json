@@ -3427,6 +3427,46 @@
       }
     },
     {
+      "name": "flipt",
+      "file": {
+        "path": "templates/flipt.yaml",
+        "sha256": "7f5c6ee6377644f1d6daf19ceea53ee03a5953b3bd09c2a8a8a3dc653617cd74"
+      },
+      "icon": {
+        "path": "icons/flipt.svg",
+        "sha256": "07bb0521286723e1aff7d97a2b2228e4c453aa91d232774570be1f0509a60cf0"
+      },
+      "title": "Flipt",
+      "tagline": "Git-native feature flags - toggles, rollouts and segments, with SDKs",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "feature-flags",
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "feature flags",
+        "feature toggles",
+        "launchdarkly alternative",
+        "unleash alternative",
+        "openfeature",
+        "rollouts"
+      ],
+      "license": "FCL-1.0-MIT",
+      "versions": [
+        {
+          "name": "2.13",
+          "release": "2.13.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "flowise",
       "file": {
         "path": "templates/flowise.yaml",
