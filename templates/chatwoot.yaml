@@ -1,0 +1,247 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: chatwoot
+  title: Chatwoot
+  tagline: Customer support across live chat, email, WhatsApp and social, in one inbox
+  description: |
+    Chatwoot is a customer engagement inbox in the spirit of Intercom and Zendesk: a chat
+    widget for your website, and email, WhatsApp, Telegram, Facebook, Instagram, SMS and
+    API channels, all answered by your team from one place - with assignment, canned
+    responses, labels, a help center, campaigns and reports.
+
+    **This template creates three apps**
+
+    - **Chatwoot**, as two components on one volume for attachments: the Rails server,
+      and the Sidekiq worker that sends messages, fetches email and runs everything else
+      in the background
+    - **a PostgreSQL database** with pgvector, named after the app with `-db` added
+    - **a Redis** for the job queue, named after the app with `-cache` added
+
+    This is the Community Edition image: the MIT-licensed code, without the enterprise
+    features Chatwoot sells separately.
+
+    **The first start creates the administrator**
+
+    Chatwoot normally asks whoever opens it first to create the account and its super
+    administrator. This template creates both on the first start, from the values below,
+    so that page never opens. Sign-up is off: invite agents from Settings > Agents.
+
+    **Email**
+
+    To send mail - invitations, password resets, conversation replies - set the `SMTP_*`
+    and `MAILER_SENDER_EMAIL` environment variables on both components; Chatwoot's
+    [environment reference](https://www.chatwoot.com/docs/self-hosted/configuration/environment-variables)
+    lists them.
+  categories: [webapps/communication, webapps/business]
+  tags: [chat, email, collaboration, open-source]
+  aliases: [live chat, help desk, customer support, intercom alternative, zendesk alternative, shared inbox, whatsapp]
+  icon: icons/chatwoot.svg
+  links:
+    website: https://www.chatwoot.com
+    documentation: https://www.chatwoot.com/docs/self-hosted
+    source: https://github.com/chatwoot/chatwoot
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address agents and the chat widget reach Chatwoot at. Leave it empty to add one
+      later, in the routing settings of the Rails component.
+    type: domain
+    optional: true
+  - name: accountName
+    title: Account name
+    description: The company or team name of the first account.
+    type: string
+    default: My Company
+    maxLength: 100
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Administrator
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      Chatwoot requires a special character, so the password is this value with `!` added
+      at the end - the whole of it is under the app's Secrets. Leave empty to generate one.
+      Used once, when the first start creates the account.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKeyBase
+    title: Secret key base
+    description: Signs sessions and cookies. Leave empty to generate one.
+    type: secret
+    minLength: 64
+    generate: {length: 128, charset: hex}
+  - name: memoryLimit
+    title: Memory limit, each component
+    description: The Rails server and the worker take about 450MB each at rest.
+    type: size
+    default: 1GB
+    min: 768MB
+  - name: dataVolume
+    title: Storage volume
+    description: The volume attachments and uploaded files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: pgvector
+    version: "0.8"
+    params:
+      dbName: chatwoot
+      username: chatwoot
+  - name: cache
+    title: Job queue
+    template: redis
+    version: "8.10"
+    params:
+      # It holds Sidekiq's queue: Redis refuses writes when full rather than lose a job.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "4.18"
+    release: "4.18.0"
+    default: true
+    components:
+      rails: {image: "chatwoot/chatwoot:v4.18.0-ce"}
+      sidekiq: {image: "chatwoot/chatwoot:v4.18.0-ce"}
+
+components:
+  # ── Rails ──────────────────────────────────────────────────────────────
+  - name: rails
+    title: Rails server
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # rails.sh waits for the database; then the schema is created or migrated, the
+          # bootstrap below runs, and the server starts. All three steps are safe to repeat.
+          command: >-
+            docker/entrypoints/rails.sh sh -c 'bundle exec rails db:chatwoot_prepare &&
+            bundle exec rails runner /hivepaas/bootstrap.rb &&
+            exec bundle exec rails s -p 3000 -b 0.0.0.0'
+        storage:
+          mounts:
+            /app/storage: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget -q -O /dev/null http://127.0.0.1:3000/api
+            interval: 15s
+            timeout: 5s
+            startPeriod: 180s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: chatwoot, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: RAILS_ENV, v: production}
+            - {k: NODE_ENV, v: production}
+            - {k: INSTALLATION_ENV, v: docker}
+            - {k: FRONTEND_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}"}
+            - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: POSTGRES_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_URL, v: "redis://${{ deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: ENABLE_ACCOUNT_SIGNUP, v: "false"}
+            - {k: ACTIVE_STORAGE_SERVICE, v: local}
+            - {k: RAILS_LOG_TO_STDOUT, v: "true"}
+            - {k: CHATWOOT_ACCOUNT_NAME, v: "${{ params.accountName }}"}
+            - {k: CHATWOOT_ADMIN_NAME, v: "${{ params.adminName }}"}
+            - {k: CHATWOOT_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: CHATWOOT_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          SECRET_KEY_BASE:
+            value: "${{ params.secretKeyBase }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}!"
+        configFiles:
+          bootstrap.rb:
+            # What the installation onboarding page does, once, while there is no user:
+            # the account, its super administrator, and the flag that page checks.
+            content: |
+              if User.count.zero?
+                AccountBuilder.new(
+                  account_name: ENV.fetch('CHATWOOT_ACCOUNT_NAME'),
+                  user_full_name: ENV.fetch('CHATWOOT_ADMIN_NAME'),
+                  email: ENV.fetch('CHATWOOT_ADMIN_EMAIL'),
+                  user_password: ENV.fetch('CHATWOOT_ADMIN_PASSWORD'),
+                  super_admin: true,
+                  confirmed: true
+                ).perform
+                ::Redis::Alfred.delete(::Redis::Alfred::CHATWOOT_INSTALLATION_ONBOARDING)
+                puts 'hivepaas: administrator created'
+              end
+            swarmRef:
+              file: {name: /hivepaas/bootstrap.rb, mode: 444}
+        routing:
+          port: 3000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Sidekiq ────────────────────────────────────────────────────────────
+  - name: sidekiq
+    title: Sidekiq worker
+    needs: [rails]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: bundle exec sidekiq -C config/sidekiq.yml
+        storage:
+          mounts:
+            /app/storage: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            # It serves nothing to ask; a worker that dies is restarted.
+            enabled: false
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: chatwoot, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: RAILS_ENV, v: production}
+            - {k: NODE_ENV, v: production}
+            - {k: INSTALLATION_ENV, v: docker}
+            # The Rails component's address, for links in the mail this worker sends.
+            - {k: FRONTEND_URL, v: "${${{ comp.rails.key }}.HIVEPAAS_APP_URL}"}
+            - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}"}
+            - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: POSTGRES_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_URL, v: "redis://${{ deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: ENABLE_ACCOUNT_SIGNUP, v: "false"}
+            - {k: ACTIVE_STORAGE_SERVICE, v: local}
+            - {k: RAILS_LOG_TO_STDOUT, v: "true"}
+        secrets:
+          SECRET_KEY_BASE:
+            value: "${{ params.secretKeyBase }}"

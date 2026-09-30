@@ -1584,6 +1584,72 @@
       }
     },
     {
+      "name": "chatwoot",
+      "file": {
+        "path": "templates/chatwoot.yaml",
+        "sha256": "d4a0968a2c117a57efe32b13404f2435deb9621714871839286b24be810cb3ed"
+      },
+      "icon": {
+        "path": "icons/chatwoot.svg",
+        "sha256": "445cdb573e30a244522b5fd748cc058e350be01eef15e3cb8dd3cb47cc128608"
+      },
+      "title": "Chatwoot",
+      "tagline": "Customer support across live chat, email, WhatsApp and social, in one inbox",
+      "categories": [
+        "webapps/communication",
+        "webapps/business"
+      ],
+      "tags": [
+        "chat",
+        "email",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "live chat",
+        "help desk",
+        "customer support",
+        "intercom alternative",
+        "zendesk alternative",
+        "shared inbox",
+        "whatsapp"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "pgvector"
+        },
+        {
+          "name": "cache",
+          "title": "Job queue",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "rails",
+          "title": "Rails server",
+          "primary": true
+        },
+        {
+          "name": "sidekiq",
+          "title": "Sidekiq worker"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.18",
+          "release": "4.18.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "chroma",
       "file": {
         "path": "templates/chroma.yaml",
