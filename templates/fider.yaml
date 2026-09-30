@@ -1,0 +1,202 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: fider
+  title: Fider
+  tagline: A feedback portal where customers suggest ideas, vote and discuss
+  description: |
+    Fider is a feedback board for your product: customers post suggestions, vote and
+    comment, you answer, tag and set a status - planned, started, completed, declined -
+    and everyone who voted is told. Sign-in is by email or OAuth; the board can be public
+    or private, and has webhooks and an API.
+
+    **This template creates two apps**
+
+    - **Fider**
+    - **a PostgreSQL database** for it, named after the app with `-db` added - uploaded
+      images are kept there too
+
+    **The first start creates the site**
+
+    A new Fider asks whoever opens it first to name the site and become its administrator.
+    This template does that step itself, with the values below, before the app takes any
+    traffic: Fider then sends the administrator an email with a link that activates the
+    site and signs them in.
+
+    **Email is needed**
+
+    Everyone, the administrator included, signs in with a link sent by email, unless you add
+    OAuth providers later in the admin pages: give an SMTP server below.
+  categories: [webapps/communication, webapps/business]
+  tags: [collaboration, forum, open-source]
+  aliases: [feedback, feature requests, roadmap, voting, canny alternative, uservoice alternative, ideas]
+  icon: icons/fider.png
+  links:
+    website: https://fider.io
+    documentation: https://docs.fider.io/self-hosted/hosting-instance
+    source: https://github.com/getfider/fider
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Fider answers at. Every link it sends by email uses it: leave it empty only
+      to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: siteName
+    title: Site name
+    description: Shown at the top of the board - your product's or company's name.
+    type: string
+    default: Feedback
+    maxLength: 60
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Administrator
+    maxLength: 60
+  - name: adminEmail
+    title: Administrator email
+    description: The address the link that activates the site is sent to.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: smtpHost
+    title: SMTP host
+    type: string
+    default: smtp.example.com
+  - name: smtpPort
+    title: SMTP port
+    description: 587 for STARTTLS, or 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: Sender address
+    description: The address Fider's emails are sent from.
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: jwtSecret
+    title: JWT secret
+    description: Signs sign-in sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: fider
+      username: fider
+
+versions:
+  - name: "0.38"
+    release: "0.38.0"
+    default: true
+    image: getfider/fider:v0.38.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Fider does not start without an address: until the app has a domain, it answers as
+      # localhost. Port 465 takes TLS from the start rather than STARTTLS. Then the image's
+      # own start - migrations, then the server - with the site created beside it.
+      command: >-
+        bash -c 'if [ -z "$BASE_URL" ]; then export BASE_URL=http://localhost:3000; fi;
+        if [ "$EMAIL_SMTP_PORT" = 465 ]; then export EMAIL_SMTP_ENABLE_IMPLICIT_TLS=true EMAIL_SMTP_ENABLE_STARTTLS=false; fi;
+        ./fider migrate && { bash /hivepaas/bootstrap.sh & exec ./fider; }'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Healthy - and so given traffic - only once the site exists, when /signup no
+        # longer answers: before, anyone could make themselves its administrator.
+        command: >-
+          bash -c '. /hivepaas/http.sh; http GET /_health | head -1 | grep -q " 200" &&
+          ! http GET /signup | head -1 | grep -q " 200"'
+        interval: 15s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: 512MB}
+  settings:
+    kind:
+      category: webapp
+      engine: fider
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: BASE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - k: DATABASE_URL
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}?sslmode=disable
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: EMAIL_NOREPLY, v: "${{ params.smtpFromEmail }}"}
+        - {k: EMAIL_SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: EMAIL_SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: EMAIL_SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: EMAIL_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: FIDER_SITE_NAME, v: "${{ params.siteName }}"}
+        - {k: FIDER_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: FIDER_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    configFiles:
+      http.sh:
+        content: |
+          # http METHOD PATH [JSON]: a request to Fider on the loopback, with bash alone - the image
+          # has no HTTP client. Prints the status line, headers and body.
+          http() {
+            exec 3<>/dev/tcp/127.0.0.1/3000 || return 1
+            printf '%s %s HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s' \
+              "$1" "$2" "${#3}" "$3" >&3
+            cat <&3
+            exec 3<&-
+          }
+        swarmRef:
+          file: {name: /hivepaas/http.sh, mode: 444}
+      bootstrap.sh:
+        content: |
+          . /hivepaas/http.sh
+          # Once the server answers: while there is no site yet, /signup is open to anyone, and
+          # whoever fills it in becomes the administrator. It is filled in here instead - the
+          # administrator gets the email that confirms it.
+          until http GET /_health 2>/dev/null | head -1 | grep -q ' 200'; do sleep 2; done
+          if http GET /signup | head -1 | grep -q ' 200'; then
+            body=$(printf '{"name":"%s","email":"%s","tenantName":"%s","legalAgreement":true}' \
+              "$FIDER_ADMIN_NAME" "$FIDER_ADMIN_EMAIL" "$FIDER_SITE_NAME")
+            echo "hivepaas: site created: $(http POST /_api/tenants "$body" | head -1)"
+          fi
+        swarmRef:
+          file: {name: /hivepaas/bootstrap.sh, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

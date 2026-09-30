@@ -3215,6 +3215,55 @@
       }
     },
     {
+      "name": "fider",
+      "file": {
+        "path": "templates/fider.yaml",
+        "sha256": "528bc234d8c69ad9d7d46a092b0400b17e392510bf5c08ed5d53f28d43bbfb4d"
+      },
+      "icon": {
+        "path": "icons/fider.png",
+        "sha256": "5a62632647cfedbd55adf4193c4775077c44b48359e2a06be5e427efe5ea14fa"
+      },
+      "title": "Fider",
+      "tagline": "A feedback portal where customers suggest ideas, vote and discuss",
+      "categories": [
+        "webapps/communication",
+        "webapps/business"
+      ],
+      "tags": [
+        "collaboration",
+        "forum",
+        "open-source"
+      ],
+      "aliases": [
+        "feedback",
+        "feature requests",
+        "roadmap",
+        "voting",
+        "canny alternative",
+        "uservoice alternative",
+        "ideas"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.38",
+          "release": "0.38.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "filebrowser",
       "file": {
         "path": "templates/filebrowser.yaml",
