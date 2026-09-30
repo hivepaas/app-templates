@@ -1,0 +1,323 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: erpnext
+  title: ERPNext
+  tagline: Open-source ERP - accounting, inventory, sales, purchasing, manufacturing, HR
+  description: |
+    ERPNext is a complete ERP on the Frappe framework: accounting with multi-currency and
+    multi-company books, invoicing and payments, stock and warehouses, buying and selling,
+    CRM, projects, manufacturing with BOMs and work orders, assets, point of sale, and a
+    website and portal - with reports, workflows, custom fields and a REST API.
+
+    **This template creates four apps**
+
+    - **ERPNext**, as five components on one volume for its site - files, backups and
+      configuration:
+      - **frontend**, the nginx the domain points at, which serves the assets and passes
+        requests on
+      - **backend**, the Gunicorn server, which also creates the site on the first start
+        and migrates it when the image changes
+      - **websocket**, for live updates in the browser
+      - **worker**, which runs background jobs, and **scheduler**, which queues the
+        periodic ones
+    - **a MariaDB database**, named after the app with `-db` added
+    - **two Redis** - a cache, and the job queue - named after the app with `-cache` and
+      `-queue` added
+
+    **The first start takes a few minutes**
+
+    The backend creates the site and installs ERPNext into it, then starts; the other
+    components wait for it.
+
+    **Signing in**
+
+    Sign in as `Administrator` with the password below. The setup wizard then asks for your
+    company, country, currency and fiscal year, and creates the chart of accounts; add users
+    afterwards under Users.
+
+    **Email**
+
+    Set up outgoing and incoming mail in ERPNext itself, under Email Account.
+  categories: [webapps/business]
+  tags: [business-intelligence, ecommerce, project-management, open-source]
+  aliases: [erp, accounting, inventory, crm, invoicing, frappe, odoo alternative, manufacturing, hr, payroll]
+  icon: icons/erpnext.svg
+  links:
+    website: https://frappe.io/erpnext
+    documentation: https://docs.frappe.io/erpnext
+    source: https://github.com/frappe/erpnext
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address ERPNext answers at. Leave it empty to add one later, in the routing settings
+      of the frontend component; links in emails and printed documents use it.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      Of the `Administrator` account. Used once, when the site is created. Leave empty to
+      generate one; it is kept under the Secrets of the backend component.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit, backend and worker each
+    description: Both take about 200MB at rest; reports, imports and PDF printing take more.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: sitesVolume
+    title: Sites volume
+    description: The volume the site is kept on - uploaded files, backups and its configuration.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: erpnext
+      username: erpnext
+  - name: cache
+    title: Cache
+    template: redis
+    version: "8.10"
+    params:
+      evictionPolicy: allkeys-lru
+      persistence: none
+  - name: queue
+    title: Job queue
+    template: redis
+    version: "8.10"
+    params:
+      # It holds the job queue: Redis refuses writes when full rather than lose a job.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "16"
+    release: "16.36.1"
+    default: true
+    components:
+      frontend: {image: "frappe/erpnext:v16.36.1"}
+      backend: {image: "frappe/erpnext:v16.36.1"}
+      websocket: {image: "frappe/erpnext:v16.36.1"}
+      worker: {image: "frappe/erpnext:v16.36.1"}
+      scheduler: {image: "frappe/erpnext:v16.36.1"}
+
+components:
+  # ── Frontend ───────────────────────────────────────────────────────────
+  - name: frontend
+    title: Frontend
+    primary: true
+    needs: [backend, websocket]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # nginx looks its upstreams up once, when it starts: it waits until both names
+          # resolve rather than exiting.
+          command: >-
+            bash -c 'until getent hosts "${BACKEND%:*}" >/dev/null && getent hosts "${SOCKETIO%:*}" >/dev/null;
+            do echo "hivepaas: waiting for the backend and the websocket"; sleep 3; done;
+            exec nginx-entrypoint.sh'
+        storage:
+          mounts:
+            /home/frappe/frappe-bench/sites: {type: volume, source: "${{ params.sitesVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fsS -o /dev/null http://127.0.0.1:8080/api/method/ping
+            interval: 20s
+            timeout: 10s
+            # It waits for the backend, which creates the site on the first start.
+            startPeriod: 600s
+            retries: 5
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: erpnext, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: BACKEND, v: "${{ comp.backend.key }}:8000"}
+            - {k: SOCKETIO, v: "${{ comp.websocket.key }}:9000"}
+            # One site, whatever the address it is reached at.
+            - {k: FRAPPE_SITE_NAME_HEADER, v: frontend}
+            # The client's address, from what HivePaaS's router puts in X-Forwarded-For.
+            - {k: UPSTREAM_REAL_IP_ADDRESS, v: 10.0.0.0/8}
+            - {k: CLIENT_MAX_BODY_SIZE, v: 50m}
+            - {k: PROXY_READ_TIMEOUT, v: "120"}
+        routing:
+          port: 8080
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Backend ────────────────────────────────────────────────────────────
+  - name: backend
+    title: Backend
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # The image's entrypoint links the assets, then this sets the site up and starts
+          # Gunicorn.
+          command: bash -c 'bash /hivepaas/setup.sh && exec start.sh'
+        storage:
+          mounts:
+            /home/frappe/frappe-bench/sites: {type: volume, source: "${{ params.sitesVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The site is chosen by the Host header.
+            command: >-
+              curl -fsS -o /dev/null -H "Host: frontend" http://127.0.0.1:8000/api/method/ping
+            interval: 20s
+            timeout: 10s
+            # The first start creates the site and installs ERPNext.
+            startPeriod: 600s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: erpnext, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: SITE_NAME, v: frontend}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - k: REDIS_CACHE_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}
+            - k: REDIS_QUEUE_URL
+              v: >-
+                redis://:${{ deps.queue.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.queue.ref.HIVEPAAS_HOST }}:${{ deps.queue.ref.HIVEPAAS_PORT }}
+            - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+            # The frontend's address, for links in emails and printed documents.
+            - {k: APP_URL, v: "${${{ comp.frontend.key }}.HIVEPAAS_APP_URL}"}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+        configFiles:
+          setup.sh:
+            content: |
+              set -e
+              cd /home/frappe/frappe-bench
+              # What every component reads: the apps the image has, and where the database and Redis are.
+              ls -1 apps > sites/apps.txt
+              bench set-config -g db_host "$DB_HOST"
+              bench set-config -gp db_port "$DB_PORT"
+              bench set-config -g redis_cache "$REDIS_CACHE_URL"
+              bench set-config -g redis_queue "$REDIS_QUEUE_URL"
+              bench set-config -g redis_socketio "$REDIS_QUEUE_URL"
+              bench set-config -gp socketio_port 9000
+              wait-for-it -t 300 "$DB_HOST:$DB_PORT"
+
+              version="$(env/bin/python -c 'import erpnext; print(erpnext.__version__)')"
+              if [ ! -f "sites/$SITE_NAME/site_config.json" ]; then
+                # The database and its user come from the MariaDB app: the site is set up in them,
+                # with no need for root's password. Frappe's tables expect this collation.
+                mariadb -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" -e \
+                  "ALTER DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                bench new-site "$SITE_NAME" --no-setup-db --db-name "$DB_NAME" --db-user "$DB_USER" \
+                  --db-password "$DB_PASSWORD" --admin-password "$ADMIN_PASSWORD" \
+                  --install-app erpnext --set-default
+              elif [ "$(cat sites/.hivepaas-version 2>/dev/null)" != "$version" ]; then
+                # A new image: the schema and the data are brought up to it.
+                bench --site "$SITE_NAME" migrate
+              fi
+              printf %s "$version" > sites/.hivepaas-version
+              if [ -n "$APP_URL" ]; then
+                bench --site "$SITE_NAME" set-config host_name "$APP_URL"
+              fi
+            swarmRef:
+              file: {name: /hivepaas/setup.sh, mode: 444}
+
+  # ── Websocket ────────────────────────────────────────────────────────
+  - name: websocket
+    title: Websocket
+    needs: [backend]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # It reads the configuration the backend writes on the site's volume.
+          command: >-
+            bash -c 'until [ -f sites/.hivepaas-version ]; do echo "hivepaas: waiting for the site"; sleep 5; done;
+            exec node /home/frappe/frappe-bench/apps/frappe/socketio.js'
+        storage:
+          mounts:
+            /home/frappe/frappe-bench/sites: {type: volume, source: "${{ params.sitesVolume }}"}
+        container:
+          healthcheck:
+            enabled: false
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: erpnext, version: "${{ version.name }}", webapp: {}}
+
+  # ── Worker ───────────────────────────────────────────────────────────
+  - name: worker
+    title: Worker
+    needs: [backend]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # It reads the configuration the backend writes on the site's volume.
+          command: >-
+            bash -c 'until [ -f sites/.hivepaas-version ]; do echo "hivepaas: waiting for the site"; sleep 5; done;
+            exec bench worker --queue long,default,short'
+        storage:
+          mounts:
+            /home/frappe/frappe-bench/sites: {type: volume, source: "${{ params.sitesVolume }}"}
+        container:
+          healthcheck:
+            enabled: false
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: erpnext, version: "${{ version.name }}", webapp: {}}
+
+  # ── Scheduler ────────────────────────────────────────────────────────
+  - name: scheduler
+    title: Scheduler
+    needs: [backend]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # It reads the configuration the backend writes on the site's volume.
+          command: >-
+            bash -c 'until [ -f sites/.hivepaas-version ]; do echo "hivepaas: waiting for the site"; sleep 5; done;
+            exec bench schedule'
+        storage:
+          mounts:
+            /home/frappe/frappe-bench/sites: {type: volume, source: "${{ params.sitesVolume }}"}
+        container:
+          healthcheck:
+            enabled: false
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: erpnext, version: "${{ version.name }}", webapp: {}}

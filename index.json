@@ -2833,6 +2833,91 @@
       }
     },
     {
+      "name": "erpnext",
+      "file": {
+        "path": "templates/erpnext.yaml",
+        "sha256": "09c65e196636d2708bb46277ba6b2b618222d85ba378baffece80bea75af5f6f"
+      },
+      "icon": {
+        "path": "icons/erpnext.svg",
+        "sha256": "d39970a2375a902a28fe210bda6d5f221f55d1c26b7a9eb4d12dac14680f8008"
+      },
+      "title": "ERPNext",
+      "tagline": "Open-source ERP - accounting, inventory, sales, purchasing, manufacturing, HR",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "business-intelligence",
+        "ecommerce",
+        "project-management",
+        "open-source"
+      ],
+      "aliases": [
+        "erp",
+        "accounting",
+        "inventory",
+        "crm",
+        "invoicing",
+        "frappe",
+        "odoo alternative",
+        "manufacturing",
+        "hr",
+        "payroll"
+      ],
+      "license": "GPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        },
+        {
+          "name": "queue",
+          "title": "Job queue",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "frontend",
+          "title": "Frontend",
+          "primary": true
+        },
+        {
+          "name": "backend",
+          "title": "Backend"
+        },
+        {
+          "name": "websocket",
+          "title": "Websocket"
+        },
+        {
+          "name": "worker",
+          "title": "Worker"
+        },
+        {
+          "name": "scheduler",
+          "title": "Scheduler"
+        }
+      ],
+      "versions": [
+        {
+          "name": "16",
+          "release": "16.36.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "esphome",
       "file": {
         "path": "templates/esphome.yaml",
