@@ -2268,6 +2268,109 @@
       }
     },
     {
+      "name": "dify",
+      "file": {
+        "path": "templates/dify.yaml",
+        "sha256": "1aa02eba685af35540aee62cae1f99cdb24f88adb73ef133ec66e463d2cd491b"
+      },
+      "icon": {
+        "path": "icons/dify.svg",
+        "sha256": "b7612d3db5b2d1ca6dd1125ae6d259a4ad45457d341f8d7e69d3b806b5d8922e"
+      },
+      "title": "Dify",
+      "tagline": "Build AI apps, agents and RAG workflows on any model, in a visual studio",
+      "categories": [
+        "webapps/ai",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "low-code",
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "llm apps",
+        "ai agents",
+        "rag",
+        "chatbot builder",
+        "ai workflow",
+        "langchain alternative",
+        "llmops"
+      ],
+      "license": "LicenseRef-Dify-Open-Source-License",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "pgvector"
+        },
+        {
+          "name": "cache",
+          "title": "Cache and job queue",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "gateway",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "api",
+          "title": "API"
+        },
+        {
+          "name": "worker",
+          "title": "Worker"
+        },
+        {
+          "name": "beat",
+          "title": "Scheduler"
+        },
+        {
+          "name": "web",
+          "title": "Web app"
+        },
+        {
+          "name": "sandbox",
+          "title": "Code sandbox"
+        },
+        {
+          "name": "plugins",
+          "title": "Plugin daemon"
+        },
+        {
+          "name": "agent",
+          "title": "Agent backend"
+        },
+        {
+          "name": "shell",
+          "title": "Agent shell"
+        },
+        {
+          "name": "proxy",
+          "title": "Proxy"
+        },
+        {
+          "name": "shellproxy",
+          "title": "Shell proxy"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.17",
+          "release": "1.17.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "directus",
       "file": {
         "path": "templates/directus.yaml",

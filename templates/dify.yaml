@@ -1,0 +1,936 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dify
+  title: Dify
+  tagline: Build AI apps, agents and RAG workflows on any model, in a visual studio
+  description: |
+    Dify is a platform for building LLM applications: chatbots, agents and workflows
+    designed on a canvas, knowledge bases that retrieve from your documents (RAG), tools
+    and model providers installed as plugins - OpenAI, Anthropic, Gemini, Ollama and
+    hundreds more - and every app published as a web app, an embeddable widget or an
+    API, with logs and annotations to improve it.
+
+    **This template creates three apps**
+
+    - **Dify**, as eleven components - the same services as Dify's own Docker Compose:
+      - **gateway**, the nginx that the domain points at, which sends each path to the
+        API, the web app or the plugin daemon
+      - **api**, **worker** and **beat** - the API server, the Celery worker that indexes
+        documents and runs published workflows, and the scheduler of periodic jobs
+      - **web**, the web app
+      - **sandbox**, which runs the code nodes of workflows
+      - **plugins**, the plugin daemon that installs and runs model providers and tools
+      - **agent** and **shell** - the Agent v2 backend, and the sandbox that runs the
+        shell commands of its agents
+      - **proxy** and **shell proxy**, two Squid proxies that outbound requests of
+        workflows, code and agents go through, and that refuse private addresses
+    - **a PostgreSQL database** with pgvector, named after the app with `-db` added: it
+      also holds the vectors of knowledge bases, and the plugin daemon's own `dify_plugin`
+      database
+    - **a Redis**, named after the app with `-cache` added, for the job queue and caches
+
+    **The first start creates the administrator**
+
+    Dify asks whoever opens a new installation first to create its administrator. This
+    template creates that account from the values below before the API answers anything,
+    so the setup page is never open to anyone. Registration is off: invite members from
+    Settings > Members.
+
+    **Models come from plugins**
+
+    Dify has no model of its own. Open Plugins, install a model provider from the
+    marketplace, and give it your API key - or point it at your own Ollama or
+    OpenAI-compatible server. Installing needs outbound internet access, to
+    marketplace.dify.ai and to the Python package index.
+
+    **The sandboxes share the project's network**
+
+    Dify's Compose file puts the code sandbox and the agent shell on networks of their
+    own, from which only their proxy is reachable. Here every component is on the
+    project's network: the proxies are set as the sandboxes' proxy and refuse private
+    addresses, but code that ignores the proxy setting reaches the project's other apps
+    directly. Give Dify a project of its own, and do not let untrusted people write code
+    nodes or agents.
+
+    **Reaching the project's other apps from workflows**
+
+    HTTP request nodes, tools and code go out through the proxy, which refuses private
+    addresses - so it refuses the project's own apps too. To let workflows call one, add
+    its name to the allowlist at the top of the proxy component's `squid.conf`.
+
+    **Email**
+
+    To send invitations and password resets, set `MAIL_TYPE` (`smtp` or `resend`),
+    `MAIL_DEFAULT_SEND_FROM` and the `SMTP_*` or `RESEND_API_KEY` environment variables on
+    the api and worker components.
+  categories: [webapps/ai, webapps/dev-tools]
+  tags: [ai, llm, low-code, automation, open-source]
+  aliases: [llm apps, ai agents, rag, chatbot builder, ai workflow, langchain alternative, llmops]
+  icon: icons/dify.svg
+  links:
+    website: https://dify.ai
+    documentation: https://docs.dify.ai/en/self-host/quick-start/docker-compose
+    source: https://github.com/langgenius/dify
+  # The Apache License 2.0 with two added conditions: no multi-tenant service built on it
+  # without a commercial license, and Dify's logo and copyright left in the web app.
+  license: LicenseRef-Dify-Open-Source-License
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Dify answers at. Leave it empty to add one later, in the routing settings
+      of the gateway component - but links to files, webhooks, plugin endpoints and live
+      collaboration need it.
+    type: domain
+    optional: true
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Administrator
+    maxLength: 30
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      At least 8 characters, with letters and digits. Used once, when the first start
+      creates the account. Leave empty to generate one; it is kept under the Secrets of the
+      api component.
+    type: secret
+    minLength: 8
+    # Long, so that a generated one lacks a digit once in thousands of draws.
+    generate: {length: 48}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Signs sessions and encrypts the model providers' credentials Dify stores. Leave empty
+      to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: sandboxKey
+    title: Code sandbox key
+    description: What the API authenticates to the code sandbox with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: pluginDaemonKey
+    title: Plugin daemon key
+    description: What the API and the agent backend authenticate to the plugin daemon with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: innerApiKey
+    title: Inner API key
+    description: What the plugin daemon and the agent backend call back into the API with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: agentApiToken
+    title: Agent backend token
+    description: What the API authenticates to the agent backend with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: agentSecretKey
+    title: Agent backend secret key
+    description: >-
+      Encrypts the tokens agents' shells call back with: 32 bytes as unpadded base64url,
+      43 letters, digits, - or _. Leave empty to generate one.
+    type: secret
+    minLength: 43
+    maxLength: 43
+    generate: {length: 43}
+  - name: shellToken
+    title: Agent shell token
+    description: What the agent backend authenticates to the agent shell with. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit, API, worker and plugin daemon each
+    description: >-
+      The API and the worker take about 500MB each at rest, and the plugin daemon grows
+      with every plugin installed; parsing large documents takes the worker more.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: >-
+      The volume uploaded files, the workspaces' encryption keys, installed plugins and the
+      agents' workspaces are kept on, each in a directory of its own.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: pgvector
+    version: "0.8"
+    params:
+      dbName: dify
+      username: dify
+  - name: cache
+    title: Cache and job queue
+    template: redis
+    version: "8.10"
+    params:
+      # It holds Celery's queue: Redis refuses writes when full rather than lose a job.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "1.17"
+    release: "1.17.1"
+    default: true
+    components:
+      gateway: {image: "nginx:1.30.5-alpine"}
+      api: {image: "langgenius/dify-api:1.17.1"}
+      worker: {image: "langgenius/dify-api:1.17.1"}
+      beat: {image: "langgenius/dify-api:1.17.1"}
+      web: {image: "langgenius/dify-web:1.17.1"}
+      sandbox: {image: "langgenius/dify-sandbox:0.2.15"}
+      plugins: {image: "langgenius/dify-plugin-daemon:0.6.10-local"}
+      agent: {image: "langgenius/dify-agent-backend:1.17.1"}
+      shell: {image: "langgenius/dify-agent-local-sandbox:1.17.1"}
+      proxy: {image: "ubuntu/squid:6.6-24.04_beta"}
+      shellproxy: {image: "ubuntu/squid:6.6-24.04_beta"}
+
+components:
+  # ── Gateway ────────────────────────────────────────────────────────────
+  - name: gateway
+    title: Gateway
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # A server of its own on the loopback: the gateway is healthy while nginx
+            # runs, whatever the components behind it are doing.
+            command: wget -q -O /dev/null http://127.0.0.1:8081/
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 128MB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        configFiles:
+          default.conf:
+            # Dify's own nginx routes, with the component names of this app.
+            content: |
+              map $http_x_forwarded_proto $forwarded_proto {
+                default $http_x_forwarded_proto;
+                "" $scheme;
+              }
+              map $http_upgrade $connection_upgrade {
+                default upgrade;
+                "" "";
+              }
+
+              server {
+                listen 80;
+                server_name _;
+                # Docker's resolver, asked at each request: a component that restarts, or
+                # is not up yet, is found again rather than failing nginx's start.
+                resolver 127.0.0.11 valid=30s ipv6=off;
+                client_max_body_size 100M;
+
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $forwarded_proto;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+                proxy_buffering off;
+                proxy_read_timeout 3600s;
+                proxy_send_timeout 3600s;
+
+                set $api ${{ comp.api.key }}:5001;
+                set $web ${{ comp.web.key }}:3000;
+                set $plugins ${{ comp.plugins.key }}:5002;
+
+                location /console/api { proxy_pass http://$api; }
+                location /api { proxy_pass http://$api; }
+                location /v1 { proxy_pass http://$api; }
+                location /openapi { proxy_pass http://$api; }
+                location /files { proxy_pass http://$api; }
+                location /mcp { proxy_pass http://$api; }
+                location /triggers { proxy_pass http://$api; }
+                # Live collaboration on workflows.
+                location /socket.io/ { proxy_pass http://$api; }
+                # The endpoints plugins publish.
+                location /e/ {
+                  # A location that sets a header inherits none of the ones above.
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $forwarded_proto;
+                  proxy_set_header Connection "";
+                  proxy_set_header Dify-Hook-Url $forwarded_proto://$host$request_uri;
+                  proxy_pass http://$plugins;
+                }
+                location / { proxy_pass http://$web; }
+              }
+
+              server {
+                listen 127.0.0.1:8081;
+                location / { return 204; }
+              }
+            swarmRef:
+              file: {name: /etc/nginx/conf.d/default.conf, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── API ────────────────────────────────────────────────────────────────
+  - name: api
+    title: API
+    needs: [proxy, sandbox]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /app/api/storage:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: storage}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: curl -fsS -o /dev/null http://127.0.0.1:5001/health
+            interval: 30s
+            timeout: 5s
+            # The first start creates the whole schema.
+            startPeriod: 300s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: MODE, v: api}
+            # The API applies the migrations, before it starts; the worker and beat do not.
+            - {k: MIGRATION_ENABLED, v: "true"}
+            # The image's server configuration, with the hook that creates the first
+            # administrator - see gunicorn.conf.py below.
+            - {k: GUNICORN_CMD_ARGS, v: "--config /hivepaas/gunicorn.conf.py"}
+            - {k: DIFY_ADMIN_NAME, v: "${{ params.adminName }}"}
+            - {k: DIFY_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: DIFY_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+            - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - {k: DEPLOY_ENV, v: PRODUCTION}
+            - {k: DISABLE_TELEMETRY, v: "true"}
+            # The gateway's address, which the web app, file links and webhooks use.
+            - {k: CONSOLE_API_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: CONSOLE_WEB_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: SERVICE_API_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: APP_WEB_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: FILES_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: TRIGGER_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: ENDPOINT_URL_TEMPLATE, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}/e/{hook_id}"}
+            - {k: INTERNAL_FILES_URL, v: "http://${{ comp.api.key }}:5001"}
+            - {k: ALLOW_REGISTER, v: "false"}
+            - {k: ALLOW_CREATE_WORKSPACE, v: "false"}
+            - {k: DB_TYPE, v: postgresql}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: VECTOR_STORE, v: pgvector}
+            - {k: PGVECTOR_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: PGVECTOR_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: PGVECTOR_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: PGVECTOR_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: PGVECTOR_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - k: CELERY_BROKER_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/1
+            - {k: STORAGE_TYPE, v: opendal}
+            - {k: OPENDAL_SCHEME, v: fs}
+            - {k: OPENDAL_FS_ROOT, v: storage}
+            - {k: CODE_EXECUTION_ENDPOINT, v: "http://${{ comp.sandbox.key }}:8194"}
+            - {k: CODE_EXECUTION_API_KEY, v: "${secrets.SANDBOX_KEY}"}
+            - {k: SSRF_PROXY_HTTP_URL, v: "http://${{ comp.proxy.key }}:3128"}
+            - {k: SSRF_PROXY_HTTPS_URL, v: "http://${{ comp.proxy.key }}:3128"}
+            - {k: PLUGIN_DAEMON_URL, v: "http://${{ comp.plugins.key }}:5002"}
+            - {k: PLUGIN_DAEMON_KEY, v: "${secrets.PLUGIN_DAEMON_KEY}"}
+            - {k: INNER_API_KEY_FOR_PLUGIN, v: "${secrets.INNER_API_KEY}"}
+            - {k: AGENT_BACKEND_BASE_URL, v: "http://${{ comp.agent.key }}:5050"}
+            - {k: AGENT_BACKEND_API_TOKEN, v: "${secrets.AGENT_API_TOKEN}"}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+          SANDBOX_KEY:
+            value: "${{ params.sandboxKey }}"
+          PLUGIN_DAEMON_KEY:
+            value: "${{ params.pluginDaemonKey }}"
+          INNER_API_KEY:
+            value: "${{ params.innerApiKey }}"
+          AGENT_API_TOKEN:
+            value: "${{ params.agentApiToken }}"
+        configFiles:
+          gunicorn.conf.py:
+            # Gunicorn calls on_starting before it opens its port - so the administrator
+            # exists before anyone could reach the setup page.
+            content: |
+              # The image's own configuration, with one hook added.
+              exec(open("/app/api/gunicorn.conf.py").read())
+
+
+              def on_starting(server):
+                  import subprocess
+
+                  subprocess.run(["python", "/hivepaas/bootstrap.py"], check=True)
+            swarmRef:
+              file: {name: /hivepaas/gunicorn.conf.py, mode: 444}
+          bootstrap.py:
+            # What the setup page does, once: after that, setup is found done and nothing
+            # happens.
+            content: |
+              import os
+              import sys
+
+              # Run as a script, it finds the application's modules only once told where.
+              sys.path.insert(0, "/app/api")
+
+              from app_factory import create_app  # noqa: E402
+
+              _, app = create_app()
+              with app.app_context():
+                  from extensions.ext_application_services import application_services
+                  from libs.password import valid_password
+                  from services.setup_service import SetupAlreadyCompletedError, SetupInput
+
+                  try:
+                      application_services().setup.initialize(
+                          SetupInput(
+                              email=os.environ["DIFY_ADMIN_EMAIL"],
+                              name=os.environ["DIFY_ADMIN_NAME"],
+                              password=valid_password(os.environ["DIFY_ADMIN_PASSWORD"]),
+                              ip_address="127.0.0.1",
+                              language="en-US",
+                          ),
+                          initialization_validated=True,
+                      )
+                      print("hivepaas: administrator created")
+                  except SetupAlreadyCompletedError:
+                      pass
+            swarmRef:
+              file: {name: /hivepaas/bootstrap.py, mode: 444}
+
+  # ── Worker ─────────────────────────────────────────────────────────────
+  - name: worker
+    title: Worker
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /app/api/storage:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: storage}
+        container:
+          healthcheck:
+            # As in Dify's Compose file: asking Celery is slow, and a worker that dies is
+            # restarted.
+            enabled: false
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: MODE, v: worker}
+            - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - {k: DEPLOY_ENV, v: PRODUCTION}
+            - {k: DISABLE_TELEMETRY, v: "true"}
+            - {k: CONSOLE_API_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: CONSOLE_WEB_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: SERVICE_API_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: APP_WEB_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: FILES_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: TRIGGER_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: ENDPOINT_URL_TEMPLATE, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}/e/{hook_id}"}
+            - {k: INTERNAL_FILES_URL, v: "http://${{ comp.api.key }}:5001"}
+            - {k: DB_TYPE, v: postgresql}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: VECTOR_STORE, v: pgvector}
+            - {k: PGVECTOR_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: PGVECTOR_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: PGVECTOR_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: PGVECTOR_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: PGVECTOR_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - k: CELERY_BROKER_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/1
+            - {k: STORAGE_TYPE, v: opendal}
+            - {k: OPENDAL_SCHEME, v: fs}
+            - {k: OPENDAL_FS_ROOT, v: storage}
+            - {k: CODE_EXECUTION_ENDPOINT, v: "http://${{ comp.sandbox.key }}:8194"}
+            - {k: CODE_EXECUTION_API_KEY, v: "${secrets.SANDBOX_KEY}"}
+            - {k: SSRF_PROXY_HTTP_URL, v: "http://${{ comp.proxy.key }}:3128"}
+            - {k: SSRF_PROXY_HTTPS_URL, v: "http://${{ comp.proxy.key }}:3128"}
+            - {k: PLUGIN_DAEMON_URL, v: "http://${{ comp.plugins.key }}:5002"}
+            - {k: PLUGIN_DAEMON_KEY, v: "${secrets.PLUGIN_DAEMON_KEY}"}
+            - {k: INNER_API_KEY_FOR_PLUGIN, v: "${secrets.INNER_API_KEY}"}
+            - {k: AGENT_BACKEND_BASE_URL, v: "http://${{ comp.agent.key }}:5050"}
+            - {k: AGENT_BACKEND_API_TOKEN, v: "${secrets.AGENT_API_TOKEN}"}
+        secrets:
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+          SANDBOX_KEY:
+            value: "${{ params.sandboxKey }}"
+          PLUGIN_DAEMON_KEY:
+            value: "${{ params.pluginDaemonKey }}"
+          INNER_API_KEY:
+            value: "${{ params.innerApiKey }}"
+          AGENT_API_TOKEN:
+            value: "${{ params.agentApiToken }}"
+
+  # ── Beat ───────────────────────────────────────────────────────────────
+  - name: beat
+    title: Scheduler
+    needs: [api]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: false
+        resources:
+          limits: {memory: 768MB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: MODE, v: beat}
+            - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - {k: DEPLOY_ENV, v: PRODUCTION}
+            - {k: DISABLE_TELEMETRY, v: "true"}
+            - {k: DB_TYPE, v: postgresql}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - k: CELERY_BROKER_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/1
+        secrets:
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+
+  # ── Web ────────────────────────────────────────────────────────────────
+  - name: web
+    title: Web app
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget -q -O /dev/null http://127.0.0.1:3000/signin
+            interval: 30s
+            timeout: 10s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # Next.js binds the address HOSTNAME names, which Docker sets to the container
+            # id: without this the server does not answer on the loopback.
+            - {k: HOSTNAME, v: 0.0.0.0}
+            - {k: DEPLOY_ENV, v: PRODUCTION}
+            - {k: NEXT_TELEMETRY_DISABLED, v: "1"}
+            # Empty without a domain: the browser then calls the gateway it came from.
+            - {k: CONSOLE_API_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: APP_API_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            - {k: NEXT_PUBLIC_SOCKET_URL, v: "${${{ comp.gateway.key }}.HIVEPAAS_APP_URL}"}
+            # For the pages the server renders.
+            - {k: SERVER_CONSOLE_API_URL, v: "http://${{ comp.api.key }}:5001"}
+            - {k: MARKETPLACE_API_URL, v: https://marketplace.dify.ai}
+            - {k: MARKETPLACE_URL, v: https://marketplace.dify.ai}
+            - {k: NEXT_PUBLIC_ENABLE_AGENT_V2, v: "true"}
+            # The values Dify's Compose file gives; the image's start script passes on
+            # empty ones otherwise.
+            - {k: TEXT_GENERATION_TIMEOUT_MS, v: "60000"}
+            - {k: TOP_K_MAX_VALUE, v: "10"}
+            - {k: INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH, v: "4000"}
+            - {k: LOOP_NODE_MAX_COUNT, v: "100"}
+            - {k: MAX_TOOLS_NUM, v: "10"}
+            - {k: MAX_PARALLEL_LIMIT, v: "10"}
+            - {k: MAX_ITERATIONS_NUM, v: "99"}
+            - {k: MAX_TREE_DEPTH, v: "50"}
+
+  # ── Code sandbox ───────────────────────────────────────────────────────
+  - name: sandbox
+    title: Code sandbox
+    needs: [proxy]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: curl -fsS -o /dev/null http://127.0.0.1:8194/health
+            interval: 30s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: API_KEY, v: "${secrets.SANDBOX_KEY}"}
+            - {k: GIN_MODE, v: release}
+            - {k: WORKER_TIMEOUT, v: "15"}
+            - {k: ENABLE_NETWORK, v: "true"}
+            - {k: HTTP_PROXY, v: "http://${{ comp.proxy.key }}:3128"}
+            - {k: HTTPS_PROXY, v: "http://${{ comp.proxy.key }}:3128"}
+            - {k: SANDBOX_PORT, v: "8194"}
+        secrets:
+          SANDBOX_KEY:
+            value: "${{ params.sandboxKey }}"
+
+  # ── Plugin daemon ──────────────────────────────────────────────────────
+  - name: plugins
+    title: Plugin daemon
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /app/storage:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: plugins}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: curl -fsS -o /dev/null http://127.0.0.1:5002/health/check
+            interval: 30s
+            timeout: 5s
+            startPeriod: 60s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: DB_TYPE, v: postgresql}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            # A database of its own, which it creates on the first start.
+            - {k: DB_DATABASE, v: dify_plugin}
+            - {k: DB_SSL_MODE, v: disable}
+            - {k: REDIS_HOST, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.cache.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: SERVER_PORT, v: "5002"}
+            - {k: SERVER_KEY, v: "${secrets.PLUGIN_DAEMON_KEY}"}
+            - {k: DIFY_INNER_API_URL, v: "http://${{ comp.api.key }}:5001"}
+            - {k: DIFY_INNER_API_KEY, v: "${secrets.INNER_API_KEY}"}
+            - {k: FORCE_VERIFYING_SIGNATURE, v: "true"}
+            - {k: PLUGIN_STORAGE_TYPE, v: local}
+            - {k: PLUGIN_STORAGE_LOCAL_ROOT, v: /app/storage}
+            - {k: PLUGIN_WORKING_PATH, v: /app/storage/cwd}
+            - {k: PLUGIN_INSTALLED_PATH, v: plugin}
+            - {k: PLUGIN_PACKAGE_CACHE_PATH, v: plugin_packages}
+            - {k: PLUGIN_MEDIA_CACHE_PATH, v: assets}
+        secrets:
+          PLUGIN_DAEMON_KEY:
+            value: "${{ params.pluginDaemonKey }}"
+          INNER_API_KEY:
+            value: "${{ params.innerApiKey }}"
+
+  # ── Agent backend ──────────────────────────────────────────────────────
+  - name: agent
+    title: Agent backend
+    needs: [plugins, shell]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # No curl in the image, and no health route: the API description answers.
+            command: >-
+              python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5050/openapi.json', timeout=5)"
+            interval: 30s
+            timeout: 10s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - k: DIFY_AGENT_REDIS_URL
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/2
+            - {k: DIFY_AGENT_PLUGIN_DAEMON_URL, v: "http://${{ comp.plugins.key }}:5002"}
+            - {k: DIFY_AGENT_PLUGIN_DAEMON_API_KEY, v: "${secrets.PLUGIN_DAEMON_KEY}"}
+            - {k: DIFY_AGENT_INNER_API_URL, v: "http://${{ comp.api.key }}:5001"}
+            - {k: DIFY_AGENT_INNER_API_KEY, v: "${secrets.INNER_API_KEY}"}
+            - {k: DIFY_AGENT_RUNTIME_BACKEND, v: local}
+            - {k: DIFY_AGENT_LOCAL_SANDBOX_ENDPOINT, v: "http://${{ comp.shell.key }}:5004"}
+            - {k: DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN, v: "${secrets.SHELL_TOKEN}"}
+            # The addresses the shell calls back to, through its proxy.
+            - {k: DIFY_AGENT_STUB_API_BASE_URL, v: "http://${{ comp.agent.key }}:5050/agent-stub"}
+            - {k: DIFY_AGENT_SANDBOX_FILES_BASE_URL, v: "http://${{ comp.api.key }}:5001"}
+            - {k: DIFY_AGENT_SERVER_SECRET_KEY, v: "${secrets.AGENT_SECRET_KEY}"}
+            - {k: DIFY_AGENT_API_TOKEN, v: "${secrets.AGENT_API_TOKEN}"}
+        secrets:
+          PLUGIN_DAEMON_KEY:
+            value: "${{ params.pluginDaemonKey }}"
+          INNER_API_KEY:
+            value: "${{ params.innerApiKey }}"
+          SHELL_TOKEN:
+            value: "${{ params.shellToken }}"
+          AGENT_SECRET_KEY:
+            value: "${{ params.agentSecretKey }}"
+          AGENT_API_TOKEN:
+            value: "${{ params.agentApiToken }}"
+
+  # ── Agent shell ────────────────────────────────────────────────────────
+  - name: shell
+    title: Agent shell
+    needs: [shellproxy]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /home/dify:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: shell/home}
+            /workspace:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: shell/workspace}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: curl -fsS -o /dev/null http://127.0.0.1:5004/healthz
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: SHELLCTL_AUTH_TOKEN, v: "${secrets.SHELL_TOKEN}"}
+            - {k: SHELLCTL_ENABLE_PATH_ISOLATION, v: "true"}
+            # Both spellings: curl reads only the lowercase one for http:// addresses.
+            - {k: HTTP_PROXY, v: "http://${{ comp.shellproxy.key }}:3128"}
+            - {k: HTTPS_PROXY, v: "http://${{ comp.shellproxy.key }}:3128"}
+            - {k: http_proxy, v: "http://${{ comp.shellproxy.key }}:3128"}
+            - {k: https_proxy, v: "http://${{ comp.shellproxy.key }}:3128"}
+            - {k: NO_PROXY, v: "localhost,127.0.0.1"}
+            - {k: no_proxy, v: "localhost,127.0.0.1"}
+        secrets:
+          SHELL_TOKEN:
+            value: "${{ params.shellToken }}"
+
+  # ── Proxy ──────────────────────────────────────────────────────────────
+  - name: proxy
+    title: Proxy
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image has no HTTP client: bash asks squid for one of its own icons, and
+            # any HTTP answer will do.
+            command: >-
+              bash -c 'exec 3<>/dev/tcp/127.0.0.1/3128;
+              printf "HEAD http://127.0.0.1:3128/squid-internal-static/icons/SN.png HTTP/1.0\r\n\r\n" >&3;
+              read -r line <&3; case "$line" in HTTP/*) ;; *) exit 1;; esac'
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 384MB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        configFiles:
+          squid.conf:
+            # Dify's own rules: public addresses are open to the project's apps, private
+            # ones are refused - the network is the project's, so this is what keeps
+            # workflows and code away from the other apps in it.
+            content: |
+              # To let workflows reach apps of this project, name them here - by the name
+              # other apps reach them at - and remove the two # below:
+              # acl allowed_private dstdomain my-app my-other-app
+              # http_access allow allowed_private
+
+              acl client_localnet src 10.0.0.0/8 100.64.0.0/10 172.16.0.0/12 192.168.0.0/16 fc00::/7 fe80::/10
+              acl to_private_networks dst 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4 ::1/128 fc00::/7 fe80::/10
+              acl SSL_ports port 443
+              acl Safe_ports port 80 21 443 70 210 1025-65535 280 488 591 777
+              acl CONNECT method CONNECT
+              acl allowed_domains dstdomain .marketplace.dify.ai
+
+              http_port 3128
+              http_access deny !Safe_ports
+              http_access deny CONNECT !SSL_ports
+              http_access deny to_private_networks
+              http_access allow allowed_domains
+              http_access allow client_localnet
+              http_access allow localhost
+              http_access deny all
+
+              cache deny all
+              cache_mem 8 MB
+              coredump_dir /var/spool/squid
+              connect_timeout 30 seconds
+              request_timeout 2 minutes
+              read_timeout 2 minutes
+              client_request_buffer_max_size 100 MB
+              logformat dify %ts.%03tu %6tr %>a %Ss/%03>Hs %<st %rm %ru %[un %Sh/%<a %mt
+              # Not the health check's requests, from the container itself.
+              acl self src 127.0.0.1/32
+              access_log daemon:/var/log/squid/access.log logformat=dify !self
+            swarmRef:
+              file: {name: /etc/squid/squid.conf, mode: 444}
+
+  # ── Shell proxy ────────────────────────────────────────────────────────
+  - name: shellproxy
+    title: Shell proxy
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image has no HTTP client: bash asks squid for one of its own icons, and
+            # any HTTP answer will do.
+            command: >-
+              bash -c 'exec 3<>/dev/tcp/127.0.0.1/3128;
+              printf "HEAD http://127.0.0.1:3128/squid-internal-static/icons/SN.png HTTP/1.0\r\n\r\n" >&3;
+              read -r line <&3; case "$line" in HTTP/*) ;; *) exit 1;; esac'
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 384MB}
+      settings:
+        kind: {category: webapp, engine: dify, version: "${{ version.name }}", webapp: {}}
+        configFiles:
+          squid.conf:
+            # Dify's rules for the agent shell: the internet, the agent backend's callback
+            # routes and the API's file links - and no other private address.
+            content: |
+              acl to_private_networks dst 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4 ::1/128 fc00::/7 fe80::/10
+              acl SSL_ports port 443
+              acl Safe_ports port 80 21 443 70 210 1025-65535 280 488 591 777
+              acl CONNECT method CONNECT
+              acl dst_agent_backend dstdomain ${{ comp.agent.key }}
+              acl dst_dify_api dstdomain ${{ comp.api.key }}
+              acl path_files urlpath_regex -i ^/files/
+              acl path_agent_stub urlpath_regex -i ^/agent-stub/
+
+              http_port 3128
+              http_access deny !Safe_ports
+              http_access deny CONNECT !SSL_ports
+              http_access allow dst_agent_backend path_agent_stub
+              http_access allow dst_dify_api path_files
+              http_access deny to_private_networks
+              http_access allow all
+
+              cache deny all
+              cache_mem 8 MB
+              coredump_dir /var/spool/squid
+              connect_timeout 30 seconds
+              request_timeout 2 minutes
+              read_timeout 2 minutes
+              client_request_buffer_max_size 100 MB
+              logformat dify %ts.%03tu %6tr %>a %Ss/%03>Hs %<st %rm %ru %[un %Sh/%<a %mt
+              # Not the health check's requests, from the container itself.
+              acl self src 127.0.0.1/32
+              access_log daemon:/var/log/squid/access.log logformat=dify !self
+            swarmRef:
+              file: {name: /etc/squid/squid.conf, mode: 444}
