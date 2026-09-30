@@ -1,0 +1,154 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: martin
+  title: Martin
+  tagline: Vector tiles for your maps, from PostGIS tables and MBTiles or PMTiles files
+  description: |
+    Martin is MapLibre's tile server: it turns PostGIS tables and functions into vector
+    tiles on the fly, and serves tiles from MBTiles and PMTiles files as they are, for
+    MapLibre, OpenLayers, Leaflet or any client that reads the Mapbox Vector Tile format.
+    It is written in Rust, and small: tens of megabytes of memory.
+
+    **This template creates two apps**
+
+    - **Martin**, with a volume for tile files
+    - **a PostGIS database** for it, named after the app with `-db` added
+
+    **What it serves**
+
+    - every table with a geometry column, and every function returning tiles, in the
+      database's `public` schema - found when Martin starts, one source each, named
+      after the table
+    - every `.mbtiles` and `.pmtiles` file on the volume; a file added there is picked
+      up without a restart
+
+    `/catalog` lists the sources, `/{source}/{z}/{x}/{y}` is a tile, and `/{source}` is
+    its TileJSON. The web UI, at the address itself, previews each source on a map.
+
+    **Everything it serves is public**
+
+    Martin has no sign-in: a table in `public` with a geometry column is readable by
+    anyone who reaches the address, tile by tile. Keep what should stay private in
+    another schema, or put basic authentication in front in the app's routing settings.
+    A table created after Martin started appears after a restart.
+  categories: [webapps/dev-tools]
+  tags: [geospatial, open-source]
+  aliases: [tile server, vector tiles, maps, mbtiles, pmtiles, maplibre, postgis tiles]
+  icon: icons/martin.svg
+  links:
+    website: https://maplibre.org/martin/
+    documentation: https://maplibre.org/martin/
+    source: https://github.com/maplibre/martin
+  license: MIT OR Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the tiles are served at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: webUi
+    title: Web UI
+    description: The page at the address that lists the sources and previews each on a map.
+    type: select
+    default: enable-for-all
+    options:
+      - {value: enable-for-all, title: "On"}
+      - {value: disable, title: "Off"}
+  - name: memoryLimit
+    title: Memory limit
+    description: Martin itself needs little; its tile cache is 256MB at most.
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Tile files volume
+    description: The volume the MBTiles and PMTiles files it serves are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgis
+    version: "3.6"
+    params:
+      dbName: gis
+      username: martin
+
+versions:
+  - name: "1.16"
+    release: "1.16.1"
+    default: true
+    image: ghcr.io/maplibre/martin:1.16.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: --config /config/config.yaml
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check; wget is in it, curl is not.
+        command: wget --spider -q http://127.0.0.1:3000/health
+        interval: 15s
+        timeout: 5s
+        # Martin waits up to two minutes for the database on a first start.
+        startPeriod: 150s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: martin
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Read by the config file below. Not DATABASE_URL: Martin reads that one on its own
+        # too, and warns that doing so is deprecated. The password is generated, letters
+        # and digits only, so nothing in it needs escaping.
+        - k: MARTIN_DATABASE_URL
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+    configFiles:
+      config.yaml:
+        # ${MARTIN_DATABASE_URL} is read by Martin from this app's environment. Only the
+        # public schema is published: the PostGIS image also creates the tables of its TIGER
+        # geocoder, empty, in schema tiger, which would otherwise all be listed as sources.
+        content: |
+          listen_addresses: 0.0.0.0:3000
+          web_ui: ${{ params.webUi }}
+          postgres:
+            connection_string: ${MARTIN_DATABASE_URL}
+            retry_timeout: 2m
+            auto_publish:
+              from_schemas: [public]
+              tables: true
+              functions: true
+          pmtiles:
+            allow_http: false
+            paths: [/data]
+          mbtiles:
+            paths: [/data]
+        swarmRef:
+          file: {name: /config/config.yaml, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

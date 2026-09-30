@@ -7046,6 +7046,53 @@
       }
     },
     {
+      "name": "martin",
+      "file": {
+        "path": "templates/martin.yaml",
+        "sha256": "d810dece8cdb3da1ef63e14728378eda10c15bbd388d281666e45f4190acb48c"
+      },
+      "icon": {
+        "path": "icons/martin.svg",
+        "sha256": "f45e25aeae9f836f84757f4bb77c26126a6c4c35f23b7c9f5deffb36387b55de"
+      },
+      "title": "Martin",
+      "tagline": "Vector tiles for your maps, from PostGIS tables and MBTiles or PMTiles files",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "geospatial",
+        "open-source"
+      ],
+      "aliases": [
+        "tile server",
+        "vector tiles",
+        "maps",
+        "mbtiles",
+        "pmtiles",
+        "maplibre",
+        "postgis tiles"
+      ],
+      "license": "MIT OR Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.16",
+          "release": "1.16.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "matomo",
       "file": {
         "path": "templates/matomo.yaml",
