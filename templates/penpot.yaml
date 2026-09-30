@@ -1,0 +1,308 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: penpot
+  title: Penpot
+  tagline: Open-source design and prototyping for teams, in the spirit of Figma
+  description: |
+    Penpot is a design and prototyping tool in the browser: vector design with flex and
+    grid layouts, components and shared libraries, design tokens, interactive prototypes,
+    real-time collaboration and comments, and code inspection - SVG, CSS and HTML - for
+    developers. It imports Figma files through a plugin.
+
+    **This template creates three apps**
+
+    - **Penpot**, as three components, with a volume for uploaded images and fonts shared
+      by the first two:
+      - **frontend**, the web app and the nginx the domain points at
+      - **backend**, the API and the background jobs
+      - **exporter**, a headless browser that renders exports to PNG, SVG and PDF
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Redis**, named after the app with `-cache` added
+
+    **Accounts**
+
+    Registration is off: this template creates the first account below, which invites the
+    others to its teams - invitations need the SMTP server. Turn registration on by removing
+    `disable-registration` from `PENPOT_FLAGS` on the frontend and backend.
+
+    **Needs HTTPS**
+
+    Session cookies are only sent over HTTPS: give Penpot its domain before signing in.
+
+    **Not included**
+
+    Penpot's admin console and MCP server - optional, newer components - are not part of
+    this template.
+  categories: [webapps/media, webapps/dev-tools]
+  tags: [collaboration, whiteboard, open-source]
+  aliases: [figma alternative, design, prototyping, ui design, ux, wireframes, vector]
+  icon: icons/penpot.svg
+  links:
+    website: https://penpot.app
+    documentation: https://help.penpot.app/technical-guide/getting-started/docker/
+    source: https://github.com/penpot/penpot
+  license: MPL-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Penpot answers at. Signing in needs it, over HTTPS: leave it empty only to
+      add one later, in the routing settings of the frontend component.
+    type: domain
+    optional: true
+  - name: adminName
+    title: First account's name
+    type: string
+    default: Administrator
+    maxLength: 100
+  - name: adminEmail
+    title: First account's email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: First account's password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the backend component's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: Signs sessions and tokens. Leave empty to generate one.
+    type: secret
+    minLength: 64
+    generate: {length: 96}
+  - name: smtpHost
+    title: SMTP host
+    description: For invitations and password resets. Leave empty and emails are only written to the backend's log.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    description: 587 for STARTTLS, or 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: Sender address
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: memoryLimit
+    title: Backend memory limit
+    description: The backend, a JVM, takes about 1GB at rest.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: assetsVolume
+    title: Assets volume
+    description: The volume uploaded images, fonts and thumbnails are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: penpot
+      username: penpot
+  - name: cache
+    title: Cache
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "2.18"
+    release: "2.18.0"
+    default: true
+    components:
+      frontend: {image: "penpotapp/frontend:2.18.0"}
+      backend: {image: "penpotapp/backend:2.18.0"}
+      exporter: {image: "penpotapp/exporter:2.18.0"}
+
+components:
+  # ── Frontend ───────────────────────────────────────────────────────────
+  - name: frontend
+    title: Frontend
+    primary: true
+    needs: [backend, exporter]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # The image's entrypoint writes nginx's configuration, then runs this: nginx looks
+          # the backend and the exporter up once, when it starts, so it waits for both.
+          command: >-
+            bash -c 'until getent hosts "$PENPOT_BACKEND_HOST" >/dev/null && getent hosts "$PENPOT_EXPORTER_HOST" >/dev/null;
+            do echo "hivepaas: waiting for the backend and the exporter"; sleep 3; done;
+            exec nginx -g "daemon off;"'
+        storage:
+          mounts:
+            # nginx serves the stored files itself, once the backend has checked access.
+            /opt/data/assets: {type: volume, source: "${{ params.assetsVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # No HTTP client in the image: bash asks nginx for the web app.
+            command: >-
+              bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf "GET / HTTP/1.0\r\n\r\n" >&3;
+              head -1 <&3 | grep -q " 200"'
+            interval: 20s
+            timeout: 5s
+            startPeriod: 60s
+            retries: 3
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: penpot, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: PENPOT_FLAGS, v: disable-registration enable-login-with-password}
+            - {k: PENPOT_PUBLIC_URI, v: "${HIVEPAAS_APP_URL}"}
+            - {k: PENPOT_BACKEND_URI, v: "http://${{ comp.backend.key }}:6060"}
+            - {k: PENPOT_EXPORTER_URI, v: "http://${{ comp.exporter.key }}:6061"}
+            - {k: PENPOT_BACKEND_HOST, v: "${{ comp.backend.key }}"}
+            - {k: PENPOT_EXPORTER_HOST, v: "${{ comp.exporter.key }}"}
+            - {k: PENPOT_HTTP_SERVER_MAX_BODY_SIZE, v: "367001600"}
+        routing:
+          port: 8080
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Backend ────────────────────────────────────────────────────────────
+  - name: backend
+    title: Backend
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Email is turned on only with an SMTP host, TLS from the first byte on port 465.
+          # Then the image's own start, with the first account created beside it.
+          command: >-
+            bash -c 'if [ -n "$PENPOT_SMTP_HOST" ]; then export PENPOT_FLAGS="$PENPOT_FLAGS enable-smtp"; fi;
+            if [ "$PENPOT_SMTP_PORT" = 465 ]; then export PENPOT_SMTP_SSL=true PENPOT_SMTP_TLS=false; fi;
+            bash /hivepaas/bootstrap.sh & exec bash run.sh'
+        storage:
+          mounts:
+            /opt/data/assets: {type: volume, source: "${{ params.assetsVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD
+            command: curl -fsS -o /dev/null http://127.0.0.1:6060/readyz
+            interval: 20s
+            timeout: 5s
+            # The first start creates the schema.
+            startPeriod: 180s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: penpot, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # The prepl server is what the command line that creates the first account
+            # talks to; it listens on the loopback only.
+            - {k: PENPOT_FLAGS, v: disable-registration enable-login-with-password disable-email-verification enable-prepl-server}
+            - {k: PENPOT_PUBLIC_URI, v: "${${{ comp.frontend.key }}.HIVEPAAS_APP_URL}"}
+            - {k: PENPOT_SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - k: PENPOT_DATABASE_URI
+              v: >-
+                postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+                deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - {k: PENPOT_DATABASE_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: PENPOT_DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - k: PENPOT_REDIS_URI
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/0
+            - {k: PENPOT_OBJECTS_STORAGE_BACKEND, v: fs}
+            - {k: PENPOT_OBJECTS_STORAGE_FS_DIRECTORY, v: /opt/data/assets}
+            - {k: PENPOT_TELEMETRY_ENABLED, v: "false"}
+            - {k: PENPOT_HTTP_SERVER_MAX_BODY_SIZE, v: "367001600"}
+            - {k: PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE, v: "367001600"}
+            - {k: PENPOT_SMTP_HOST, v: "${{ params.smtpHost }}"}
+            - {k: PENPOT_SMTP_PORT, v: "${{ params.smtpPort }}"}
+            - {k: PENPOT_SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+            - {k: PENPOT_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+            - {k: PENPOT_SMTP_TLS, v: "true"}
+            - {k: PENPOT_SMTP_DEFAULT_FROM, v: "${{ params.smtpFromEmail }}"}
+            - {k: PENPOT_SMTP_DEFAULT_REPLY_TO, v: "${{ params.smtpFromEmail }}"}
+            - {k: PENPOT_ADMIN_NAME, v: "${{ params.adminName }}"}
+            - {k: PENPOT_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: PENPOT_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+          SMTP_PASSWORD:
+            value: "${{ params.smtpPassword }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+        configFiles:
+          bootstrap.sh:
+            content: |
+              # Once the backend answers: the first account, created while it does not exist -
+              # registration is off, so this is how the first account comes to be.
+              until curl -fsS -o /dev/null http://127.0.0.1:6060/readyz; do sleep 3; done
+              if ! python3 manage.py search-profile -e "$PENPOT_ADMIN_EMAIL" 2>/dev/null | grep -qi "$PENPOT_ADMIN_EMAIL"; then
+                python3 manage.py create-profile --skip-tutorial --skip-walkthrough \
+                  -e "$PENPOT_ADMIN_EMAIL" -n "$PENPOT_ADMIN_NAME" -p "$PENPOT_ADMIN_PASSWORD" &&
+                  echo "hivepaas: first account created"
+              fi
+            swarmRef:
+              file: {name: /hivepaas/bootstrap.sh, mode: 444}
+
+  # ── Exporter ───────────────────────────────────────────────────────────
+  - name: exporter
+    title: Exporter
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # Any answer will do: it has no health route.
+            command: curl -s -o /dev/null http://127.0.0.1:6061/
+            interval: 30s
+            timeout: 5s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: penpot, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: PENPOT_PUBLIC_URI, v: "${${{ comp.frontend.key }}.HIVEPAAS_APP_URL}"}
+            # It opens the designs it renders through the frontend.
+            - {k: PENPOT_INTERNAL_URI, v: "http://${{ comp.frontend.key }}:8080"}
+            - {k: PENPOT_SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - k: PENPOT_REDIS_URI
+              v: >-
+                redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/0
+        secrets:
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"

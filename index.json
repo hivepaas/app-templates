@@ -9805,6 +9805,75 @@
       }
     },
     {
+      "name": "penpot",
+      "file": {
+        "path": "templates/penpot.yaml",
+        "sha256": "2c7a1ae03d393beaba4247a651d47ef4eb73783cda247f69047128609af31ffe"
+      },
+      "icon": {
+        "path": "icons/penpot.svg",
+        "sha256": "89bdbf79f1c5d268206192a7ffe5b7b450fe53b61d25b909072b6d574e7b172e"
+      },
+      "title": "Penpot",
+      "tagline": "Open-source design and prototyping for teams, in the spirit of Figma",
+      "categories": [
+        "webapps/media",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "collaboration",
+        "whiteboard",
+        "open-source"
+      ],
+      "aliases": [
+        "figma alternative",
+        "design",
+        "prototyping",
+        "ui design",
+        "ux",
+        "wireframes",
+        "vector"
+      ],
+      "license": "MPL-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "frontend",
+          "title": "Frontend",
+          "primary": true
+        },
+        {
+          "name": "backend",
+          "title": "Backend"
+        },
+        {
+          "name": "exporter",
+          "title": "Exporter"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.18",
+          "release": "2.18.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "pgadmin",
       "file": {
         "path": "templates/pgadmin.yaml",
