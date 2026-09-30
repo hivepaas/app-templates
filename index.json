@@ -9610,6 +9610,66 @@
       }
     },
     {
+      "name": "osticket",
+      "file": {
+        "path": "templates/osticket.yaml",
+        "sha256": "0a9a0a0bcfc1d6d9fee76768eae4287d8c897442aac05eee78b9823fbbd8bac1"
+      },
+      "icon": {
+        "path": "icons/osticket.png",
+        "sha256": "afd9a632c297cbe86b9bd7089e621d9bba7a48ec79ad5cc6abb187fa2dffb7eb"
+      },
+      "title": "osTicket",
+      "tagline": "A support ticket system - email, web forms and a help desk for your agents",
+      "categories": [
+        "webapps/communication",
+        "webapps/business"
+      ],
+      "tags": [
+        "email",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "help desk",
+        "helpdesk",
+        "support tickets",
+        "ticketing",
+        "customer support",
+        "zendesk alternative",
+        "freshdesk alternative"
+      ],
+      "license": "GPL-2.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "components": [
+        {
+          "name": "web",
+          "title": "Web",
+          "primary": true
+        },
+        {
+          "name": "cron",
+          "title": "Cron"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.18",
+          "release": "1.18.4",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "otel-collector",
       "file": {
         "path": "templates/otel-collector.yaml",

@@ -1,0 +1,201 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: osticket
+  title: osTicket
+  tagline: A support ticket system - email, web forms and a help desk for your agents
+  description: |
+    osTicket is a support ticket system: tickets come in by email, from the web portal or
+    over the API, and are routed to departments and help topics, assigned to agents, and
+    tracked against SLAs - with canned responses, custom forms, a knowledge base, and a
+    client portal where customers follow their tickets.
+
+    **This template creates two apps**
+
+    - **osTicket**, as two components: the web server - the client portal at `/` and the
+      staff control panel at `/scp` - and a cron worker that fetches email and runs
+      osTicket's scheduled tasks every five minutes
+    - **a MariaDB database**, named after the app with `-db` added - attachments are kept
+      there too
+
+    **The image**
+
+    osTicket publishes no container image. This template uses
+    [HomeLabHD's](https://github.com/HomeLabHD/osticket), which runs rootless on PHP 8.3,
+    installs osTicket from the values below on the first start, and bundles the official
+    plugins. It is built for x86-64 only.
+
+    **Signing in**
+
+    The administrator below signs in to `/scp`. Set up incoming mail, departments and
+    agents from there; outgoing mail uses the SMTP server below.
+  categories: [webapps/communication, webapps/business]
+  tags: [email, collaboration, open-source]
+  aliases: [help desk, helpdesk, support tickets, ticketing, customer support, zendesk alternative, freshdesk alternative]
+  icon: icons/osticket.png
+  links:
+    website: https://osticket.com
+    documentation: https://docs.osticket.com
+    source: https://github.com/osTicket/osTicket
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the client portal and the staff panel answer at. Leave it empty to add one
+      later, in the routing settings of the web component.
+    type: domain
+    optional: true
+  - name: helpdeskName
+    title: Help desk name
+    type: string
+    default: Support
+    maxLength: 100
+  - name: helpdeskEmail
+    title: Help desk email
+    description: The system's default email address, which tickets are sent from and replied to.
+    type: string
+    default: support@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: ostadmin
+    pattern: '^[A-Za-z0-9._-]{3,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start installs osTicket. Leave empty to generate one; it is kept under the Secrets of both components.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: installSecret
+    title: Secret salt
+    description: Written into osTicket's configuration, and used to sign sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: smtpHost
+    title: SMTP host
+    description: For outgoing mail. Leave empty to set it up later in the staff panel.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: osticket
+      username: osticket
+
+versions:
+  - name: "1.18"
+    release: "1.18.4"
+    default: true
+    components:
+      web: {image: "hlhd/osticket:v1.18.4"}
+      cron: {image: "hlhd/osticket:v1.18.4"}
+
+components:
+  # ── Web ────────────────────────────────────────────────────────────────
+  - name: web
+    title: Web
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The image's own check.
+            command: curl -fsS -o /dev/null http://127.0.0.1:8080/scp/login.php
+            interval: 30s
+            timeout: 5s
+            # The first start installs the schema.
+            startPeriod: 120s
+            retries: 3
+        resources:
+          limits: {memory: 512MB}
+      settings:
+        kind: {category: webapp, engine: osticket, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data: &env
+            - {k: HTTP_PORT, v: "8080"}
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: INSTALL_NAME, v: "${{ params.helpdeskName }}"}
+            - {k: INSTALL_EMAIL, v: "${{ params.helpdeskEmail }}"}
+            - {k: INSTALL_SECRET, v: "${secrets.INSTALL_SECRET}"}
+            - {k: ADMIN_USER, v: "${{ params.adminUsername }}"}
+            - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: ADMIN_PASS, v: "${secrets.ADMIN_PASSWORD}"}
+            - {k: SMTP_HOST, v: "${{ params.smtpHost }}"}
+            - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+            - {k: SMTP_USER, v: "${{ params.smtpUser }}"}
+            - {k: SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+            - {k: SMTP_FROM, v: "${{ params.helpdeskEmail }}"}
+        secrets: &secrets
+          INSTALL_SECRET:
+            value: "${{ params.installSecret }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+          SMTP_PASSWORD:
+            value: "${{ params.smtpPassword }}"
+        routing:
+          port: 8080
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Cron ───────────────────────────────────────────────────────────────
+  - name: cron
+    title: Cron
+    needs: [web]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Mail fetching and scheduled tasks, every five minutes, in this component only:
+          # the image keeps the web server's own cron off, so they never run twice.
+          command: sh -c 'while true; do php /var/www/html/api/cron.php; sleep 300; done'
+        container:
+          healthcheck:
+            enabled: false
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: osticket, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data: *env
+        secrets: *secrets
