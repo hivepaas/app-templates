@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: trailbase
+  title: TrailBase
+  tagline: A fast, single-binary backend on SQLite - APIs, auth, realtime and an admin UI
+  description: |
+    TrailBase is an application backend in one Rust binary, on SQLite: type-safe REST and
+    realtime APIs generated from your tables, user accounts with password, OAuth and
+    passkey sign-in, file uploads, server-side code in WASM or JavaScript, and an admin
+    UI with a SQL editor - with client libraries for TypeScript, Dart, Swift, Kotlin,
+    Python, Go, Rust and .NET. A lighter take on what PocketBase and Supabase do.
+
+    **Everything is on one volume**
+
+    The databases, the configuration, uploaded files and the keys that sign tokens all
+    live in the depot, on the volume below. There is no separate database app: back up the
+    volume.
+
+    **The administrator**
+
+    The admin UI is at `/_/admin`. On a first start TrailBase makes an administrator of
+    its own, `admin@localhost`, with a random password; this template renames it to the
+    email below and gives it the password below as soon as the server is up. On later
+    starts the account is left as it is.
+
+    **Sign-up is open**
+
+    Letting your app's users register is what TrailBase is for, so anyone can create an
+    account through the API. That makes them users, not administrators. If your app
+    should not allow it, set the auth option `disable_password_auth` in the admin UI's
+    settings: it turns password sign-up off and leaves existing accounts as they are.
+  categories: [webapps/dev-tools, webapps/low-code]
+  tags: [sql, identity, open-source]
+  aliases: [backend as a service, baas, pocketbase alternative, firebase alternative, supabase alternative, sqlite]
+  icon: icons/trailbase.svg
+  links:
+    website: https://trailbase.io
+    documentation: https://trailbase.io/getting-started/install
+    source: https://github.com/trailbaseio/trailbase
+  license: OSL-3.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address TrailBase answers at. Leave it empty to add one later, in the app's
+      routing settings; links in emails and OAuth redirects are built from it.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: What the administrator TrailBase creates on the first start is renamed to.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Set once, on the first start. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Depot volume
+    description: The volume the databases, configuration, uploads and signing keys are kept on.
+    type: volume
+
+versions:
+  - name: "0.34"
+    release: "0.34.1"
+    default: true
+    image: trailbase/trailbase:0.34.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is tini, which runs this. TrailBase refuses an empty
+      # PUBLIC_URL, which is what the app has until it has a domain, so it is unset then.
+      # Beside the server, once it answers: if the administrator is still the one
+      # TrailBase made on its first start, it gets the email and password below. On any
+      # later start there is no admin@localhost, and nothing changes.
+      command: >-
+        sh -c 'if [ -z "$PUBLIC_URL" ]; then unset PUBLIC_URL; fi;
+        (until curl -fsS -o /dev/null http://127.0.0.1:4000/api/healthcheck; do sleep 1; done;
+        if /app/trail --depot /app/traildepot admin list | grep -q "admin@localhost"; then
+        /app/trail --depot /app/traildepot user change-email admin@localhost "$TRAILBASE_ADMIN_EMAIL" &&
+        /app/trail --depot /app/traildepot user change-password "$TRAILBASE_ADMIN_EMAIL" "$TRAILBASE_ADMIN_PASSWORD";
+        fi) &
+        exec /app/trail --depot /app/traildepot run --address 0.0.0.0:4000'
+    storage:
+      mounts:
+        /app/traildepot: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:4000/api/healthcheck
+        interval: 15s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: trailbase
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUBLIC_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: TRAILBASE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: TRAILBASE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 4000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

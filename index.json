@@ -12318,6 +12318,47 @@
       }
     },
     {
+      "name": "trailbase",
+      "file": {
+        "path": "templates/trailbase.yaml",
+        "sha256": "9cbb0a8606102301dc73652dbe60c3cff85237f255f4181f5be1521cc0d26ca8"
+      },
+      "icon": {
+        "path": "icons/trailbase.svg",
+        "sha256": "c543edacf5cc678b1da1cc09986a6cf4ec414f6a5c43f4ba2b03349a08ec5a96"
+      },
+      "title": "TrailBase",
+      "tagline": "A fast, single-binary backend on SQLite - APIs, auth, realtime and an admin UI",
+      "categories": [
+        "webapps/dev-tools",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "sql",
+        "identity",
+        "open-source"
+      ],
+      "aliases": [
+        "backend as a service",
+        "baas",
+        "pocketbase alternative",
+        "firebase alternative",
+        "supabase alternative",
+        "sqlite"
+      ],
+      "license": "OSL-3.0",
+      "versions": [
+        {
+          "name": "0.34",
+          "release": "0.34.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "trilium",
       "file": {
         "path": "templates/trilium.yaml",
