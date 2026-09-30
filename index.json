@@ -13621,6 +13621,45 @@
       }
     },
     {
+      "name": "vault",
+      "file": {
+        "path": "templates/vault.yaml",
+        "sha256": "e5c0b43e8fa574cd63d968375e397096cd52a3b61363f7d8ca0680a22776cc75"
+      },
+      "icon": {
+        "path": "icons/vault.svg",
+        "sha256": "728cb98106c9f44114f146b8d1124d19fe4220f31dff2368c67f3830b574257f"
+      },
+      "title": "HashiCorp Vault",
+      "tagline": "Secrets management - key-value secrets, dynamic credentials, PKI and encryption",
+      "categories": [
+        "webapps/security"
+      ],
+      "tags": [
+        "secrets",
+        "open-source"
+      ],
+      "aliases": [
+        "hashicorp vault",
+        "secrets",
+        "secrets manager",
+        "kms",
+        "pki",
+        "credentials"
+      ],
+      "license": "BUSL-1.1",
+      "versions": [
+        {
+          "name": "2.1",
+          "release": "2.1.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "vaultwarden",
       "file": {
         "path": "templates/vaultwarden.yaml",

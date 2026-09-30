@@ -1,0 +1,154 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: vault
+  title: HashiCorp Vault
+  tagline: Secrets management - key-value secrets, dynamic credentials, PKI and encryption
+  description: |
+    Vault keeps secrets and hands them out under policy: static key-value secrets,
+    database and cloud credentials created on demand and revoked when they expire,
+    certificates from its own PKI, and encryption as a service for data it never stores -
+    with tokens, AppRole, Kubernetes, OIDC and other ways for people and machines to sign in.
+
+    **This is HashiCorp's Vault, under the Business Source License**
+
+    It may be run for your own use, but not offered to others as a competing hosted
+    service. OpenBao, its fork under the Mozilla Public License, has a template of its own
+    and speaks the same API.
+
+    **This template sets up**
+
+    - Vault with its integrated Raft storage on a volume
+    - the web interface at `/ui`, on the same port as the API
+    - a health check that passes while it is sealed, so it is not restarted while it waits
+      for you
+    - a memory limit you choose
+
+    **After the first deployment**
+
+    Open the app's console and initialise it:
+
+    ```sh
+    vault operator init
+    ```
+
+    It prints the unseal keys and the root token, once. Keep them somewhere that is not this
+    app - they cannot be recovered, and without enough unseal keys nothing stored here can
+    be read again. Then unseal it with three of the keys, `vault operator unseal`, three times.
+
+    **Every restart seals it**
+
+    Vault starts sealed, every time: after a redeployment, a node reboot or a crash it
+    answers health checks but serves no secrets until it is unsealed again. That is the
+    point of it - the keys are never kept next to the data - so plan who does it.
+
+    **TLS ends at the proxy**
+
+    The listener here is plain HTTP inside the project; give the app a domain to reach it
+    over HTTPS from outside.
+  categories: [webapps/security]
+  tags: [secrets, open-source]
+  aliases: [hashicorp vault, secrets, secrets manager, kms, pki, credentials]
+  icon: icons/vault.svg
+  links:
+    website: https://www.hashicorp.com/products/vault
+    documentation: https://developer.hashicorp.com/vault/docs
+    source: https://github.com/hashicorp/vault
+  license: BUSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the API and web interface answer at. Leave it empty to add one later, in
+      the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the encrypted storage is kept on.
+    type: volume
+
+versions:
+  - name: "2.1"
+    release: "2.1.1"
+    default: true
+    image: hashicorp/vault:2.1.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point turns this into `vault server -config=/vault/config`,
+      # which reads the file below. Without it the image starts a development server
+      # that keeps everything in memory.
+      command: server
+    storage:
+      mounts:
+        /vault/file: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # A sealed or uninitialised server answers 503 and 501 by default; asking for 200
+        # instead keeps it running while it waits for someone to unseal it. The image has
+        # wget and no curl.
+        command: >-
+          wget -q -O /dev/null
+          'http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200'
+        interval: 20s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: vault
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # What the CLI in the app's console talks to.
+        - {k: VAULT_ADDR, v: "http://127.0.0.1:8200"}
+    configFiles:
+      config.hcl:
+        content: |
+          ui = true
+
+          # Locking memory needs the IPC_LOCK capability, which the container does not
+          # have. Swap is where an unlocked secret could end up; nodes that run this
+          # should have it off.
+          disable_mlock = true
+
+          api_addr = "http://127.0.0.1:8200"
+          cluster_addr = "http://127.0.0.1:8201"
+
+          storage "raft" {
+            path = "/vault/file"
+            node_id = "node1"
+          }
+
+          # TLS is the reverse proxy's job; inside the project this is plain HTTP.
+          listener "tcp" {
+            address = "0.0.0.0:8200"
+            tls_disable = true
+          }
+        inheritable: true
+        swarmRef:
+          file: {name: /vault/config/config.hcl, mode: 444}
+    routing:
+      port: 8200
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
