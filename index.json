@@ -11223,6 +11223,58 @@
       }
     },
     {
+      "name": "sequin",
+      "file": {
+        "path": "templates/sequin.yaml",
+        "sha256": "b1bcdb67a3f7b602588b60116d1876ea85ede5f6793b0d2c6eea7466e1fdf902"
+      },
+      "icon": {
+        "path": "icons/sequin.svg",
+        "sha256": "4c958d5ff21b5d7ef1b45f084c71b8d1ca215ffbd5e1c5da6e1da675c01c7501"
+      },
+      "title": "Sequin",
+      "tagline": "Stream every change in a Postgres database to Kafka, SQS, Redis or a webhook",
+      "categories": [
+        "databases/messaging"
+      ],
+      "tags": [
+        "messaging",
+        "sql",
+        "open-source"
+      ],
+      "aliases": [
+        "cdc",
+        "change data capture",
+        "debezium alternative",
+        "postgres replication",
+        "outbox",
+        "event streaming"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Redis",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.14",
+          "release": "0.14.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "sftpgo",
       "file": {
         "path": "templates/sftpgo.yaml",

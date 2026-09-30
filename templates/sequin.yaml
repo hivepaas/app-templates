@@ -1,0 +1,188 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: sequin
+  title: Sequin
+  tagline: Stream every change in a Postgres database to Kafka, SQS, Redis or a webhook
+  description: |
+    Sequin reads a Postgres database's changes as they happen - through logical
+    replication, like Debezium - and delivers each insert, update and delete to a sink:
+    Kafka, SQS, SNS, Redis Streams, NATS, RabbitMQ, Elasticsearch, Typesense, GCP Pub/Sub,
+    Azure Event Hubs or an HTTP endpoint. It backfills existing rows, filters and
+    transforms messages, and retries until each is delivered.
+
+    **This template creates three apps**
+
+    - **Sequin**, with its web console and API
+    - **a PostgreSQL database** for Sequin's own state, named after the app with `-db`
+      added - not the database it streams from
+    - **a Redis** for it, named after the app with `-cache` added
+
+    **Signing in**
+
+    Sign in with the administrator email and password; the password is under the app's
+    Secrets. Sign-up and Sequin's built-in default account are both off.
+
+    **Connecting the database to stream from**
+
+    Logical replication has to be on in it. For a PostgreSQL app on this installation,
+    set its command, under Deployment Settings, to `postgres -c wal_level=logical` and
+    redeploy it. Then add it in Sequin's console, by its app name as host, and follow the
+    console's steps for the publication and the replication slot.
+
+    **Logs**
+
+    `LOG_LEVEL` is `warning`: at `info`, Sequin writes the administrator's password to the
+    log on every start, as it applies its configuration.
+  categories: [databases/messaging]
+  tags: [messaging, sql, open-source]
+  aliases: [cdc, change data capture, debezium alternative, postgres replication, outbox, event streaming]
+  icon: icons/sequin.svg
+  links:
+    website: https://sequinstream.com
+    documentation: https://sequinstream.com/docs/reference/configuration
+    source: https://github.com/sequinstream/sequin
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address of the console and API. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The account created on the first start. It is also what you sign in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKeyBase
+    title: Secret key base
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    # 86 letters and digits, plus the padding below: base64 for exactly 64 bytes.
+    minLength: 86
+    maxLength: 86
+    generate: {length: 86}
+  - name: vaultKey
+    title: Vault key
+    description: >-
+      Encrypts the credentials of the databases and sinks Sequin connects to. Leave empty
+      to generate one, and keep it with the backups: without it they cannot be read.
+    type: secret
+    # 43 letters and digits, plus the padding below: base64 for exactly 32 bytes.
+    minLength: 43
+    maxLength: 43
+    generate: {length: 43}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: sequin
+      username: sequin
+  - name: cache
+    title: Redis
+    template: redis
+    version: "8.10"
+    params:
+      # Sequin's own state, which it needs back after a restart: nothing may be evicted.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "0.14"
+    release: "0.14.6"
+    default: true
+    image: sequin/sequin:v0.14.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:7376/health
+        interval: 15s
+        timeout: 5s
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: sequin
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SERVER_PORT, v: "7376"}
+        - {k: SERVER_HOST, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: PG_HOSTNAME, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: PG_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: PG_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: PG_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PG_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # With a user name: Sequin's Redis client refuses a password with none.
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{ deps.cache.ref.HIVEPAAS_HOST }}:${{
+            deps.cache.ref.HIVEPAAS_PORT }}
+        - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}=="}
+        - {k: VAULT_KEY, v: "${secrets.VAULT_KEY}="}
+        # The config file below creates the administrator; no one signs up, and the
+        # well-known default account is not made.
+        - {k: CONFIG_FILE_PATH, v: /config/sequin.yml}
+        - {k: FEATURE_PROVISION_DEFAULT_USER, v: disabled}
+        - {k: FEATURE_ACCOUNT_SELF_SIGNUP, v: disabled}
+        - {k: SEQUIN_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: SEQUIN_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: LOG_LEVEL, v: warning}
+        - {k: SEQUIN_TELEMETRY_DISABLED, v: "true"}
+        - {k: CRASH_REPORTING_DISABLED, v: "true"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      SECRET_KEY_BASE:
+        value: "${{ params.secretKeyBase }}"
+      VAULT_KEY:
+        value: "${{ params.vaultKey }}"
+    configFiles:
+      sequin.yml:
+        # Applied on every start. ${...} is filled in by Sequin from this app's environment,
+        # which keeps the password out of the file. A user that exists already is left as it
+        # is, so a password changed in the console stays changed.
+        content: |
+          account:
+            name: "HivePaaS"
+          users:
+            - email: "${SEQUIN_ADMIN_EMAIL}"
+              password: "${SEQUIN_ADMIN_PASSWORD}"
+        swarmRef:
+          file: {name: /config/sequin.yml, mode: 444}
+    routing:
+      port: 7376
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
