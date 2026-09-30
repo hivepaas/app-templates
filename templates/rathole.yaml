@@ -1,0 +1,145 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rathole
+  title: rathole
+  tagline: A small, fast reverse tunnel for services behind NAT, written in Rust
+  description: |
+    rathole exposes services that cannot be reached directly: a machine behind NAT or a
+    firewall runs the rathole client, which dials out to this server and keeps the
+    connection open, and connections to a service's port on this server are passed back
+    through it. It does what frp does for TCP and UDP, in a few megabytes of memory.
+
+    This template runs the server.
+
+    **x86-64 only**
+
+    rathole publishes its image for `linux/amd64` and no other architecture. On an ARM
+    machine it will not start.
+
+    **Clients connect over the domain**
+
+    The server speaks WebSocket, and its domain is routed like any other app: HivePaaS
+    terminates TLS in front of it, so clients get an encrypted connection with no control
+    port to publish and no keys to generate. A client's configuration:
+
+    ```toml
+    [client]
+    remote_addr = "<the domain>:443"
+    default_token = "<the token, under this app's Secrets>"
+
+    [client.transport]
+    type = "websocket"
+
+    [client.transport.websocket]
+    tls = true
+
+    [client.transport.tls]
+    hostname = "<the domain>"
+
+    [client.services.ssh]
+    local_addr = "127.0.0.1:22"
+    ```
+
+    **Adding a service**
+
+    Every service is declared on both sides, under the same name. On this server, edit
+    `RATHOLE_CONFIG` under the app's Secrets, which is the server's whole configuration,
+    and add:
+
+    ```toml
+    [server.services.ssh]
+    bind_addr = "0.0.0.0:5202"
+    ```
+
+    Then make the port reachable. For a TCP service, publish it under Networks > Endpoint
+    & Port Configuration. For an HTTP service, add a domain in the routing settings on
+    that container port instead, and it gets TLS like every other app.
+  categories: [webapps/networking]
+  tags: [networking, open-source]
+  aliases: [reverse tunnel, frp alternative, ngrok alternative, pangolin alternative, nat traversal]
+  icon: icons/rathole.png
+  links:
+    website: https://github.com/rathole-org/rathole
+    documentation: https://github.com/rathole-org/rathole#configuration
+    source: https://github.com/rathole-org/rathole
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address clients connect to. Leave it empty to add one later, in the app's routing
+      settings; no client can connect until it has one.
+    type: domain
+    optional: true
+  - name: token
+    title: Client token
+    description: >-
+      What clients authenticate with, for every service that sets no token of its own.
+      Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "0.5"
+    release: "0.5.0"
+    default: true
+    image: rapiz1/rathole:v0.5.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is rathole itself.
+      command: --server /config/server.toml
+    container:
+      healthcheck:
+        # Nothing in the image can run a check: one static binary, no shell.
+        enabled: false
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: rathole
+      version: "${{ version.name }}"
+      webapp: {}
+    secrets:
+      # The whole configuration, as a secret rather than a config file: rathole reads no
+      # environment variables, so the token has to be in the file. Services are added
+      # here, as [server.services.<name>] tables.
+      RATHOLE_CONFIG:
+        value: |
+          [server]
+          bind_addr = "0.0.0.0:2333"
+          default_token = "${{ params.token }}"
+
+          [server.transport]
+          type = "websocket"
+
+          # TLS is HivePaaS's, in front of this server.
+          [server.transport.websocket]
+          tls = false
+
+          # One table per service, named as the client names it:
+          # [server.services.ssh]
+          # bind_addr = "0.0.0.0:5202"
+          [server.services]
+        swarmRef:
+          file: {name: /config/server.toml, mode: 444}
+    routing:
+      port: 2333
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

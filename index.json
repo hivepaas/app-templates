@@ -3475,6 +3475,45 @@
       }
     },
     {
+      "name": "frp",
+      "file": {
+        "path": "templates/frp.yaml",
+        "sha256": "c7d58a2606e8b71c3dbd5507713f0964ae2a64b53f5e96690632b2348f501476"
+      },
+      "icon": {
+        "path": "icons/frp.svg",
+        "sha256": "33fbbde19a3d0f15cb7fab1f684f2568cac16e513355307e45366a1c1169913e"
+      },
+      "title": "frp",
+      "tagline": "Reach services behind NAT or a firewall through this server, over HTTP or TCP",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "frps",
+        "reverse tunnel",
+        "ngrok alternative",
+        "cloudflare tunnel alternative",
+        "pangolin alternative",
+        "nat traversal"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.71",
+          "release": "0.71.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "garage",
       "file": {
         "path": "templates/garage.yaml",
@@ -10510,6 +10549,44 @@
         {
           "name": "4.15",
           "release": "4.15.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "rathole",
+      "file": {
+        "path": "templates/rathole.yaml",
+        "sha256": "5f4cf2e03bfd806537079662306d008a49504a775dcd741a0c432e0602cec9f3"
+      },
+      "icon": {
+        "path": "icons/rathole.png",
+        "sha256": "25c44e9707d62e0d9f0c150d0b66707d2203d0c25cd875596b70ff54bf2c249f"
+      },
+      "title": "rathole",
+      "tagline": "A small, fast reverse tunnel for services behind NAT, written in Rust",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "reverse tunnel",
+        "frp alternative",
+        "ngrok alternative",
+        "pangolin alternative",
+        "nat traversal"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "0.5",
+          "release": "0.5.0",
           "default": true
         }
       ],
