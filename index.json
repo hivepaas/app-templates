@@ -14383,6 +14383,69 @@
       "requires": {
         "versionCode": "v000001"
       }
+    },
+    {
+      "name": "zulip",
+      "file": {
+        "path": "templates/zulip.yaml",
+        "sha256": "8d6082fa5b9328f32a3e409f6149a5690dd9625ca84136e2511e0c8ac52f2662"
+      },
+      "icon": {
+        "path": "icons/zulip.svg",
+        "sha256": "2dc3c651151cab84a8a4f7bf89bf5c48024c0c7d8688c389247e84c91e8ee092"
+      },
+      "title": "Zulip",
+      "tagline": "Team chat organized by topic, with threads that keep conversations apart",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "team-chat",
+        "chat",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "slack alternative",
+        "team chat",
+        "messaging",
+        "threads",
+        "topics",
+        "chat"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Redis",
+          "template": "redis"
+        },
+        {
+          "name": "mq",
+          "title": "Job queue",
+          "template": "rabbitmq"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "memcached"
+        }
+      ],
+      "versions": [
+        {
+          "name": "12.3",
+          "release": "12.3-0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
     }
   ]
 }

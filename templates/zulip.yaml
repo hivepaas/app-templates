@@ -1,0 +1,255 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: zulip
+  title: Zulip
+  tagline: Team chat organized by topic, with threads that keep conversations apart
+  description: |
+    Zulip is team chat where every message belongs to a channel and a topic, so parallel
+    conversations stay apart and can be read later, like email threads - with direct
+    messages, search, integrations with hundreds of tools, bots, video calls through Jitsi
+    or Zoom, and desktop and mobile apps.
+
+    **This template creates five apps**
+
+    - **Zulip**, the all-in-one server image: web app, API, real-time events and
+      background workers, on a volume for uploads, backups and its generated secrets
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Redis**, **a RabbitMQ** and **a Memcached** - its rate limits, job queue and
+      cache - named after the app with `-redis`, `-mq` and `-cache` added
+
+    **The first start creates the organization**
+
+    A new Zulip has no organization until someone opens a one-time creation link. This
+    template creates the organization below instead, with its owner, as soon as the server
+    answers. Signing up is by invitation: invite people from the organization's settings.
+
+    **The first start takes several minutes**
+
+    Zulip configures itself and creates its database on the first start. It takes about
+    2GB of memory at rest.
+
+    **Email**
+
+    Invitations, password resets and notifications need an SMTP server - give it below, or
+    later as `SETTING_EMAIL_*` environment variables.
+
+    **Search**
+
+    PostgreSQL's standard English search is used, rather than Zulip's own dictionaries,
+    which need a PostgreSQL image of Zulip's.
+  categories: [webapps/communication]
+  tags: [team-chat, chat, collaboration, open-source]
+  aliases: [slack alternative, team chat, messaging, threads, topics, chat]
+  icon: icons/zulip.svg
+  links:
+    website: https://zulip.com
+    documentation: https://zulip.readthedocs.io/projects/docker/en/latest/
+    source: https://github.com/zulip/zulip
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Zulip answers at, which it answers for only. Leave it empty only to add
+      one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: organizationName
+    title: Organization name
+    type: string
+    default: My Organization
+    maxLength: 40
+  - name: ownerName
+    title: Owner's name
+    type: string
+    default: Owner
+    maxLength: 100
+  - name: ownerEmail
+    title: Owner's email
+    description: The organization owner's account; also where Zulip sends server error reports.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: ownerPassword
+    title: Owner's password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: Django's secret key, which signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 50
+    generate: {length: 64}
+  - name: smtpHost
+    title: SMTP host
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    description: 587 for STARTTLS, or 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: Sender address
+    description: The address Zulip's notifications are sent from.
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 3GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files, backups and Zulip's generated secrets are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: zulip
+      username: zulip
+  - name: redis
+    title: Redis
+    template: redis
+    version: "8.10"
+  - name: mq
+    title: Job queue
+    template: rabbitmq
+    version: "4.3"
+    params:
+      username: zulip
+      vhost: zulip
+  - name: cache
+    title: Cache
+    template: memcached
+    version: "1.6"
+
+versions:
+  - name: "12.3"
+    release: "12.3-0"
+    default: true
+    image: ghcr.io/zulip/zulip-server:12.3-0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Zulip needs a host name with a dot in it: until the app has a domain, it answers as
+      # zulip.local. Port 465 takes TLS from the start rather than STARTTLS. Then the image's
+      # own start, with the organization created beside it.
+      command: >-
+        bash -c 'if [ -z "$SETTING_EXTERNAL_HOST" ]; then export SETTING_EXTERNAL_HOST=zulip.local; fi;
+        if [ "$SETTING_EMAIL_PORT" = 465 ]; then export SETTING_EMAIL_USE_SSL=True SETTING_EMAIL_USE_TLS=False;
+        else export SETTING_EMAIL_USE_TLS=True; fi;
+        bash /hivepaas/bootstrap.sh & exec /sbin/entrypoint.sh app:run'
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Zulip's own check: the database, RabbitMQ, Redis, Memcached and the event server.
+        command: curl -fs -o /dev/null http://127.0.0.1/health
+        interval: 30s
+        timeout: 10s
+        # The first start configures the server and creates the database.
+        startPeriod: 900s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: zulip
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SETTING_EXTERNAL_HOST, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: SETTING_ZULIP_ADMINISTRATOR, v: "${{ params.ownerEmail }}"}
+        # Plain HTTP behind HivePaaS's router, which terminates TLS; its addresses are
+        # trusted for the client's address and scheme.
+        - {k: CERTIFICATES, v: ""}
+        - {k: LOADBALANCER_IPS, v: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"}
+        # One process for all the queue workers: about 1GB less memory.
+        - {k: CONFIG_application_server__queue_workers_multiprocess, v: "false"}
+        - {k: SETTING_REMOTE_POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: SETTING_REMOTE_POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: CONFIG_postgresql__database_name, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: CONFIG_postgresql__database_user, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: SECRETS_postgres_password, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SETTING_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+        - {k: SETTING_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+        - {k: SECRETS_redis_password, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SETTING_RABBITMQ_HOST, v: "${{ deps.mq.ref.HIVEPAAS_HOST }}"}
+        - {k: SETTING_RABBITMQ_PORT, v: "${{ deps.mq.ref.HIVEPAAS_PORT }}"}
+        - {k: SETTING_RABBITMQ_USERNAME, v: "${{ deps.mq.ref.HIVEPAAS_USER }}"}
+        - {k: SETTING_RABBITMQ_VHOST, v: "${{ deps.mq.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: SECRETS_rabbitmq_password, v: "${{ deps.mq.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SETTING_MEMCACHED_LOCATION, v: "${{ deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}"}
+        # The Memcached app has no authentication; only the project's apps reach it.
+        - {k: SETTING_MEMCACHED_USERNAME, v: None}
+        - {k: SECRETS_secret_key, v: "${secrets.SECRET_KEY}"}
+        - {k: SETTING_EMAIL_HOST, v: "${{ params.smtpHost }}"}
+        - {k: SETTING_EMAIL_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SETTING_EMAIL_HOST_USER, v: "${{ params.smtpUser }}"}
+        - {k: SECRETS_email_password, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: SETTING_NOREPLY_EMAIL_ADDRESS, v: "${{ params.smtpFromEmail }}"}
+        - {k: ZULIP_ORGANIZATION, v: "${{ params.organizationName }}"}
+        - {k: ZULIP_OWNER_NAME, v: "${{ params.ownerName }}"}
+        - {k: ZULIP_OWNER_EMAIL, v: "${{ params.ownerEmail }}"}
+        - {k: ZULIP_OWNER_PASSWORD, v: "${secrets.OWNER_PASSWORD}"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+      OWNER_PASSWORD:
+        value: "${{ params.ownerPassword }}"
+    configFiles:
+      bootstrap.sh:
+        content: |
+          # Once the server answers: the organization and its owner, created while there is no
+          # organization - otherwise Zulip only offers a one-time creation link, printed on demand.
+          until curl -fs -o /dev/null http://127.0.0.1/health; do sleep 5; done
+          manage() { runuser -u zulip -- /home/zulip/deployments/current/manage.py "$@"; }
+          if ! manage list_realms 2>/dev/null | grep -q "^ *[0-9][0-9]* *''"; then
+            password_file=$(mktemp)
+            printf %s "$ZULIP_OWNER_PASSWORD" > "$password_file"
+            chown zulip "$password_file"
+            manage create_realm --string-id= --password-file="$password_file" \
+              "$ZULIP_ORGANIZATION" "$ZULIP_OWNER_EMAIL" "$ZULIP_OWNER_NAME" &&
+              echo "hivepaas: organization created"
+            rm -f "$password_file"
+          fi
+        swarmRef:
+          file: {name: /hivepaas/bootstrap.sh, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
