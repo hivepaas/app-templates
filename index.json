@@ -12878,6 +12878,59 @@
       }
     },
     {
+      "name": "teable",
+      "file": {
+        "path": "templates/teable.yaml",
+        "sha256": "079ee3ce2794eac5d5f46bd25e9ae4952e62e6f51af61add3c4f0b6deb547a0c"
+      },
+      "icon": {
+        "path": "icons/teable.svg",
+        "sha256": "19ebfa258f5b3c100a5b4bbf14a4b162e347ef73ab914bf8d92676742559ece0"
+      },
+      "title": "Teable",
+      "tagline": "A no-code database on PostgreSQL, in the spirit of Airtable",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "spreadsheet",
+        "sql",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "airtable alternative",
+        "no-code database",
+        "spreadsheet database",
+        "nocodb alternative",
+        "baserow alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.09.27",
+          "release": "release.2026-09-27T02-14-26Z.3273",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "technitium-dns",
       "file": {
         "path": "templates/technitium-dns.yaml",

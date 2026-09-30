@@ -1,0 +1,328 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: teable
+  title: Teable
+  tagline: A no-code database on PostgreSQL, in the spirit of Airtable
+  description: |
+    Teable is a no-code database with a spreadsheet's interface: tables with typed fields,
+    links between them, formulas, grid, kanban, gallery, calendar and form views, real-time
+    collaboration, automations, and a REST API - on PostgreSQL, where each table is a real
+    table you can also query with SQL.
+
+    **This template creates three apps**
+
+    - **Teable**, with uploaded attachments on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Redis**, named after the app with `-cache` added
+
+    **The first start creates the administrator**
+
+    Teable makes whoever signs up first its administrator. This template signs up the
+    administrator below and closes sign-up before the app takes any traffic. Invite people
+    from a space, or reopen sign-up in the admin settings.
+
+    **The image**
+
+    Teable's official image is the whole product: free to run, with AI and enterprise
+    features unlocked by a paid license key. Its code is under the AGPL, apart from the
+    enterprise features.
+
+    **Secrets**
+
+    Teable has a secret for each thing it signs or encrypts; left unset, each falls back to a
+    value published in its source. All of them are generated below - keep them with the
+    backups, as encrypted settings cannot be read without them.
+  categories: [webapps/low-code]
+  tags: [low-code, spreadsheet, sql, collaboration, open-source]
+  aliases: [airtable alternative, no-code database, spreadsheet database, nocodb alternative, baserow alternative]
+  icon: icons/teable.svg
+  links:
+    website: https://teable.ai
+    documentation: https://help.teable.ai/en/deploy/docker
+    source: https://github.com/teableio/teable
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Teable answers at. Links in emails and to attachments are built from it:
+      leave it empty only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 8
+    generate: {length: 32}
+  - name: smtpHost
+    title: SMTP host
+    description: For invitations, notifications and password resets. Leave empty to send no email.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 465
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: SMTP TLS
+    type: select
+    default: "true"
+    options:
+      - {value: "true", title: "TLS from the first byte (usually port 465)"}
+      - {value: "false", title: "STARTTLS or none (usually port 587)"}
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: Sender address
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: secretKey
+    title: Root secret
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: jwtSecret
+    title: JWT secret
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: sessionSecret
+    title: Session secret
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: envVariableSecret
+    title: Environment variables secret
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: aiConfigSecret
+    title: AI settings secret
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: sandboxSecret
+    title: Sandbox secret
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: mailKey
+    title: Mail settings key
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: mailIv
+    title: Mail settings IV
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: storageKey
+    title: Storage key
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: storageIv
+    title: Storage IV
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: accessTokenKey
+    title: Access token key
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: accessTokenIv
+    title: Access token IV
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: dataDbUrlKey
+    title: Database URL key
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: dataDbUrlIv
+    title: Database URL IV
+    description: Exactly 16 characters. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    maxLength: 16
+    generate: {length: 16, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: It takes about 1.7GB at rest.
+    type: size
+    default: 3GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded attachments are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: teable
+      username: teable
+  - name: cache
+    title: Cache
+    template: redis
+    version: "8.10"
+
+versions:
+  - name: "2026.09.27"
+    release: "release.2026-09-27T02-14-26Z.3273"
+    default: true
+    image: ghcr.io/teableio/teable:release.2026-09-27T02-14-26Z.3273
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/.assets: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: sh /hivepaas/health.sh
+        interval: 15s
+        timeout: 20s
+        # The first start applies the migrations.
+        startPeriod: 180s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: teable
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUBLIC_ORIGIN, v: "${HIVEPAAS_APP_URL}"}
+        - k: PRISMA_DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: BACKEND_CACHE_PROVIDER, v: redis}
+        - k: BACKEND_CACHE_REDIS_URI
+          v: >-
+            redis://default:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.cache.ref.HIVEPAAS_HOST }}:${{ deps.cache.ref.HIVEPAAS_PORT }}/0
+        - {k: BACKEND_MAIL_HOST, v: "${{ params.smtpHost }}"}
+        - {k: BACKEND_MAIL_PORT, v: "${{ params.smtpPort }}"}
+        - {k: BACKEND_MAIL_SECURE, v: "${{ params.smtpSecure }}"}
+        - {k: BACKEND_MAIL_AUTH_USER, v: "${{ params.smtpUser }}"}
+        - {k: BACKEND_MAIL_AUTH_PASS, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: BACKEND_MAIL_SENDER, v: "${{ params.smtpFromEmail }}"}
+        - {k: BACKEND_MAIL_SENDER_NAME, v: Teable}
+        # For the health check, which creates the administrator on the first start.
+        - {k: TEABLE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: TEABLE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: BACKEND_JWT_SECRET, v: "${secrets.BACKEND_JWT_SECRET}"}
+        - {k: BACKEND_SESSION_SECRET, v: "${secrets.BACKEND_SESSION_SECRET}"}
+        - {k: BACKEND_ENV_VARIABLE_SECRET, v: "${secrets.BACKEND_ENV_VARIABLE_SECRET}"}
+        - {k: BACKEND_AI_CONFIG_ENCRYPTION_SECRET, v: "${secrets.BACKEND_AI_CONFIG_ENCRYPTION_SECRET}"}
+        - {k: SANDBOX_JWT_SECRET, v: "${secrets.SANDBOX_JWT_SECRET}"}
+        # The aes-128 keys and IVs: exactly 16 characters each. They are here rather than
+        # under Secrets, which hold at most ten.
+        - {k: BACKEND_MAIL_ENCRYPTION_KEY, v: "${{ params.mailKey }}"}
+        - {k: BACKEND_MAIL_ENCRYPTION_IV, v: "${{ params.mailIv }}"}
+        - {k: BACKEND_STORAGE_ENCRYPTION_KEY, v: "${{ params.storageKey }}"}
+        - {k: BACKEND_STORAGE_ENCRYPTION_IV, v: "${{ params.storageIv }}"}
+        - {k: BACKEND_ACCESS_TOKEN_ENCRYPTION_KEY, v: "${{ params.accessTokenKey }}"}
+        - {k: BACKEND_ACCESS_TOKEN_ENCRYPTION_IV, v: "${{ params.accessTokenIv }}"}
+        - {k: BACKEND_DATA_DB_URL_ENCRYPTION_KEY, v: "${{ params.dataDbUrlKey }}"}
+        - {k: BACKEND_DATA_DB_URL_ENCRYPTION_IV, v: "${{ params.dataDbUrlIv }}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      BACKEND_JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      BACKEND_SESSION_SECRET:
+        value: "${{ params.sessionSecret }}"
+      BACKEND_ENV_VARIABLE_SECRET:
+        value: "${{ params.envVariableSecret }}"
+      BACKEND_AI_CONFIG_ENCRYPTION_SECRET:
+        value: "${{ params.aiConfigSecret }}"
+      SANDBOX_JWT_SECRET:
+        value: "${{ params.sandboxSecret }}"
+    configFiles:
+      health.sh:
+        content: |
+          # The health check, and the first start's setup: Teable makes whoever signs up first its
+          # administrator. While sign-up is still open, the administrator below is signed up and
+          # sign-up is closed; the app is healthy - and so gets traffic - only after that.
+          base=http://127.0.0.1:3000
+          curl -fs -o /dev/null "$base/health" || exit 1
+          if curl -fs "$base/api/admin/setting/public" | grep -q '"disallowSignUp":true'; then
+            exit 0
+          fi
+          jar=$(mktemp)
+          body=$(node -e 'console.log(JSON.stringify({email: process.env.TEABLE_ADMIN_EMAIL, password: process.env.TEABLE_ADMIN_PASSWORD}))')
+          curl -fs -o /dev/null -c "$jar" -H 'Content-Type: application/json' -X POST "$base/api/auth/signup" -d "$body" ||
+            curl -fs -o /dev/null -c "$jar" -H 'Content-Type: application/json' -X POST "$base/api/auth/signin" -d "$body"
+          curl -fs -o /dev/null -b "$jar" -H 'Content-Type: application/json' -X PATCH "$base/api/admin/setting" -d '{"disallowSignUp":true}' &&
+            echo "hivepaas: administrator created, sign-up closed"
+          rm -f "$jar"
+          exit 1
+        swarmRef:
+          file: {name: /hivepaas/health.sh, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
