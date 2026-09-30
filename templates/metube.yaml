@@ -1,0 +1,107 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: metube
+  title: MeTube
+  tagline: A web page for yt-dlp - download video and audio from YouTube and more
+  description: |
+    MeTube puts yt-dlp behind a web page: paste a link to a video, a playlist or a channel
+    from YouTube or any of the hundreds of sites yt-dlp supports, pick the quality or an
+    audio-only format, and it downloads to the server. It keeps a queue, subscribes to
+    channels and playlists to fetch what they publish next, and serves what it downloaded
+    back to you from the same page.
+
+    **Everything is on one volume**
+
+    Downloads, and MeTube's own queue, history and subscriptions (in `.metube`), are on
+    the volume below.
+
+    **Keeping it to yourself**
+
+    MeTube has no sign-in: anyone who reaches the page can download to your server and
+    fetch what is there. Put basic authentication in front of it in the app's routing
+    settings, or leave it on the project network and reach it from inside.
+
+    **Sending links from a browser**
+
+    The browser extensions and bookmarklet in the
+    [wiki](https://github.com/alexta69/metube/wiki/Sending-links-to-MeTube) call MeTube
+    from other sites; allow them with `CORS_ALLOWED_ORIGINS`.
+  categories: [webapps/media]
+  tags: [files, open-source]
+  aliases: [youtube downloader, yt-dlp, youtube-dl, video downloader, playlist downloader]
+  icon: icons/metube.svg
+  links:
+    website: https://github.com/alexta69/metube
+    documentation: https://github.com/alexta69/metube#configuration
+    source: https://github.com/alexta69/metube
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: maxConcurrentDownloads
+    title: Downloads at once
+    description: The rest wait their turn in the queue.
+    type: int
+    default: 3
+    min: 1
+    max: 20
+  - name: memoryLimit
+    title: Memory limit
+    description: yt-dlp and ffmpeg merging and converting take most of it.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Downloads volume
+    description: The volume downloads, and MeTube's queue and history, are kept on.
+    type: volume
+
+versions:
+  - name: "2026.09"
+    release: "2026.09.29"
+    default: true
+    image: ghcr.io/alexta69/metube:2026.09.29
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /downloads: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:8081/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: metube
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MAX_CONCURRENT_DOWNLOADS, v: "${{ params.maxConcurrentDownloads }}"}
+    routing:
+      port: 8081
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

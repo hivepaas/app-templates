@@ -7552,6 +7552,44 @@
       }
     },
     {
+      "name": "metube",
+      "file": {
+        "path": "templates/metube.yaml",
+        "sha256": "904f1498950ec4f7bce580228714b0c46845d901510a26b93cd5bdef6c8af360"
+      },
+      "icon": {
+        "path": "icons/metube.svg",
+        "sha256": "9f930cc07019c7592c8e69d50e16e27eb9147d96cf7ebcc94d4ecc271266891c"
+      },
+      "title": "MeTube",
+      "tagline": "A web page for yt-dlp - download video and audio from YouTube and more",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "youtube downloader",
+        "yt-dlp",
+        "youtube-dl",
+        "video downloader",
+        "playlist downloader"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2026.09",
+          "release": "2026.09.29",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "milvus",
       "file": {
         "path": "templates/milvus.yaml",
