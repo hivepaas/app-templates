@@ -1,0 +1,193 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rocket-chat
+  title: Rocket.Chat
+  tagline: Team chat with channels, threads, calls and omnichannel customer service
+  description: |
+    Rocket.Chat is team messaging in the spirit of Slack: channels, direct messages,
+    threads, file sharing, audio and video calls, integrations and bots, end-to-end
+    encryption, and an omnichannel desk that answers customers from live chat, email
+    and messaging apps - with desktop and mobile apps for every platform.
+
+    **This template creates one app, as two components**
+
+    - **Rocket.Chat**
+    - **MongoDB**, as a single-member replica set, on a volume: Rocket.Chat needs a
+      replica set to follow changes. It has no password, and no routing: only the apps
+      of this project reach it.
+
+    **The first start creates the administrator**
+
+    The setup wizard is skipped, and the administrator below is created instead.
+    Registration starts closed; add users, or open it, from the Administration pages.
+
+    **Editions**
+
+    The image is Rocket.Chat's one image for every edition. Without a license it runs as
+    the free Starter plan; the enterprise features in it stay locked.
+
+    **Memory**
+
+    Rocket.Chat takes about 1GB at rest, and MongoDB about 450MB.
+  categories: [webapps/communication]
+  tags: [team-chat, chat, collaboration, open-source]
+  aliases: [slack alternative, team chat, messaging, omnichannel, livechat, chat]
+  icon: icons/rocket-chat.svg
+  links:
+    website: https://www.rocket.chat
+    documentation: https://docs.rocket.chat/docs/deploy-with-docker-docker-compose
+    source: https://github.com/RocketChat/Rocket.Chat
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Rocket.Chat answers at. Leave it empty to add one later, in the routing
+      settings; links, the mobile apps and email all use it.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: mongoMemoryLimit
+    title: MongoDB memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: mongoVolume
+    title: MongoDB volume
+    description: The volume messages, users and uploaded files (stored in the database) are kept on.
+    type: volume
+
+versions:
+  - name: "8.8"
+    release: "8.8.1"
+    default: true
+    components:
+      rocketchat: {image: "registry.rocket.chat/rocketchat/rocket.chat:8.8.1"}
+      # 8.2 rather than 8.0: MongoDB 8.0 refuses to start on Linux 6.19 and later.
+      mongodb: {image: "mongo:8.2.12-noble"}
+
+components:
+  # ── Rocket.Chat ────────────────────────────────────────────────────────
+  - name: rocketchat
+    title: Rocket.Chat
+    primary: true
+    needs: [mongodb]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget -q -O /dev/null http://127.0.0.1:3000/api/info
+            interval: 20s
+            timeout: 10s
+            startPeriod: 180s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: rocketchat, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: ROOT_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: PORT, v: "3000"}
+            - {k: DEPLOY_METHOD, v: docker}
+            - {k: MONGO_URL, v: "mongodb://${{ comp.mongodb.key }}:27017/rocketchat?replicaSet=rs0"}
+            # Created on the first start, with no one in the database.
+            - {k: ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+            - {k: ADMIN_NAME, v: Administrator}
+            - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: ADMIN_PASS, v: "${secrets.ADMIN_PASSWORD}"}
+            # Settings named without OVERWRITE_SETTING_ only give the first value: both can
+            # be changed afterwards in the Administration pages.
+            - {k: Show_Setup_Wizard, v: completed}
+            - {k: Accounts_RegistrationForm, v: Disabled}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+        routing:
+          port: 3000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── MongoDB ────────────────────────────────────────────────────────────
+  - name: mongodb
+    title: MongoDB
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: bash /hivepaas/mongod.sh
+        storage:
+          mounts:
+            /data/db: {type: volume, source: "${{ params.mongoVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # Answering, and the primary of its replica set - which it is only once the
+            # set has been initiated.
+            command: >-
+              mongosh --quiet --norc --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'
+            interval: 10s
+            timeout: 10s
+            startPeriod: 60s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.mongoMemoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: rocketchat, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # The address the replica set's one member is known by: its name on the project
+            # network, which is how Rocket.Chat reaches it.
+            - {k: MONGO_MEMBER_HOST, v: "${{ comp.mongodb.key }}:27017"}
+        configFiles:
+          mongod.sh:
+            # Starts mongod as a replica set, and initiates the set the first time - after
+            # that rs.status() answers, and nothing is done.
+            content: |
+              mongod --replSet rs0 --bind_ip_all &
+              pid=$!
+              # Pass a stop on to mongod, so that it shuts down cleanly.
+              trap 'kill -TERM $pid' TERM INT
+              until mongosh --quiet --norc --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; do
+                sleep 1
+              done
+              mongosh --quiet --norc --eval "try { rs.status().ok } catch (e) {
+                rs.initiate({_id: 'rs0', members: [{_id: 0, host: '$MONGO_MEMBER_HOST'}]}) }"
+              wait $pid
+              # A stop interrupts the first wait; this one waits for mongod to finish.
+              wait $pid
+            swarmRef:
+              file: {name: /hivepaas/mongod.sh, mode: 444}

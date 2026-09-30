@@ -11016,6 +11016,58 @@
       }
     },
     {
+      "name": "rocket-chat",
+      "file": {
+        "path": "templates/rocket-chat.yaml",
+        "sha256": "6209a17331e2d7484a384808e0d6c78ae994de53e4bcfb05fb8a19e4763f822a"
+      },
+      "icon": {
+        "path": "icons/rocket-chat.svg",
+        "sha256": "ac3df9b46d5885a15c22cb1fa13a3ed5d70ce74953653e63fdd1ee009fbc02a2"
+      },
+      "title": "Rocket.Chat",
+      "tagline": "Team chat with channels, threads, calls and omnichannel customer service",
+      "categories": [
+        "webapps/communication"
+      ],
+      "tags": [
+        "team-chat",
+        "chat",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "slack alternative",
+        "team chat",
+        "messaging",
+        "omnichannel",
+        "livechat",
+        "chat"
+      ],
+      "license": "MIT",
+      "components": [
+        {
+          "name": "rocketchat",
+          "title": "Rocket.Chat",
+          "primary": true
+        },
+        {
+          "name": "mongodb",
+          "title": "MongoDB"
+        }
+      ],
+      "versions": [
+        {
+          "name": "8.8",
+          "release": "8.8.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "roundcube",
       "file": {
         "path": "templates/roundcube.yaml",
