@@ -1,0 +1,228 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: temporal
+  title: Temporal
+  tagline: Durable execution - workflows that survive crashes, restarts and deploys
+  description: |
+    Temporal runs your code as durable workflows: each step is recorded, so a workflow
+    picks up where it left off after a crash, a deploy or a week-long wait, with retries,
+    timers and signals handled for you. Your workers, written with its SDKs for Go, Java,
+    TypeScript, Python, .NET, PHP or Ruby, poll Temporal for work.
+
+    **This template creates two apps**
+
+    - **Temporal**, as three components: the server, the Web UI, and admin tools
+    - **a PostgreSQL database** for it, named after the app with `-db` added - the
+      admin tools create a second database, `temporal_visibility`, beside the first
+
+    **The admin tools component**
+
+    On every start it brings both databases' schemas up to date, and creates the
+    `default` namespace if it is missing; then it stays up as the place to run the
+    `temporal` CLI and `tdbg`, from its shell - `temporal workflow list`, `temporal
+    operator namespace create -n orders`.
+
+    **Connecting workers**
+
+    Workers reach the server over gRPC on port 7233, on the project network: point an
+    SDK at `<the server component's name>:7233` - the app's server component, as the
+    project's app list shows it - from apps of the same project. The port is not exposed
+    publicly.
+
+    **The Web UI has no sign-in**
+
+    Anyone who reaches it can read every workflow's inputs and results, and cancel or
+    terminate them. Put basic authentication in front of it in the routing settings of
+    the UI component, or leave it without a domain and reach it from inside.
+  categories: [webapps/automation, webapps/dev-tools]
+  tags: [open-source]
+  aliases: [durable execution, workflow engine, orchestration, cadence, background jobs, sagas]
+  icon: icons/temporal.svg
+  links:
+    website: https://temporal.io
+    documentation: https://docs.temporal.io/self-hosted-guide
+    source: https://github.com/temporalio/temporal
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Web UI domain
+    description: >-
+      The address of the Web UI. Leave it empty to add one later, in the routing settings
+      of the UI component.
+    type: domain
+    optional: true
+  - name: historyShards
+    title: History shards
+    description: >-
+      How Temporal partitions workflow history. Fixed for the life of the cluster: it
+      cannot be changed once the database exists. 4 is plenty for one server; large
+      installations use 512 or more.
+    type: int
+    default: 4
+    min: 1
+    max: 16384
+  - name: memoryLimit
+    title: Server memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: temporal
+      username: temporal
+
+versions:
+  - name: "1.31"
+    release: "1.31.3"
+    default: true
+    components:
+      server: {image: "temporalio/server:1.31.3"}
+      admin: {image: "temporalio/admin-tools:1.31.3"}
+      ui: {image: "temporalio/ui:2.54.1"}
+
+components:
+  # ── Server ─────────────────────────────────────────────────────────────
+  - name: server
+    title: Server
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The frontend's gRPC port. It opens only once the schema is in place: until
+            # the admin tools have set it up, the server exits and is started again.
+            command: nc -z 127.0.0.1 7233
+            interval: 15s
+            timeout: 5s
+            startPeriod: 120s
+            retries: 5
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: temporal, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # Read by the configuration template built into the server.
+            - {k: DB, v: postgres12}
+            - {k: POSTGRES_SEEDS, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: POSTGRES_PWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DBNAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: VISIBILITY_DBNAME, v: temporal_visibility}
+            - {k: NUM_HISTORY_SHARDS, v: "${{ params.historyShards }}"}
+            # Listen on every address: the container has one per network it is on, and
+            # workers and the UI arrive on the project's. It still advertises its own.
+            - {k: BIND_ON_IP, v: "0.0.0.0"}
+        configFiles:
+          dynamicconfig.yaml:
+            # The server refuses to start without a dynamic configuration file; settings
+            # that change at runtime go here, and are read again when it changes.
+            content: |
+              limit.maxIDLength:
+                - value: 255
+                  constraints: {}
+            swarmRef:
+              file: {name: /etc/temporal/config/dynamicconfig/docker.yaml, mode: 444}
+
+  # ── Admin tools ────────────────────────────────────────────────────────
+  - name: admin
+    title: Admin tools
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: sh /hivepaas/setup.sh
+        container:
+          healthcheck:
+            # It serves nothing; its log says what the setup did.
+            enabled: false
+        resources:
+          limits: {memory: 128MB}
+      settings:
+        kind: {category: webapp, engine: temporal, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: POSTGRES_SEEDS, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: POSTGRES_PWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DBNAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: VISIBILITY_DBNAME, v: temporal_visibility}
+            # Where the temporal CLI in this component's shell connects.
+            - {k: TEMPORAL_ADDRESS, v: "${{ comp.server.key }}:7233"}
+        configFiles:
+          setup.sh:
+            # Every step is safe to repeat: an existing database is kept, and a schema
+            # already at the image's version gets no update.
+            content: |
+              set -e
+              schema=/etc/temporal/schema/postgresql/v12
+              sql() {
+                temporal-sql-tool --plugin postgres12 --ep "$POSTGRES_SEEDS" -p "$DB_PORT" \
+                  -u "$POSTGRES_USER" --pw "$POSTGRES_PWD" "$@"
+              }
+              until nc -z "$POSTGRES_SEEDS" "$DB_PORT"; do sleep 2; done
+              for db in "$DBNAME:temporal" "$VISIBILITY_DBNAME:visibility"; do
+                name=${db%%:*}
+                dir=${db##*:}
+                sql --db "$name" create 2>/dev/null || true
+                sql --db "$name" setup-schema -v 0.0
+                sql --db "$name" update-schema -d "$schema/$dir/versioned"
+              done
+              echo "hivepaas: schema up to date"
+              until temporal operator namespace describe -n default >/dev/null 2>&1 ||
+                temporal operator namespace create -n default; do
+                sleep 5
+              done
+              echo "hivepaas: namespace default ready"
+              exec sleep infinity
+            swarmRef:
+              file: {name: /hivepaas/setup.sh, mode: 444}
+
+  # ── Web UI ─────────────────────────────────────────────────────────────
+  - name: ui
+    title: Web UI
+    primary: true
+    needs: [server]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: wget -q -O /dev/null http://127.0.0.1:8080/
+            interval: 30s
+            timeout: 5s
+            startPeriod: 20s
+            retries: 3
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: temporal, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: TEMPORAL_ADDRESS, v: "${{ comp.server.key }}:7233"}
+        routing:
+          port: 8080
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

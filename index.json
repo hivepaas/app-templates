@@ -12169,6 +12169,67 @@
       }
     },
     {
+      "name": "temporal",
+      "file": {
+        "path": "templates/temporal.yaml",
+        "sha256": "600b4710c2e67a6c2e8698e15e564cbc520cb4bd5091f6fb5cab9c25cc746a1b"
+      },
+      "icon": {
+        "path": "icons/temporal.svg",
+        "sha256": "dcbaa9218db72d5d1adc54fb396063b30e08ed821e492df630b8bbd9c6ba2472"
+      },
+      "title": "Temporal",
+      "tagline": "Durable execution - workflows that survive crashes, restarts and deploys",
+      "categories": [
+        "webapps/automation",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "durable execution",
+        "workflow engine",
+        "orchestration",
+        "cadence",
+        "background jobs",
+        "sagas"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "components": [
+        {
+          "name": "server",
+          "title": "Server"
+        },
+        {
+          "name": "admin",
+          "title": "Admin tools"
+        },
+        {
+          "name": "ui",
+          "title": "Web UI",
+          "primary": true
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.31",
+          "release": "1.31.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "termix",
       "file": {
         "path": "templates/termix.yaml",
