@@ -12709,6 +12709,73 @@
       }
     },
     {
+      "name": "swetrix",
+      "file": {
+        "path": "templates/swetrix.yaml",
+        "sha256": "9c051212639dd6254c668b23018b88f78424210eca74ae8f31fce39ff444ab12"
+      },
+      "icon": {
+        "path": "icons/swetrix.png",
+        "sha256": "b7301c2062ef14dae315600843d2de460b6fc8fa71a2211b2eb90a8d53abfe3b"
+      },
+      "title": "Swetrix",
+      "tagline": "Cookieless, privacy-friendly web analytics with error and speed tracking",
+      "categories": [
+        "observability/analytics"
+      ],
+      "tags": [
+        "web-analytics",
+        "analytics",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "web analytics",
+        "google analytics alternative",
+        "plausible alternative",
+        "umami alternative",
+        "privacy analytics",
+        "cookieless analytics"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Cache",
+          "template": "redis"
+        }
+      ],
+      "components": [
+        {
+          "name": "gateway",
+          "title": "Gateway",
+          "primary": true
+        },
+        {
+          "name": "frontend",
+          "title": "Web app"
+        },
+        {
+          "name": "api",
+          "title": "API"
+        },
+        {
+          "name": "clickhouse",
+          "title": "ClickHouse"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5.4",
+          "release": "5.4.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "synapse",
       "file": {
         "path": "templates/synapse.yaml",
