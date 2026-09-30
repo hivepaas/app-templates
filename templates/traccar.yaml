@@ -1,0 +1,136 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: traccar
+  title: Traccar
+  tagline: GPS tracking for phones, vehicles and trackers, on your own server
+  description: |
+    Traccar is a GPS tracking server: live positions on a map, trip and stop history,
+    geofences, alerts by email or push, reports, and fleet maintenance - from more than
+    2,000 tracker models, over 200 protocols, and phones running the Traccar Client app.
+
+    **This template creates two apps**
+
+    - **Traccar**, with a volume for uploaded media
+    - **a PostgreSQL database** for it, named after the app with `-db` added - Traccar's
+      own recommendation over the H2 file it uses by default
+
+    **The first account is the administrator**
+
+    Open the address once the app is up and register: the first account becomes the
+    administrator, and registration closes behind it. Anyone who reaches the address
+    first can take that step, so do it right away.
+
+    **Connecting phones**
+
+    The Traccar Client app sends positions over HTTP, on container port 5055. Give it the
+    tracking domain below and use `https://<that domain>` as the server URL in the app;
+    the device's identifier in the app has to match a device added in Traccar.
+
+    **Connecting hardware trackers**
+
+    Each tracker model speaks its own protocol on its own port, between 5000 and 5300 -
+    the [device list](https://www.traccar.org/devices/) gives each model's. Most are not
+    HTTP: publish the ports of the models you use under Networks > Endpoint & Port
+    Configuration, and point the trackers at the node's address.
+  categories: [webapps/business]
+  tags: [geospatial, iot, open-source]
+  aliases: [gps, gps tracking, fleet tracking, vehicle tracking, location, tracker]
+  icon: icons/traccar.svg
+  links:
+    website: https://www.traccar.org
+    documentation: https://www.traccar.org/configuration-file/
+    source: https://github.com/traccar/traccar
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address of the web app. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: trackingDomain
+    title: Tracking domain
+    description: >-
+      The address phones running Traccar Client send positions to. Leave it empty to add
+      one later, in the routing settings on container port 5055.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: Java sizes its heap from this.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded media - device photos, attachments - is kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: traccar
+      username: traccar
+
+versions:
+  - name: "6.16"
+    release: "6.16.0"
+    default: true
+    image: traccar/traccar:6.16.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /opt/traccar/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:8082/api/server
+        interval: 15s
+        timeout: 5s
+        # The first start creates every table.
+        startPeriod: 90s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: traccar
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Every key of traccar.xml can be set as an environment variable instead: dots
+        # become underscores, in capitals.
+        - {k: CONFIG_USE_ENVIRONMENT_VARIABLES, v: "true"}
+        - {k: DATABASE_DRIVER, v: org.postgresql.Driver}
+        - k: DATABASE_URL
+          v: >-
+            jdbc:postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: DATABASE_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # To standard output, where the app's logs are read, rather than a file in logs/.
+        - {k: LOGGER_CONSOLE, v: "true"}
+    routing:
+      port: 8082
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+        # Traccar Client's OsmAnd protocol is plain HTTP, so it can go through the proxy.
+        - {domain: "${{ params.trackingDomain }}", enabled: true, forceHttps: true, containerPort: 5055}

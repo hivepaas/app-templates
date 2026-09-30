@@ -12318,6 +12318,53 @@
       }
     },
     {
+      "name": "traccar",
+      "file": {
+        "path": "templates/traccar.yaml",
+        "sha256": "fdb779b1df4a14e46108da07aff25a7f4a1adfd728d77a05332336a46411f018"
+      },
+      "icon": {
+        "path": "icons/traccar.svg",
+        "sha256": "d9f3b7f9bf58d0a5e76c2897cf59c08ea0e094e994bc614b263789835fe1f452"
+      },
+      "title": "Traccar",
+      "tagline": "GPS tracking for phones, vehicles and trackers, on your own server",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "geospatial",
+        "iot",
+        "open-source"
+      ],
+      "aliases": [
+        "gps",
+        "gps tracking",
+        "fleet tracking",
+        "vehicle tracking",
+        "location",
+        "tracker"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.16",
+          "release": "6.16.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "trailbase",
       "file": {
         "path": "templates/trailbase.yaml",
