@@ -5180,6 +5180,53 @@
       }
     },
     {
+      "name": "hoppscotch",
+      "file": {
+        "path": "templates/hoppscotch.yaml",
+        "sha256": "be22d4dcce425f684c6a0204a379257c9ac60c195add120901b79de8bb64ef57"
+      },
+      "icon": {
+        "path": "icons/hoppscotch.svg",
+        "sha256": "3636dcf914ca48ece25e8d07d8cbfb472348e422d936424b52bfcf6adcab2bd1"
+      },
+      "title": "Hoppscotch",
+      "tagline": "An API client for REST, GraphQL and WebSocket, in the browser, for teams",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "testing",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "postman alternative",
+        "api client",
+        "rest client",
+        "graphql client",
+        "insomnia alternative",
+        "api testing"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.8",
+          "release": "2026.8.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "imgcompress",
       "file": {
         "path": "templates/imgcompress.yaml",

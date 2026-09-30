@@ -1,0 +1,361 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: hoppscotch
+  title: Hoppscotch
+  tagline: An API client for REST, GraphQL and WebSocket, in the browser, for teams
+  description: |
+    Hoppscotch is an API development platform in the spirit of Postman: send REST,
+    GraphQL, WebSocket, Server-Sent Events, Socket.IO and MQTT requests from the browser,
+    organise them in collections with environments, scripts and tests, share them with
+    your team in workspaces, and publish API docs and mock servers.
+
+    **This template creates two apps**
+
+    - **Hoppscotch**, in its all-in-one image: the web app at `/`, the admin dashboard at
+      `/admin` and the backend at `/backend`, behind one domain
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **Sign-in: a magic link by email, or an OAuth provider**
+
+    Hoppscotch has no passwords. Choose how people sign in:
+
+    - **Email** sends a sign-in link, through the SMTP server below
+    - **GitHub**, **Google** or **Microsoft** sign in with an OAuth application you
+      create there, with the callback address
+      `https://<this app's domain>/backend/v1/auth/<github|google|microsoft>/callback`
+
+    Anyone who can sign in that way gets an account: with email or GitHub, that is
+    anyone. Keep that in mind before opening it to the internet. Other providers, and
+    SMTP for invitations, can be added later in the admin dashboard.
+
+    **The first start sets it up**
+
+    A new Hoppscotch asks its first visitor to choose the sign-in providers, and makes the
+    first person to open the admin dashboard its administrator. This template does both
+    from the values below, before the app takes any traffic: sign in with the
+    administrator's email, and `/admin` is yours.
+
+    **A domain is needed**
+
+    Sign-in links, OAuth callbacks and the web app's own calls to the backend are all
+    built from the app's address.
+  categories: [webapps/dev-tools]
+  tags: [testing, collaboration, open-source]
+  aliases: [postman alternative, api client, rest client, graphql client, insomnia alternative, api testing]
+  icon: icons/hoppscotch.svg
+  links:
+    website: https://hoppscotch.io
+    documentation: https://docs.hoppscotch.io/documentation/self-host/community-edition/install-and-build
+    source: https://github.com/hoppscotch/hoppscotch
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Hoppscotch answers at. Sign-in needs it: leave it empty only to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Administrator
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    description: >-
+      The address the administrator signs in with - by the sign-in link, or as the email of
+      their account at the OAuth provider.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: authProvider
+    title: Sign-in
+    type: select
+    default: EMAIL
+    options:
+      - {value: EMAIL, title: "Email - a sign-in link, through the SMTP server below"}
+      - {value: GITHUB, title: GitHub}
+      - {value: GOOGLE, title: Google}
+      - {value: MICROSOFT, title: Microsoft}
+  - name: smtpHost
+    title: SMTP host
+    description: Needed for sign-in by email; otherwise optional, for invitations.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    description: 587 for STARTTLS, or 465 for TLS from the first byte.
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromEmail
+    title: Sender address
+    description: The address the emails are sent from.
+    type: string
+    optional: true
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: oauthClientId
+    title: OAuth client ID
+    description: For GitHub, Google or Microsoft sign-in, of the OAuth application created there.
+    type: string
+    optional: true
+  - name: oauthClientSecret
+    title: OAuth client secret
+    type: secret
+    optional: true
+  - name: microsoftTenant
+    title: Microsoft tenant
+    description: For Microsoft sign-in - `common` for any account, or your tenant's ID.
+    type: string
+    default: common
+  - name: dataEncryptionKey
+    title: Data encryption key
+    description: >-
+      Encrypts the secrets Hoppscotch stores, from OAuth secrets to users' tokens: 32
+      characters. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: The backend, the web servers and Caddy take about 400MB at rest.
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: hoppscotch
+      username: hoppscotch
+
+versions:
+  - name: "2026.8"
+    release: "2026.8.2"
+    default: true
+    image: hoppscotch/hoppscotch:2026.8.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Migrations, the administrator and the sign-in settings, then the image's own start.
+      command: sh /hivepaas/start.sh
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Healthy - and so given traffic - only once sign-in is set up, and the server
+        # restarted with it: before, the onboarding page would let any visitor choose how
+        # everyone signs in.
+        command: >-
+          test -f /tmp/hivepaas-started &&
+          curl -fsS http://127.0.0.1/backend/v1/onboarding/status | grep -q '"onboardingCompleted":true'
+        interval: 15s
+        timeout: 5s
+        startPeriod: 180s
+        retries: 4
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: hoppscotch
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: DATA_ENCRYPTION_KEY, v: "${secrets.DATA_ENCRYPTION_KEY}"}
+        # One port, with the app, the dashboard and the backend under paths of it.
+        - {k: ENABLE_SUBPATH_BASED_ACCESS, v: "true"}
+        # The client's address is in X-Forwarded-For, from HivePaaS's router.
+        - {k: TRUST_PROXY, v: "true"}
+        # The addresses built from it are in start.sh.
+        - {k: HOPP_APP_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: HOPP_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: HOPP_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HOPP_AUTH_PROVIDER, v: "${{ params.authProvider }}"}
+        - {k: HOPP_SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: HOPP_SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: HOPP_SMTP_USER, v: "${{ params.smtpUser }}"}
+        - {k: HOPP_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: HOPP_SMTP_FROM, v: "${{ params.smtpFromEmail }}"}
+        - {k: HOPP_OAUTH_CLIENT_ID, v: "${{ params.oauthClientId }}"}
+        - {k: HOPP_OAUTH_CLIENT_SECRET, v: "${secrets.OAUTH_CLIENT_SECRET}"}
+        - {k: HOPP_MICROSOFT_TENANT, v: "${{ params.microsoftTenant }}"}
+    secrets:
+      DATA_ENCRYPTION_KEY:
+        value: "${{ params.dataEncryptionKey }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+      OAUTH_CLIENT_SECRET:
+        value: "${{ params.oauthClientSecret }}"
+    configFiles:
+      start.sh:
+        content: |
+          set -e
+          # Every address the web app and the admin dashboard use, from the app's own: in subpath
+          # mode the app is at /, the dashboard at /admin and the backend at /backend.
+          base="${HOPP_APP_URL:-http://localhost}"
+          export VITE_BASE_URL="$base" VITE_SHORTCODE_BASE_URL="$base" VITE_ADMIN_URL="$base/admin"
+          export VITE_BACKEND_GQL_URL="$base/backend/graphql" VITE_BACKEND_API_URL="$base/backend/v1"
+          export VITE_BACKEND_WS_URL="$(printf %s "$base" | sed 's/^http/ws/')/backend/graphql"
+          export WHITELISTED_ORIGINS="$base,app://localhost_3200,app://hoppscotch"
+          node /hivepaas/bootstrap.mjs check
+          cd /dist/backend
+          pnpm exec prisma migrate deploy
+          node /hivepaas/bootstrap.mjs admin
+          if ! node /hivepaas/bootstrap.mjs onboarded; then
+            node /hivepaas/bootstrap.mjs onboard &
+            # Given its settings, the backend stops itself to load them - which ends this first run.
+            node /usr/src/app/aio_run.mjs || true
+            # It leaves the web servers it started running; they are started again below.
+            pkill -x caddy || true
+            pkill -x webapp-server || true
+            sleep 2
+          fi
+          # What the health check waits for: the run that stays.
+          touch /tmp/hivepaas-started
+          exec node /usr/src/app/aio_run.mjs
+        swarmRef:
+          file: {name: /hivepaas/start.sh, mode: 444}
+      bootstrap.mjs:
+        # The sign-in settings are used once, on the first start: after that they are
+        # changed in the admin dashboard, not here.
+        content: |
+          // check: whether the sign-in settings below are complete.
+          // onboarded: whether sign-in has been set up.
+          // admin: before the server starts, creates the administrator's account while there is
+          // no user - whoever signs in with its email, by any provider, is that account.
+          // onboard: once the server answers, gives it the sign-in settings below, which the
+          // onboarding page would otherwise ask the first visitor for.
+          import { randomUUID } from 'crypto';
+          import { createRequire } from 'module';
+
+          const env = process.env;
+          const step = process.argv[2];
+
+          const db = async () => {
+            const pg = createRequire('/dist/backend/package.json')('pg');
+            const client = new pg.Client({ connectionString: env.DATABASE_URL });
+            await client.connect();
+            return client;
+          };
+
+          if (step === 'check') {
+            const provider = env.HOPP_AUTH_PROVIDER;
+            const missing =
+              provider === 'EMAIL'
+                ? !env.HOPP_SMTP_HOST || !env.HOPP_SMTP_FROM
+                : !env.HOPP_OAUTH_CLIENT_ID || !env.HOPP_OAUTH_CLIENT_SECRET;
+            if (missing) {
+              console.error(
+                provider === 'EMAIL'
+                  ? 'hivepaas: sign-in by email needs an SMTP host and a sender address'
+                  : `hivepaas: sign-in with ${provider} needs its OAuth client ID and secret`,
+              );
+              process.exit(1);
+            }
+          } else if (step === 'onboarded') {
+            // Exits 0 once sign-in has been set up.
+            const client = await db();
+            const { rows } = await client.query(
+              `SELECT 1 FROM "InfraConfig" WHERE name = 'ONBOARDING_COMPLETED' AND value = 'true'`,
+            );
+            await client.end();
+            process.exit(rows.length ? 0 : 1);
+          } else if (step === 'admin') {
+            const client = await db();
+            const { rows } = await client.query('SELECT count(*)::int AS n FROM "User"');
+            if (rows[0].n === 0) {
+              await client.query(
+                'INSERT INTO "User" (uid, email, "displayName", "isAdmin") VALUES ($1, $2, $3, true)',
+                [randomUUID(), env.HOPP_ADMIN_EMAIL.toLowerCase(), env.HOPP_ADMIN_NAME],
+              );
+              console.log('hivepaas: administrator created');
+            }
+            await client.end();
+          } else if (step === 'onboard') {
+            const api = 'http://127.0.0.1/backend/v1/onboarding';
+            let status;
+            for (;;) {
+              try {
+                const res = await fetch(`${api}/status`);
+                if (res.ok) { status = await res.json(); break; }
+              } catch {}
+              await new Promise((r) => setTimeout(r, 2000));
+            }
+            if (status.onboardingCompleted) process.exit(0);
+
+            const base = env.HOPP_APP_URL || 'http://localhost';
+            const provider = env.HOPP_AUTH_PROVIDER;
+            const config = { VITE_ALLOWED_AUTH_PROVIDERS: provider };
+            const smtp = !!env.HOPP_SMTP_HOST;
+            if (smtp) {
+              Object.assign(config, {
+                MAILER_SMTP_ENABLE: 'true',
+                MAILER_USE_CUSTOM_CONFIGS: 'true',
+                MAILER_SMTP_HOST: env.HOPP_SMTP_HOST,
+                MAILER_SMTP_PORT: env.HOPP_SMTP_PORT,
+                MAILER_SMTP_SECURE: env.HOPP_SMTP_PORT === '465' ? 'true' : 'false',
+                MAILER_TLS_REJECT_UNAUTHORIZED: 'true',
+                MAILER_SMTP_IGNORE_TLS: 'false',
+                MAILER_ADDRESS_FROM: env.HOPP_SMTP_FROM,
+                ...(env.HOPP_SMTP_USER && { MAILER_SMTP_USER: env.HOPP_SMTP_USER, MAILER_SMTP_PASSWORD: env.HOPP_SMTP_PASSWORD }),
+              });
+            } else {
+              config.MAILER_SMTP_ENABLE = 'false';
+            }
+            const oauth = {
+              GITHUB: { scope: 'user:email', path: 'github' },
+              GOOGLE: { scope: 'email,profile', path: 'google' },
+              MICROSOFT: { scope: 'user.read', path: 'microsoft' },
+            }[provider];
+            if (oauth) {
+              Object.assign(config, {
+                [`${provider}_CLIENT_ID`]: env.HOPP_OAUTH_CLIENT_ID,
+                [`${provider}_CLIENT_SECRET`]: env.HOPP_OAUTH_CLIENT_SECRET,
+                [`${provider}_CALLBACK_URL`]: `${base}/backend/v1/auth/${oauth.path}/callback`,
+                [`${provider}_SCOPE`]: oauth.scope,
+                ...(provider === 'MICROSOFT' && { MICROSOFT_TENANT: env.HOPP_MICROSOFT_TENANT || 'common' }),
+              });
+            }
+            const res = await fetch(`${api}/config`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(config),
+            });
+            console.log(`hivepaas: sign-in settings: ${res.status} ${res.ok ? '' : await res.text()}`);
+          }
+        swarmRef:
+          file: {name: /hivepaas/bootstrap.mjs, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
