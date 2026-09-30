@@ -1,0 +1,242 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: documenso
+  title: Documenso
+  tagline: Document signing in the spirit of DocuSign - send, sign and seal PDFs
+  description: |
+    Documenso signs documents: upload a PDF, place fields for each recipient, send it, and
+    everyone signs in the browser; the finished PDF is sealed with a digital signature and
+    an audit log. It has templates, teams, direct signing links, webhooks and an API.
+
+    **This template creates two apps**
+
+    - **Documenso**, with its signing certificate on a volume - documents themselves are
+      kept in the database
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    **The signing certificate**
+
+    The first start creates a self-signed certificate that seals every signed PDF. PDF
+    readers show such a signature as valid but from an unknown signer; for one they trust,
+    replace `cert.p12` on the volume with a certificate from a certificate authority,
+    protected with the passphrase below.
+
+    **Who can sign up**
+
+    Only addresses in the email domains below can create accounts; people you send
+    documents to sign without one. Sign up with the administrator email below: it is taken
+    as confirmed and gets the admin panel at `/admin`.
+
+    **Email is needed**
+
+    Documents are sent, and signers notified, by email: give an SMTP server below.
+  categories: [webapps/documents, webapps/business]
+  tags: [documents, collaboration, open-source]
+  aliases: [e-signature, esignature, docusign alternative, pdf signing, sign documents, contracts]
+  icon: icons/documenso.png
+  links:
+    website: https://documenso.com
+    documentation: https://docs.documenso.com/developers/self-hosting
+    source: https://github.com/documenso/documenso
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Documenso answers at. Signing links in emails are built from it: leave it
+      empty only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: Sign up with this address to get the admin panel. It must be in a domain below.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: signupDomains
+    title: Sign-up email domains
+    description: The email domains that may create accounts, comma-separated - `example.com,example.org`.
+    type: string
+    default: example.com
+  - name: smtpHost
+    title: SMTP host
+    type: string
+    default: smtp.example.com
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 465
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: SMTP TLS
+    type: select
+    default: "true"
+    options:
+      - {value: "true", title: "TLS from the first byte (usually port 465)"}
+      - {value: "false", title: "STARTTLS or none (usually port 587)"}
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: smtpFromName
+    title: Sender name
+    type: string
+    default: Documenso
+  - name: smtpFromEmail
+    title: Sender address
+    type: string
+    default: noreply@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: nextauthSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      The two encryption keys protect data Documenso encrypts in the database, 32 characters
+      each. Leave them empty to generate them, and keep them with the backups.
+    type: secret
+    minLength: 32
+    generate: {length: 32}
+  - name: encryptionSecondaryKey
+    title: Secondary encryption key
+    type: secret
+    minLength: 32
+    generate: {length: 32}
+  - name: certificatePassphrase
+    title: Signing certificate passphrase
+    description: Protects the signing certificate. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: dataVolume
+    title: Data volume
+    description: The volume the signing certificate is kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: documenso
+      username: documenso
+
+versions:
+  - name: "2.19"
+    release: "2.19.0"
+    default: true
+    image: documenso/documenso:v2.19.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The signing certificate, created self-signed the first time; then the image's own
+      # start - migrations, then the server.
+      command: >-
+        sh -c 'if [ ! -f /data/cert.p12 ]; then
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=Documenso"
+        -keyout /tmp/key.pem -out /tmp/cert.pem 2>/dev/null &&
+        openssl pkcs12 -export -out /data/cert.p12 -inkey /tmp/key.pem -in /tmp/cert.pem
+        -passout env:NEXT_PRIVATE_SIGNING_PASSPHRASE && rm -f /tmp/key.pem /tmp/cert.pem &&
+        echo "hivepaas: signing certificate created"; fi;
+        exec sh start.sh'
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Documenso's own check - the database and the certificate - then the administrator
+        # made one, once they have signed up: nothing to do after that.
+        command: >-
+          wget -q -O - http://127.0.0.1:3000/api/health | grep -q '"status":"ok"' &&
+          npx prisma db execute --file /hivepaas/admin.sql --schema ../../packages/prisma/schema.prisma >/dev/null 2>&1
+        interval: 30s
+        timeout: 20s
+        # The first start applies the migrations.
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: 1GB}
+  settings:
+    kind:
+      category: webapp
+      engine: documenso
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PORT, v: "3000"}
+        - {k: NEXT_PUBLIC_WEBAPP_URL, v: "${HIVEPAAS_APP_URL}"}
+        # Its background jobs are calls to itself.
+        - {k: NEXT_PRIVATE_INTERNAL_WEBAPP_URL, v: "http://localhost:3000"}
+        - k: NEXT_PRIVATE_DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - k: NEXT_PRIVATE_DIRECT_DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
+        - {k: NEXT_PRIVATE_ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        - {k: NEXT_PRIVATE_ENCRYPTION_SECONDARY_KEY, v: "${secrets.ENCRYPTION_SECONDARY_KEY}"}
+        - {k: NEXT_PUBLIC_UPLOAD_TRANSPORT, v: database}
+        - {k: NEXT_PRIVATE_SIGNING_LOCAL_FILE_PATH, v: /data/cert.p12}
+        - {k: NEXT_PRIVATE_SIGNING_PASSPHRASE, v: "${secrets.CERTIFICATE_PASSPHRASE}"}
+        - {k: NEXT_PRIVATE_ALLOWED_SIGNUP_DOMAINS, v: "${{ params.signupDomains }}"}
+        - {k: NEXT_PRIVATE_SMTP_TRANSPORT, v: smtp-auth}
+        - {k: NEXT_PRIVATE_SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: NEXT_PRIVATE_SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: NEXT_PRIVATE_SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+        - {k: NEXT_PRIVATE_SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: NEXT_PRIVATE_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: NEXT_PRIVATE_SMTP_FROM_NAME, v: "${{ params.smtpFromName }}"}
+        - {k: NEXT_PRIVATE_SMTP_FROM_ADDRESS, v: "${{ params.smtpFromEmail }}"}
+        # No update checks from Prisma, in the health check.
+        - {k: CHECKPOINT_DISABLE, v: "1"}
+    secrets:
+      NEXTAUTH_SECRET:
+        value: "${{ params.nextauthSecret }}"
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      ENCRYPTION_SECONDARY_KEY:
+        value: "${{ params.encryptionSecondaryKey }}"
+      CERTIFICATE_PASSPHRASE:
+        value: "${{ params.certificatePassphrase }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    configFiles:
+      admin.sql:
+        content: |
+          -- The administrator: ADMIN, and the address taken as confirmed - it is the one this
+          -- app was created with. Nothing changes once that is so, or before they sign up.
+          UPDATE "User" SET roles = ARRAY['ADMIN', 'USER']::"Role"[], "emailVerified" = COALESCE("emailVerified", now())
+          WHERE email = lower('${{ params.adminEmail }}') AND (NOT ('ADMIN' = ANY (roles)) OR "emailVerified" IS NULL);
+        swarmRef:
+          file: {name: /hivepaas/admin.sql, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

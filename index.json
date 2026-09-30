@@ -2467,6 +2467,54 @@
       }
     },
     {
+      "name": "documenso",
+      "file": {
+        "path": "templates/documenso.yaml",
+        "sha256": "0a2b75e13217cf31a159b5af9c08a9a79fddd0f842de0d4be122e08c6b014a35"
+      },
+      "icon": {
+        "path": "icons/documenso.png",
+        "sha256": "f2ee8dceb70a5bdf4d28bc4e113d06284d670f0278bcf8ee19ea5f795aa5631b"
+      },
+      "title": "Documenso",
+      "tagline": "Document signing in the spirit of DocuSign - send, sign and seal PDFs",
+      "categories": [
+        "webapps/documents",
+        "webapps/business"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "e-signature",
+        "esignature",
+        "docusign alternative",
+        "pdf signing",
+        "sign documents",
+        "contracts"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.19",
+          "release": "2.19.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "docuseal",
       "file": {
         "path": "templates/docuseal.yaml",
