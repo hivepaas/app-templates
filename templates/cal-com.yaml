@@ -1,0 +1,201 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cal-com
+  title: Cal.com
+  tagline: Scheduling in the spirit of Calendly - booking pages over your calendars
+  description: |
+    Cal.com is a scheduling platform: booking pages for your event types, availability
+    read from Google, Outlook or CalDAV calendars, round-robin and collective team events,
+    routing forms, workflows that send reminders, and video links from Zoom, Google Meet
+    or Cal Video - embeddable in your own site.
+
+    **This template creates two apps**
+
+    - **Cal.com**
+    - **a PostgreSQL database** for it, named after the app with `-db` added
+
+    **Two images**
+
+    Cal.com publishes one image per architecture rather than one for both: pick the
+    variant that matches your servers.
+
+    **The first start creates the administrator**
+
+    Whoever opens a new Cal.com first would be asked to create its administrator. This
+    template creates that account from the values below as soon as the app answers, and
+    the app is not reported healthy - and so gets no traffic - until it exists. Public
+    sign-up is off: invite people from the settings.
+
+    **Admin rights need two-factor authentication**
+
+    Cal.com treats an administrator without two-factor authentication as an ordinary
+    user. Sign in, enable it under Settings > Security, sign in again, and the admin pages
+    open.
+
+    **Calendars and email**
+
+    Connecting Google or Outlook calendars, and sending booking emails, take credentials
+    of your own - `GOOGLE_API_CREDENTIALS`, `EMAIL_SERVER_*` and others, as environment
+    variables; Cal.com's [documentation](https://cal.com/docs/self-hosting/installation)
+    lists them.
+  categories: [webapps/scheduling, webapps/business]
+  tags: [scheduling, open-source]
+  aliases: [calendly alternative, booking, appointments, scheduling, meetings, calcom]
+  icon: icons/cal-com.svg
+  links:
+    website: https://cal.com
+    documentation: https://cal.com/docs/self-hosting/installation
+    source: https://github.com/calcom/cal.com
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Cal.com answers at: every booking link is built from it. Leave it empty
+      to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUsername
+    title: Administrator username
+    type: string
+    default: admin
+    pattern: '^[a-z0-9-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: >-
+      At least 15 characters, with a digit and both upper- and lowercase letters. Leave
+      empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 15
+    # Long, so that a generated one lacks a digit or a case once in thousands of draws.
+    generate: {length: 48}
+  - name: nextauthSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: encryptionKey
+    title: Encryption key
+    description: >-
+      Encrypts the calendar and app credentials Cal.com stores. Leave empty to generate
+      one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: It takes about 900MB at rest.
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: calcom
+      username: calcom
+
+variants:
+  - name: amd64
+    title: x86-64
+    description: For Intel and AMD servers.
+    default: true
+  - name: arm64
+    title: ARM64
+    description: For Ampere, Graviton and other ARM servers.
+
+versions:
+  - name: "6.2"
+    release: "6.2.0"
+    default: true
+    images:
+      amd64: calcom/cal.com:v6.2.0
+      arm64: calcom/cal.com:v6.2.0-arm
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image rewrites its build's address into the address below at start; an empty
+      # one - the app has no domain yet - would rewrite it into nothing, so it keeps the
+      # built one then. Beside the server, once it answers: the first administrator, by
+      # the setup page's own API, which refuses once any user exists.
+      command: >-
+        sh -c 'if [ -z "$NEXT_PUBLIC_WEBAPP_URL" ]; then export NEXT_PUBLIC_WEBAPP_URL=http://localhost:3000; fi;
+        (until curl -fsS -o /dev/null http://127.0.0.1:3000/api/auth/providers; do sleep 3; done;
+        curl -sS -o /dev/null -w "hivepaas: first administrator: %{http_code}\n"
+        -X POST http://127.0.0.1:3000/api/auth/setup -H "Content-Type: application/json"
+        -d "{\"username\":\"$CALCOM_ADMIN_USERNAME\",\"full_name\":\"Administrator\",\"email_address\":\"$CALCOM_ADMIN_EMAIL\",\"password\":\"$CALCOM_ADMIN_PASSWORD\"}") &
+        exec /calcom/scripts/start.sh'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The sign-in page answers 200 only once an administrator exists: before, it sends
+        # to the setup page, which anyone reaching it could use.
+        command: >-
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/auth/login)" = 200
+        interval: 20s
+        timeout: 10s
+        # The first start applies every migration.
+        startPeriod: 240s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: calcom
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NEXT_PUBLIC_WEBAPP_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: NEXTAUTH_SECRET, v: "${secrets.NEXTAUTH_SECRET}"}
+        - {k: CALENDSO_ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        # host:port, which the start script waits on before migrating.
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - k: DATABASE_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - k: DATABASE_DIRECT_URL
+          v: >-
+            postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        # Read at runtime despite its prefix.
+        - {k: NEXT_PUBLIC_DISABLE_SIGNUP, v: "true"}
+        - {k: CALCOM_TELEMETRY_DISABLED, v: "1"}
+        - {k: CALCOM_ADMIN_USERNAME, v: "${{ params.adminUsername }}"}
+        - {k: CALCOM_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: CALCOM_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      NEXTAUTH_SECRET:
+        value: "${{ params.nextauthSecret }}"
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

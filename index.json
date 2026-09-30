@@ -1506,6 +1506,66 @@
       }
     },
     {
+      "name": "cal-com",
+      "file": {
+        "path": "templates/cal-com.yaml",
+        "sha256": "f49d51f76e304c2cde9bfbed3e7588aab40d7f11dabb92c6a9fbebbca9e1b284"
+      },
+      "icon": {
+        "path": "icons/cal-com.svg",
+        "sha256": "7419f0ca71747bff1509d26628098ba4ecdb2d4bacf435765629870a20985eb1"
+      },
+      "title": "Cal.com",
+      "tagline": "Scheduling in the spirit of Calendly - booking pages over your calendars",
+      "categories": [
+        "webapps/scheduling",
+        "webapps/business"
+      ],
+      "tags": [
+        "scheduling",
+        "open-source"
+      ],
+      "aliases": [
+        "calendly alternative",
+        "booking",
+        "appointments",
+        "scheduling",
+        "meetings",
+        "calcom"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "variants": [
+        {
+          "name": "amd64",
+          "default": true
+        },
+        {
+          "name": "arm64"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.2",
+          "release": "6.2.0",
+          "default": true,
+          "variants": [
+            "amd64",
+            "arm64"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "calibre-web",
       "file": {
         "path": "templates/calibre-web.yaml",
