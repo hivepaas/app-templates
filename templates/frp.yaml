@@ -1,0 +1,188 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: frp
+  title: frp
+  tagline: Reach services behind NAT or a firewall through this server, over HTTP or TCP
+  description: |
+    frp is a reverse proxy for services that cannot be reached directly: a machine at
+    home, in an office or behind a carrier's NAT runs `frpc`, which dials out to this
+    server and keeps the connection open. Requests to this server are then passed back
+    through it - a self-hosted alternative to ngrok or Cloudflare Tunnel.
+
+    This template runs the server, `frps`. It is the official image.
+
+    **Three addresses**
+
+    - **The control port**, published on the node: what `frpc` connects to. It is not
+      HTTP and does not go through the reverse proxy; open it in the node's firewall.
+      Clients must use TLS, which `frpc` does by default.
+    - **The dashboard**, at the domain: the connected clients and their proxies, behind
+      the dashboard username and password.
+    - **HTTP tunnels**, at the tunnel domain: HivePaaS terminates TLS and frps passes the
+      request to whichever client claimed that host name.
+
+    **Connecting a client**
+
+    ```toml
+    serverAddr = "<a DNS name or IP of the node>"
+    serverPort = 7000
+    auth.token = "<the token, under this app's Secrets>"
+
+    [[proxies]]
+    name = "web"
+    type = "http"
+    localPort = 8080
+    customDomains = ["<the tunnel domain>"]
+    ```
+
+    **More tunnels**
+
+    - Another HTTP service: add its domain in the routing settings, on container port
+      8080, and name it in the client's `customDomains`.
+    - A TCP service (SSH, a database): pick a `remotePort` in the allowed range below,
+      and publish that port under Networks > Endpoint & Port Configuration.
+  categories: [webapps/networking]
+  tags: [networking, open-source]
+  aliases: [frps, reverse tunnel, ngrok alternative, cloudflare tunnel alternative, pangolin alternative, nat traversal]
+  icon: icons/frp.svg
+  links:
+    website: https://gofrp.org
+    documentation: https://gofrp.org/en/docs/
+    source: https://github.com/fatedier/frp
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Dashboard domain
+    description: >-
+      The address of the dashboard. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: tunnelDomain
+    title: Tunnel domain
+    description: >-
+      A host name an HTTP tunnel is reached at. More can be added later in the routing
+      settings, on container port 8080.
+    type: domain
+    optional: true
+  - name: bindPort
+    title: Control port
+    description: The TCP port published on the node, which clients connect to.
+    type: int
+    default: 7000
+    min: 1024
+    max: 65535
+  - name: authToken
+    title: Client token
+    description: What every client authenticates with. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: dashboardUser
+    title: Dashboard username
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: dashboardPassword
+    title: Dashboard password
+    description: Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 12
+    generate: {length: 24}
+  - name: tcpPortStart
+    title: First TCP tunnel port
+    description: Clients may ask for a remote port from here to the last one below, and no other.
+    type: int
+    default: 6000
+    min: 1024
+    max: 65535
+  - name: tcpPortEnd
+    title: Last TCP tunnel port
+    type: int
+    default: 6010
+    min: 1024
+    max: 65535
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 128MB
+    min: 64MB
+
+versions:
+  - name: "0.71"
+    release: "0.71.0"
+    default: true
+    image: fatedier/frps:v0.71.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entry point is frps itself.
+      command: -c /etc/frp/frps.toml
+    networks:
+      endpointSpec:
+        ports:
+          # Published on the node rather than through the ingress mesh, which would
+          # replace the client's address with its own.
+          - {target: "${{ params.bindPort }}", published: "${{ params.bindPort }}", protocol: tcp, publishMode: host}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The dashboard's own health endpoint, which needs no sign-in.
+        command: wget -q -O /dev/null http://127.0.0.1:7500/healthz
+        interval: 15s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: frp
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: FRP_AUTH_TOKEN, v: "${secrets.AUTH_TOKEN}"}
+        - {k: FRP_DASHBOARD_USER, v: "${{ params.dashboardUser }}"}
+        - {k: FRP_DASHBOARD_PASSWORD, v: "${secrets.DASHBOARD_PASSWORD}"}
+    secrets:
+      AUTH_TOKEN:
+        value: "${{ params.authToken }}"
+      DASHBOARD_PASSWORD:
+        value: "${{ params.dashboardPassword }}"
+    configFiles:
+      frps.toml:
+        # {{ .Envs.NAME }} is frp's own template syntax: it reads the value from this app's
+        # environment when it starts, which keeps the token and the password out of the file.
+        content: |
+          bindPort = ${{ params.bindPort }}
+          vhostHTTPPort = 8080
+          # Clients connect with TLS, frpc's default; one that does not is refused.
+          transport.tls.force = true
+          allowPorts = [{ start = ${{ params.tcpPortStart }}, end = ${{ params.tcpPortEnd }} }]
+
+          auth.method = "token"
+          auth.token = "{{ .Envs.FRP_AUTH_TOKEN }}"
+
+          webServer.addr = "0.0.0.0"
+          webServer.port = 7500
+          webServer.user = "{{ .Envs.FRP_DASHBOARD_USER }}"
+          webServer.password = "{{ .Envs.FRP_DASHBOARD_PASSWORD }}"
+        swarmRef:
+          file: {name: /etc/frp/frps.toml, mode: 444}
+    routing:
+      port: 7500
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+        - {domain: "${{ params.tunnelDomain }}", enabled: true, forceHttps: true, containerPort: 8080}
