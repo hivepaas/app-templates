@@ -1,0 +1,84 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: vert
+  title: VERT
+  tagline: A file converter that runs in the browser - images, audio and documents
+  description: |
+    VERT converts files in the browser: images, audio and documents between hundreds of
+    formats, with WebAssembly builds of FFmpeg, ImageMagick and Pandoc - so the files never
+    leave the device converting them. It has no ads, no accounts and no file size limit.
+
+    **This template creates one app**
+
+    VERT's web app, served as static files. It keeps nothing: there is no storage and no
+    database.
+
+    **Video is the exception**
+
+    Video conversion is too heavy for the browser, so VERT sends videos to a `vertd`
+    server - by default the one VERT runs at `vertd.vert.sh`, which then sees them. To keep
+    videos too on your own servers, run [vertd](https://github.com/VERT-sh/vertd) yourself
+    and set its address under Settings > Video conversion, in each browser.
+
+    **The image**
+
+    VERT publishes no versioned images: this template pins the build of the commit named
+    below.
+  categories: [storage/files]
+  tags: [files, documents, privacy, open-source]
+  aliases: [file converter, convert, image converter, audio converter, document converter, ffmpeg, cloudconvert alternative]
+  icon: icons/vert.png
+  links:
+    website: https://vert.sh
+    documentation: https://github.com/VERT-sh/VERT/blob/main/docs/DOCKER.md
+    source: https://github.com/VERT-sh/VERT
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address VERT answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+
+versions:
+  - name: "2026.07"
+    # The main branch at commit e1c83ba, of 1 July 2026 - the build the image's latest tag
+    # points at.
+    release: "e1c83ba"
+    default: true
+    image: ghcr.io/vert-sh/vert:sha-e1c83ba@sha256:6492f2a88e977e7ce82fd26f49028a17575fee8cac38604f585bc5773298cbc8
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: 64MB}
+  settings:
+    kind:
+      category: webapp
+      engine: vert
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

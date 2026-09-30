@@ -13921,6 +13921,48 @@
       }
     },
     {
+      "name": "vert",
+      "file": {
+        "path": "templates/vert.yaml",
+        "sha256": "10b52ec54153a94d47960a4b6841b7e684c4ebf841a4865da9529e43eac5506e"
+      },
+      "icon": {
+        "path": "icons/vert.png",
+        "sha256": "3a312ab537e23c294b60686e34cb0c4057d325329d7fd29a77180e894ec2fd0c"
+      },
+      "title": "VERT",
+      "tagline": "A file converter that runs in the browser - images, audio and documents",
+      "categories": [
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "documents",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "file converter",
+        "convert",
+        "image converter",
+        "audio converter",
+        "document converter",
+        "ffmpeg",
+        "cloudconvert alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2026.07",
+          "release": "e1c83ba",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "victorialogs",
       "file": {
         "path": "templates/victorialogs.yaml",
