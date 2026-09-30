@@ -7971,7 +7971,7 @@
       "name": "mongodb",
       "file": {
         "path": "templates/mongodb.yaml",
-        "sha256": "09da3665f66e2f1fee2d8b1b9072b42a026147f7bfe34920d07db3a8639ee5cf"
+        "sha256": "c3d244d8353c2bb58a4f08242359bceb37b9514105e976471362917ceff8d136"
       },
       "icon": {
         "path": "icons/mongodb.svg",
@@ -7992,9 +7992,13 @@
       "license": "SSPL-1.0",
       "versions": [
         {
-          "name": "8.0",
-          "release": "8.0.32",
+          "name": "8.2",
+          "release": "8.2.12",
           "default": true
+        },
+        {
+          "name": "8.0",
+          "release": "8.0.32"
         },
         {
           "name": "7.0",
