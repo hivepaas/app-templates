@@ -1,0 +1,254 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: akaunting
+  title: Akaunting
+  tagline: Accounting for small businesses - invoices, bills, banking and reports
+  description: |
+    Akaunting is accounting software for small businesses and freelancers: invoices and
+    recurring invoices, bills, customers and vendors, bank accounts and transfers,
+    reconciliation, taxes and multiple currencies, a client portal where customers pay,
+    and reports - profit and loss, balance sheet, tax summaries - with apps for more.
+
+    **This template creates two apps**
+
+    - **Akaunting**, with its storage - uploads, attachments, caches - on a volume
+    - **a MariaDB database**, named after the app with `-db` added
+
+    **The first start sets it up**
+
+    The company and the administrator below are created on the first start; sign in with
+    the administrator email and password.
+
+    **The license**
+
+    Akaunting is under the Business Source License: free in production for at most two
+    users, one company and a thousand invoices; beyond that it needs a commercial license
+    from Akaunting.
+
+    **Apps**
+
+    Apps installed from Akaunting's marketplace are kept in the container, not on the
+    volume, and are lost when it is recreated.
+  categories: [webapps/business]
+  tags: [ecommerce, business-intelligence]
+  aliases: [accounting, invoicing, bookkeeping, quickbooks alternative, xero alternative, invoices, expenses]
+  icon: icons/akaunting.svg
+  links:
+    website: https://akaunting.com
+    documentation: https://akaunting.com/hc/docs
+    source: https://github.com/akaunting/akaunting
+  license: BUSL-1.1
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Akaunting answers at. Links in invoices and emails use it: leave it empty
+      only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: companyName
+    title: Company name
+    type: string
+    default: My Company
+    maxLength: 100
+  - name: companyEmail
+    title: Company email
+    type: string
+    default: company@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Used once, when the first start creates the account. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: locale
+    title: Language
+    type: string
+    default: en-GB
+    pattern: '^[a-z]{2}-[A-Z]{2}$'
+  - name: appKey
+    title: Application key
+    description: >-
+      Encrypts sessions and the data Akaunting encrypts, 32 characters. Leave empty to
+      generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: smtpHost
+    title: SMTP host
+    description: For sending invoices and reminders. Leave empty to set it up later, in the settings.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpEncryption
+    title: SMTP encryption
+    type: select
+    default: tls
+    options:
+      - {value: tls, title: "STARTTLS (usually port 587)"}
+      - {value: ssl, title: "TLS from the first byte (usually port 465)"}
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: dataVolume
+    title: Storage volume
+    description: The volume uploads, attachments and caches are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: akaunting
+      username: akaunting
+
+versions:
+  - name: "3.1"
+    release: "3.1.21"
+    default: true
+    image: akaunting/akaunting:3.1.21
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /var/www/html/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Akaunting answers only for its own address's host: the check asks as that host.
+        command: >-
+          curl -fs -o /dev/null -H "Host: $(printf %s "${APP_URL:-http://localhost}" | sed -E "s#^[a-z]+://##; s#/.*##")"
+          http://127.0.0.1/auth/login
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema.
+        startPeriod: 180s
+        retries: 3
+    resources:
+      limits: {memory: 512MB}
+  settings:
+    kind:
+      category: webapp
+      engine: akaunting
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        - {k: APP_ENV, v: production}
+        - {k: APP_DEBUG, v: "false"}
+        - {k: LOCALE, v: "${{ params.locale }}"}
+        - {k: APP_LOCALE, v: "${{ params.locale }}"}
+        - {k: LOG_CHANNEL, v: stderr}
+        - {k: DB_CONNECTION, v: mysql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        # The install reads DB_NAME, the application DB_DATABASE.
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: DB_PREFIX, v: ak_}
+        - {k: MAIL_MAILER, v: smtp}
+        - {k: MAIL_HOST, v: "${{ params.smtpHost }}"}
+        - {k: MAIL_PORT, v: "${{ params.smtpPort }}"}
+        - {k: MAIL_ENCRYPTION, v: "${{ params.smtpEncryption }}"}
+        - {k: MAIL_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: MAIL_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: MAIL_FROM_ADDRESS, v: "${{ params.companyEmail }}"}
+        - {k: MAIL_FROM_NAME, v: "${{ params.companyName }}"}
+        # For the install, on the first start only.
+        - {k: COMPANY_NAME, v: "${{ params.companyName }}"}
+        - {k: COMPANY_EMAIL, v: "${{ params.companyEmail }}"}
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    configFiles:
+      akaunting.sh:
+        # In place of the image's start script: see its first lines.
+        content: |
+          #!/bin/bash -e
+          # The image's start script, with the install run once - a marker on the storage volume
+          # remembers it, where the image would run it on every start - and the settings read from
+          # the environment, where the image keeps them in a .env file that a new container loses.
+
+          a2enmod rewrite
+
+          mkdir -p storage/framework/{sessions,views,cache}
+          mkdir -p storage/app/uploads
+
+          if [ ! -f storage/.hivepaas-installed ]; then
+              retry_for=120
+              retry_interval=5
+              while sleep $retry_interval; do
+                  if php artisan install \
+                      --db-host="$DB_HOST" \
+                      --db-port="$DB_PORT" \
+                      --db-name="$DB_NAME" \
+                      --db-username="$DB_USERNAME" \
+                      "--db-password=$DB_PASSWORD" \
+                      --db-prefix="$DB_PREFIX" \
+                      "--company-name=$COMPANY_NAME" \
+                      "--company-email=$COMPANY_EMAIL" \
+                      "--admin-email=$ADMIN_EMAIL" \
+                      "--admin-password=$ADMIN_PASSWORD" \
+                      "--locale=$LOCALE" --no-interaction; then
+                      touch storage/.hivepaas-installed
+                      echo "hivepaas: installed"
+                      break
+                  fi
+                  if [ $retry_for -le 0 ]; then
+                      echo "Unable to find database!" >&2
+                      exit 1
+                  fi
+                  (( retry_for -= retry_interval ))
+              done
+          fi
+          unset COMPANY_NAME COMPANY_EMAIL ADMIN_EMAIL ADMIN_PASSWORD
+          export APP_INSTALLED=true
+
+          chown -R www-data:root storage
+          exec docker-php-entrypoint apache2-foreground
+        swarmRef:
+          file: {name: /usr/local/bin/akaunting.sh, mode: 555}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

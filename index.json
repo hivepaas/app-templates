@@ -659,6 +659,53 @@
       }
     },
     {
+      "name": "akaunting",
+      "file": {
+        "path": "templates/akaunting.yaml",
+        "sha256": "019166775462481b8dce1b3064eecd10f52459dd00ababa938aa6f87d3bf5c04"
+      },
+      "icon": {
+        "path": "icons/akaunting.svg",
+        "sha256": "a340a21ab7c39f32fe6811558bde2e91fb025854b74b2c536491fb4a83d867ec"
+      },
+      "title": "Akaunting",
+      "tagline": "Accounting for small businesses - invoices, bills, banking and reports",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "ecommerce",
+        "business-intelligence"
+      ],
+      "aliases": [
+        "accounting",
+        "invoicing",
+        "bookkeeping",
+        "quickbooks alternative",
+        "xero alternative",
+        "invoices",
+        "expenses"
+      ],
+      "license": "BUSL-1.1",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.21",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "alertmanager",
       "file": {
         "path": "templates/alertmanager.yaml",
