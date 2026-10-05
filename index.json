@@ -14771,7 +14771,7 @@
       "name": "wg-easy",
       "file": {
         "path": "templates/wg-easy.yaml",
-        "sha256": "2e6aa880493325c90b598583058a8627768207838a79f29a3c9c8246bb9a7448"
+        "sha256": "fce56b053a8dffc4dc2310b4c607214cd3894915097f9515ed2c1d62c53021ce"
       },
       "icon": {
         "path": "icons/wg-easy.svg",

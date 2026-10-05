@@ -50,6 +50,16 @@ metadata:
     connect to, so it has to be an address that reaches this node from outside: a public IP,
     or a DNS name pointing at one. It defaults to this app's own domain, which is right when
     that domain points at the node the app runs on.
+
+    **One step after the first start: let clients reach the internet**
+
+    wg-easy sends its clients' traffic out through the network device `eth0`. Here the app
+    runs as a Swarm service, where `eth0` is one of the project's networks and the internet
+    is reached through another device: clients connect, and reach nothing past the server.
+    Once, after the first start, on the admin page: in **Admin Panel → Hooks**, replace
+    `-o {{device}} -j MASQUERADE` with `! -o wg0 -j MASQUERADE` in both **PostUp** and
+    **PostDown**, save, then **Admin Panel → Interface → Restart Interface**. Clients
+    reconnect on their own.
   categories: [webapps/networking]
   tags: [vpn, networking, open-source]
   aliases: [wireguard, wg, vpn, wgeasy]
