@@ -1,0 +1,136 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: heimdall
+  title: Heimdall
+  tagline: An application dashboard with tiles for everything you run
+  description: |
+    Heimdall puts your web apps on one page as colored tiles, each opening its app. For
+    many apps - Sonarr, Radarr, qBittorrent, Pi-hole, Nextcloud and over a hundred others -
+    an enhanced tile shows live figures from the app's API. A search bar sends queries to
+    the search engine you choose.
+
+    **This template sets up**
+
+    - Heimdall, on a volume for its tiles, icons, backgrounds and users
+    - a password for its admin user
+    - a memory limit you choose
+
+    **Signing in**
+
+    Heimdall's admin user starts with no password, and while it has none anyone who
+    reaches the page can change it. Here the first start gives it the password below - it
+    is under this app's Secrets - so the page asks for it. Change it later in Heimdall's
+    own Users page; Heimdall can also show the tiles to visitors without signing in, if
+    you turn that on for the user.
+  categories: [webapps/dev-tools]
+  tags: [dashboards, open-source]
+  aliases: [heimdall, dashboard, start page, homepage, homelab, launcher, bookmarks]
+  icon: icons/heimdall.svg
+  links:
+    website: https://heimdall.site
+    documentation: https://github.com/linuxserver/Heimdall#readme
+    source: https://github.com/linuxserver/Heimdall
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Heimdall answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Admin password
+    description: For the user named admin. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the tiles, icons, backgrounds and users are kept on.
+    type: volume
+
+versions:
+  - name: "2.8"
+    release: "2.8.3"
+    default: true
+    image: lscr.io/linuxserver/heimdall:v2.8.3-ls365
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1/login
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: heimdall
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      set-admin-password:
+        content: |
+          #!/bin/bash
+          # Heimdall's admin user starts with no password, and while it has none anyone who
+          # reaches the page can change it. Before Heimdall first starts, it is given the password
+          # from this app's Secrets; after that, it is changed in Heimdall's Users page.
+          set -e
+          db=/config/www/app.sqlite
+          php -r '
+            $db = new PDO("sqlite:" . $argv[1]);
+            $set = $db->prepare("UPDATE users SET password = ? WHERE id = 1 AND (password IS NULL OR password = \"\")");
+            $set->execute([password_hash(getenv("HIVEPAAS_ADMIN_PASSWORD"), PASSWORD_BCRYPT)]);
+            echo $set->rowCount() ? "hivepaas: admin password set\n" : "hivepaas: admin has a password\n";
+          ' "$db"
+        swarmRef:
+          # Run by the image's init, as root, after it has set up the database and before
+          # Heimdall starts.
+          file: {name: /custom-cont-init.d/set-admin-password, mode: 555}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -5703,6 +5703,46 @@
       }
     },
     {
+      "name": "heimdall",
+      "file": {
+        "path": "templates/heimdall.yaml",
+        "sha256": "5b68057f346ed8675f6d4443469e879a2e4b2e7e7c7485dfe8fa0304bcb0d049"
+      },
+      "icon": {
+        "path": "icons/heimdall.svg",
+        "sha256": "8cb2471baf38b87ffd85c9ac2d5baa4a80782cb5208efc0aed74df7fffefe5d1"
+      },
+      "title": "Heimdall",
+      "tagline": "An application dashboard with tiles for everything you run",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "heimdall",
+        "dashboard",
+        "start page",
+        "homepage",
+        "homelab",
+        "launcher",
+        "bookmarks"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.8",
+          "release": "2.8.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "heyform",
       "file": {
         "path": "templates/heyform.yaml",
