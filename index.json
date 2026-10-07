@@ -1094,6 +1094,54 @@
       }
     },
     {
+      "name": "atuin",
+      "file": {
+        "path": "templates/atuin.yaml",
+        "sha256": "5031f1323f03674469ca29a7bd31a792a503d5efc5a82035ac1a31367d872e7d"
+      },
+      "icon": {
+        "path": "icons/atuin.svg",
+        "sha256": "0b304b597185cce8386f2f895b582babde7b7a181d3ddab9c1c4a018bbcbf8ae"
+      },
+      "title": "Atuin",
+      "tagline": "Your own sync server for Atuin's shell history, end-to-end encrypted",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "atuin",
+        "shell history",
+        "bash history",
+        "zsh history",
+        "fish",
+        "terminal",
+        "sync server",
+        "cli"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "18.23",
+          "release": "18.23.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "audiobookshelf",
       "file": {
         "path": "templates/audiobookshelf.yaml",

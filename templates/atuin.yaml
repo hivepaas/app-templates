@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: atuin
+  title: Atuin
+  tagline: Your own sync server for Atuin's shell history, end-to-end encrypted
+  description: |
+    Atuin replaces your shell's history with a searchable database of every command - where
+    it ran, how long it took, whether it worked - and syncs it between your machines. This
+    template is the sync server, so your history goes to a server you run instead of
+    Atuin's.
+
+    **This template creates two apps**
+
+    - **the Atuin server**
+    - **a PostgreSQL database**, named after the app with `-db` added, which holds all it
+      keeps and is the backup
+
+    The history is encrypted on your machines before it is sent, with a key that never
+    leaves them: the server stores only what it cannot read.
+
+    **It has no web page**
+
+    It is an API for the `atuin` command. Point each machine at it in
+    `~/.config/atuin/config.toml`:
+
+    ```toml
+    sync_address = "https://your-domain"
+    ```
+
+    then `atuin register` on the first machine and `atuin login` on the others, with the
+    encryption key `atuin key` prints on the first.
+
+    **Registration**
+
+    Leave it open while you make your accounts, then set `ATUIN_OPEN_REGISTRATION` to
+    `false` under the app's environment variables, so nobody else can make one on your
+    server.
+  categories: [webapps/dev-tools]
+  tags: [privacy, open-source]
+  aliases: [atuin, shell history, bash history, zsh history, fish, terminal, sync server, cli]
+  icon: icons/atuin.svg
+  links:
+    website: https://atuin.sh
+    documentation: https://docs.atuin.sh/self-hosting/server-setup/
+    source: https://github.com/atuinsh/atuin
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the machines sync with. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: openRegistration
+    title: Open registration
+    description: On, anyone who reaches the server can make an account. Turn it off once yours are made.
+    type: bool
+    default: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 64MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: atuin
+      username: atuin
+
+versions:
+  - name: "18.23"
+    release: "18.23.0"
+    default: true
+    image: ghcr.io/atuinsh/atuin:18.23.0@sha256:f232feeead54a0a13132b9cd477e312c3380e9dc90f1db24c4f79ce6c8e034ea
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entrypoint is atuin-server; this is what it runs.
+      command: start
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8888/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: atuin
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ATUIN_HOST, v: 0.0.0.0}
+        - {k: ATUIN_PORT, v: "8888"}
+        - {k: ATUIN_OPEN_REGISTRATION, v: "${{ params.openRegistration }}"}
+        - k: ATUIN_DB_URI
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: RUST_LOG, v: info}
+    routing:
+      port: 8888
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
