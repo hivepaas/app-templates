@@ -69,6 +69,15 @@ jobs:
           git config user.email "bot@hivepaas.com"
           git checkout -b "$branch"
           git commit -am "Bump pinned images and count stars"
-          git push -u origin "$branch"
+          # The branch is the bot's own: a second run on the same day replaces it,
+          # and the pull request already open for it shows the new commit.
+          git push --force -u origin "$branch"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "the pull request for $branch is updated"
+            exit 0
+          fi
+          # Needs "Allow GitHub Actions to create and approve pull requests" in the
+          # repository's Actions settings; without it, the branch is pushed and the
+          # pull request is opened by hand from it.
           gh pr create --fill --title "Bump pinned images and count stars" \
             --body "Opened by the scheduled bump job. Each version line moved to the newest release every variant publishes, within the line the template declares, and stats.yaml has this week's GitHub stars."
