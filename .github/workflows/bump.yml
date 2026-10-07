@@ -34,6 +34,14 @@ jobs:
         working-directory: hivepaas
         run: go run ./tools/apptemplate bump ../app-templates
 
+      # The stars the store orders by, and those of the last four weeks. Read-only
+      # queries of public repositories: the job's own token is enough.
+      - name: Count stars
+        working-directory: hivepaas
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: go run ./tools/apptemplate stats ../app-templates
+
       # The pull request is opened with GITHUB_TOKEN, and GitHub does not run
       # workflows on what that token pushes - so lint runs here instead of waiting
       # for a check that will never start.
@@ -56,7 +64,7 @@ jobs:
           git config user.name "hivepaas-bot"
           git config user.email "bot@hivepaas.com"
           git checkout -b "$branch"
-          git commit -am "Bump pinned images"
+          git commit -am "Bump pinned images and count stars"
           git push -u origin "$branch"
-          gh pr create --fill --title "Bump pinned images" \
-            --body "Opened by the scheduled bump job. Each version line moved to the newest release every variant publishes, within the line the template declares."
+          gh pr create --fill --title "Bump pinned images and count stars" \
+            --body "Opened by the scheduled bump job. Each version line moved to the newest release every variant publishes, within the line the template declares, and stats.yaml has this week's GitHub stars."
