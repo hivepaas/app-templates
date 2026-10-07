@@ -1,0 +1,124 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: homer
+  title: Homer
+  tagline: A dead simple static start page, configured in one YAML file
+  description: |
+    Homer is a start page for your services and links: groups of cards with an icon, a
+    subtitle and a tag, a search box, a dark mode, and smart cards that show the status of
+    apps such as Pi-hole, Sonarr or Uptime Kuma. It is a static page - no server code, no
+    database - built from one YAML file.
+
+    **This template sets up**
+
+    - Homer, serving the page
+    - its `config.yml` as one of this app's configuration files, started with an example
+    - a memory limit you choose
+
+    **Editing the page**
+
+    Open the app's configuration files in HivePaaS, change `config.yml` and deploy. Icons
+    are Font Awesome names (`fas fa-cloud`) or image URLs; Homer's documentation lists
+    every option.
+
+    **It is public**
+
+    Homer has no sign-in: anyone who reaches the address sees the page and the links on
+    it. Keep it on an address only you use, or list only what may be seen.
+  categories: [webapps/dev-tools]
+  tags: [dashboards, open-source]
+  aliases: [homer, dashboard, start page, homepage, homelab, launcher, bookmarks, static]
+  icon: icons/homer.svg
+  links:
+    website: https://homer-demo.netlify.app
+    documentation: https://github.com/bastienwirtz/homer/blob/main/docs/configuration.md
+    source: https://github.com/bastienwirtz/homer
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Homer answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: title
+    title: Page title
+    description: The heading of the example configuration; change the rest in config.yml.
+    type: string
+    default: Home
+    pattern: '^[^"\\]{1,64}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "26.08"
+    release: "26.08.3"
+    default: true
+    image: b4bz/homer:v26.08.3@sha256:febc8967c9f7648ec37633ef3ae1ec90dbe8b7c46fecab80299f08f05be7ecb6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q --spider http://127.0.0.1:8080/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: homer
+      version: "${{ version.name }}"
+      webapp: {}
+    configFiles:
+      config.yml:
+        content: |
+          # Homer's whole page. Every option:
+          # https://github.com/bastienwirtz/homer/blob/main/docs/configuration.md
+          title: "${{ params.title }}"
+          subtitle: "Homer"
+          logo: "logo.png"
+          header: true
+          footer: false
+          theme: default
+
+          links:
+            - name: "Documentation"
+              icon: "fas fa-book"
+              url: "https://github.com/bastienwirtz/homer/blob/main/docs/configuration.md"
+
+          # Groups of cards. Icons are Font Awesome names, or set `logo` to an image URL.
+          services:
+            - name: "Apps"
+              icon: "fas fa-cloud"
+              items:
+                - name: "An app"
+                  icon: "fas fa-rocket"
+                  subtitle: "What it is for"
+                  tag: "example"
+                  url: "https://example.com"
+        swarmRef:
+          # The image's start installs its example only when this file is missing.
+          file: {name: /www/assets/config.yml, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

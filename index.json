@@ -5967,6 +5967,47 @@
       }
     },
     {
+      "name": "homer",
+      "file": {
+        "path": "templates/homer.yaml",
+        "sha256": "d342a06453ab6e21aa60c88843e648fb6f2de10776a59a43cf31a4d7e273fe39"
+      },
+      "icon": {
+        "path": "icons/homer.svg",
+        "sha256": "d1495821e074c3faa6b12007ad51dfc4ef17b25158fbe0daea1544c0446b73c3"
+      },
+      "title": "Homer",
+      "tagline": "A dead simple static start page, configured in one YAML file",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "homer",
+        "dashboard",
+        "start page",
+        "homepage",
+        "homelab",
+        "launcher",
+        "bookmarks",
+        "static"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "26.08",
+          "release": "26.08.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "hoppscotch",
       "file": {
         "path": "templates/hoppscotch.yaml",
