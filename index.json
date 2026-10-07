@@ -5796,6 +5796,56 @@
       }
     },
     {
+      "name": "huginn",
+      "file": {
+        "path": "templates/huginn.yaml",
+        "sha256": "08ff902f4fe874de7012240177a98e6687a9d52b104d7f0db105be93872b2f2e"
+      },
+      "icon": {
+        "path": "icons/huginn.svg",
+        "sha256": "892ff4aec9d1ee00e67cd51c755a4ae45d0f085d83c474dff458b27e7054ed5d"
+      },
+      "title": "Huginn",
+      "tagline": "Agents that watch the web for you and act on what they find",
+      "categories": [
+        "webapps/automation"
+      ],
+      "tags": [
+        "automation",
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "huginn",
+        "ifttt",
+        "zapier",
+        "agents",
+        "web scraping",
+        "rss",
+        "monitoring",
+        "workflow",
+        "scenarios"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.10",
+          "release": "2026.10.04",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "imgcompress",
       "file": {
         "path": "templates/imgcompress.yaml",

@@ -1,0 +1,204 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: huginn
+  title: Huginn
+  tagline: Agents that watch the web for you and act on what they find
+  description: |
+    Huginn runs agents: small programs that each do one thing - fetch a page or a feed,
+    watch for a change, parse JSON, filter, wait, send an email or a webhook. Wired
+    together into scenarios, they make an IFTTT or Zapier that runs on your own server, with
+    your data staying there.
+
+    **This template creates two apps**
+
+    - **Huginn**, the web interface and the workers that run the agents, in one app
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    Everything Huginn keeps - users, agents, their events and logs - is in the database,
+    which is the backup.
+
+    **The administrator**
+
+    The first start creates the administrator from the values below, with a sample
+    scenario of a few agents to show how they fit together; delete them if you do not want
+    them. The password is under this app's Secrets.
+
+    **Who can sign up**
+
+    Anyone can open the sign-up page, but making an account takes the **invitation code**.
+    It is generated unless you give one; share it only with the people you want on your
+    server.
+
+    **Email**
+
+    Email agents, digests and password resets go out through the SMTP server set up below.
+    Without one, Huginn still runs; those emails are not sent.
+  categories: [webapps/automation]
+  tags: [automation, notifications, open-source]
+  aliases: [huginn, ifttt, zapier, agents, web scraping, rss, monitoring, workflow, scenarios]
+  icon: icons/huginn.svg
+  links:
+    website: https://github.com/huginn/huginn
+    documentation: https://github.com/huginn/huginn/wiki
+    source: https://github.com/huginn/huginn
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Huginn answers at. Links in its emails and the URLs of webhook agents use
+      it: leave it empty only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9_-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: invitationCode
+    title: Invitation code
+    description: What a new account needs to sign up. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 20}
+  - name: secretToken
+    title: Secret token
+    description: Signs sessions and cookies. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: timezone
+    title: Timezone
+    description: The zone agents are scheduled in, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+  - name: smtpHost
+    title: SMTP host
+    description: For email agents and password resets. Leave empty to send no email.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSsl
+    title: TLS from the first byte
+    description: On for a server that wants TLS at once, usually on port 465. Off, STARTTLS is used when the server offers it.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: mailFrom
+    title: Sender address
+    description: The address Huginn's emails come from.
+    type: string
+    default: huginn@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 768MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: huginn
+      username: huginn
+
+versions:
+  - name: "2026.10"
+    release: "2026.10.04"
+    default: true
+    image: ghcr.io/huginn/huginn:v2026.10.04@sha256:ca6a5603f84d6fb74dd8fdee087e9cf6facf6f059ef1dc4b96d474ef732ab4f8
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:3000/users/sign_in
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema and the administrator.
+        startPeriod: 180s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: huginn
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DOMAIN, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: APP_SECRET_TOKEN, v: "${secrets.APP_SECRET_TOKEN}"}
+        - {k: DATABASE_ADAPTER, v: postgresql}
+        - {k: DATABASE_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DATABASE_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DATABASE_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DATABASE_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATABASE_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # The database comes with the dependency; its user may not create another.
+        - {k: DO_NOT_CREATE_DATABASE, v: "true"}
+        # Read by the seed, which runs only while there is no user yet.
+        - {k: SEED_USERNAME, v: "${{ params.adminUser }}"}
+        - {k: SEED_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: SEED_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: INVITATION_CODE, v: "${secrets.INVITATION_CODE}"}
+        - {k: TIMEZONE, v: "${{ params.timezone }}"}
+        - {k: SMTP_SERVER, v: "${{ params.smtpHost }}"}
+        - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SMTP_SSL, v: "${{ params.smtpSsl }}"}
+        - {k: SMTP_DOMAIN, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: SMTP_USER_NAME, v: "${{ params.smtpUser }}"}
+        - {k: SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: EMAIL_FROM_ADDRESS, v: "${{ params.mailFrom }}"}
+    secrets:
+      APP_SECRET_TOKEN:
+        value: "${{ params.secretToken }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      INVITATION_CODE:
+        value: "${{ params.invitationCode }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
