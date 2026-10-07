@@ -10102,6 +10102,49 @@
       }
     },
     {
+      "name": "obsidian-livesync",
+      "file": {
+        "path": "templates/obsidian-livesync.yaml",
+        "sha256": "d44ce77e15129367f1ad5e5ff425dc1b427be870577c077690d3930b4513f7fb"
+      },
+      "icon": {
+        "path": "icons/couchdb.svg",
+        "sha256": "7038ad2ca6eaae7710f2d992d10dc32b723c2fe33c34fb24168bcf2c09d92edf"
+      },
+      "title": "Obsidian LiveSync",
+      "tagline": "Your own server for Self-hosted LiveSync - sync Obsidian vaults across devices",
+      "categories": [
+        "webapps/knowledge",
+        "storage/files"
+      ],
+      "tags": [
+        "notes",
+        "files",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "obsidian",
+        "livesync",
+        "self-hosted livesync",
+        "obsidian sync",
+        "couchdb",
+        "notes sync",
+        "vault"
+      ],
+      "license": "Apache-2.0",
+      "versions": [
+        {
+          "name": "3.5",
+          "release": "3.5.2.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "odoo",
       "file": {
         "path": "templates/odoo.yaml",

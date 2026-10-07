@@ -1,0 +1,155 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: obsidian-livesync
+  title: Obsidian LiveSync
+  tagline: Your own server for Self-hosted LiveSync - sync Obsidian vaults across devices
+  description: |
+    Self-hosted LiveSync is the community Obsidian plugin that syncs a vault between your
+    computers and phones in near real time, through a CouchDB server you run. This template
+    is that server: CouchDB set up the way the plugin's guide asks for.
+
+    **This template creates one app**
+
+    - **CouchDB**, its databases on a volume, with an administrator whose password is
+      generated
+
+    **Set up the way LiveSync wants**
+
+    - every request needs the user name and password - nothing is readable without them
+    - CORS open to the Obsidian apps (`app://obsidian.md`, `capacitor://localhost` and
+      `http://localhost`), and to nothing else
+    - large documents and requests allowed, for attachments
+    - a single node, so the system databases are created on the first start
+
+    **Connecting Obsidian**
+
+    Obsidian on a phone talks only to an HTTPS address, so give the app a domain. Then in
+    the plugin choose CouchDB and enter `https://` and the domain, the administrator's user
+    name, the password from this app's Secrets, and a database name such as `obsidian` - the
+    plugin creates it. Turn on end-to-end encryption in the plugin to keep the notes
+    unreadable on the server as well.
+
+    The volume holds every vault synced to the server; it is the backup.
+  categories: [webapps/knowledge, storage/files]
+  tags: [notes, files, privacy, open-source]
+  aliases: [obsidian, livesync, self-hosted livesync, obsidian sync, couchdb, notes sync, vault]
+  icon: icons/couchdb.svg
+  links:
+    website: https://github.com/vrtmrz/obsidian-livesync
+    documentation: https://github.com/vrtmrz/obsidian-livesync/blob/main/docs/setup_own_server.md
+    source: https://github.com/vrtmrz/obsidian-livesync
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Obsidian syncs with. Phones reach only HTTPS addresses: leave it empty only
+      to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: username
+    title: User name
+    description: The administrator the plugin signs in as.
+    type: string
+    default: admin
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the synced vaults are kept on.
+    type: volume
+
+versions:
+  - name: "3.5"
+    release: "3.5.2.1"
+    default: true
+    image: couchdb:3.5.2.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The settings are copied in rather than mounted there: the image's start changes the
+      # owner of everything under /opt/couchdb, and stops at a file it cannot change. The
+      # entrypoint runs this command as it is, and sets CouchDB up when called again with
+      # CouchDB's own.
+      command: >-
+        sh -c 'cp /hivepaas/livesync.ini /opt/couchdb/etc/local.d/10-livesync.ini &&
+        exec /docker-entrypoint.sh /opt/couchdb/bin/couchdb'
+    storage:
+      mounts:
+        /opt/couchdb/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Even /_up wants the user name and password here.
+        command: curl -fsS -o /dev/null -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://127.0.0.1:5984/_up
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: couchdb
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: COUCHDB_USER, v: "${{ params.username }}"}
+        - {k: COUCHDB_PASSWORD, v: "${secrets.COUCHDB_PASSWORD}"}
+    secrets:
+      COUCHDB_PASSWORD:
+        value: "${{ params.password }}"
+    configFiles:
+      livesync.ini:
+        content: |
+          ; What Self-hosted LiveSync's guide sets on its CouchDB.
+          [couchdb]
+          single_node = true
+          max_document_size = 50000000
+
+          [chttpd]
+          require_valid_user = true
+          max_http_request_size = 4294967296
+          enable_cors = true
+
+          [chttpd_auth]
+          require_valid_user = true
+
+          [httpd]
+          WWW-Authenticate = Basic realm="couchdb"
+          enable_cors = true
+
+          [cors]
+          credentials = true
+          origins = app://obsidian.md,capacitor://localhost,http://localhost
+          headers = accept, authorization, content-type, origin, referer
+          methods = GET, PUT, POST, HEAD, DELETE
+          max_age = 3600
+        swarmRef:
+          file: {name: /hivepaas/livesync.ini, mode: 444}
+    routing:
+      port: 5984
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
