@@ -10683,6 +10683,59 @@
       }
     },
     {
+      "name": "peertube",
+      "file": {
+        "path": "templates/peertube.yaml",
+        "sha256": "967c03c15330bdeacd6d1147fc3f541ec782d1ac3d0a04a0057460a73fba2697"
+      },
+      "icon": {
+        "path": "icons/peertube.svg",
+        "sha256": "f7b7d1b1d91b66144651247c398822be82d08b6f7ff0b909bedeb19fd567345c"
+      },
+      "title": "PeerTube",
+      "tagline": "Your own video platform, federated with PeerTube servers and the fediverse",
+      "categories": [
+        "webapps/media",
+        "webapps/social"
+      ],
+      "tags": [
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "peertube",
+        "video",
+        "youtube alternative",
+        "video hosting",
+        "fediverse",
+        "activitypub",
+        "streaming"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Job queue",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "8.3",
+          "release": "8.3.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "penpot",
       "file": {
         "path": "templates/penpot.yaml",

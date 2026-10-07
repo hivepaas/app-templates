@@ -1,0 +1,217 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: peertube
+  title: PeerTube
+  tagline: Your own video platform, federated with PeerTube servers and the fediverse
+  description: |
+    PeerTube hosts videos the way a video site does - channels, playlists, subtitles,
+    comments, a player that adapts to the connection - on a server you run. It federates
+    over ActivityPub: other PeerTube servers can follow yours and show its videos, and
+    Mastodon users can follow its channels and comment.
+
+    **This template creates three apps**
+
+    - **PeerTube**, with videos, thumbnails, logs and the settings changed in its
+      administration on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Valkey**, named after the app with `-redis` added, holding the job queue
+
+    The database and the volume together are the backup. Videos are large: size the volume
+    for them.
+
+    **The domain comes first, and stays**
+
+    PeerTube writes its address into everything it federates, so it will not start without
+    a domain, and the domain cannot be changed afterwards.
+
+    **Signing in**
+
+    The administrator is `root`, with the password below; it is under this app's Secrets as
+    `ROOT_PASSWORD`, read only on the first start. Sign-up is closed: open it, and
+    configure the instance, under *Administration > Configuration*.
+
+    **Transcoding**
+
+    Uploads are transcoded on this server's CPU, which takes a while and as much memory as
+    you give it. Choose the resolutions under *Administration > Configuration > VOD
+    Transcoding*. Live streaming needs RTMP on port 1935, which this template does not
+    publish.
+  categories: [webapps/media, webapps/social]
+  tags: [privacy, open-source]
+  aliases: [peertube, video, youtube alternative, video hosting, fediverse, activitypub, streaming]
+  icon: icons/peertube.svg
+  links:
+    website: https://joinpeertube.org
+    documentation: https://docs.joinpeertube.org
+    source: https://github.com/Chocobozzz/PeerTube
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address PeerTube answers at, written into every video and account it federates.
+      It is needed to start, and cannot be changed later.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The root account's address, and the instance's contact address.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: rootPassword
+    title: Root password
+    description: What root signs in with the first time. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secret
+    title: Secret
+    description: Signs sessions and federation requests. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    generate: {length: 64, charset: hex}
+  - name: smtpHost
+    title: SMTP host
+    description: For sign-up confirmations, password resets and notifications. Leave empty to send no email.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpTls
+    title: TLS from the first byte
+    description: On for port 465; off for STARTTLS on 587.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: mailFrom
+    title: Sender address
+    type: string
+    default: peertube@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: memoryLimit
+    title: Memory limit
+    description: About 250MB at rest; transcoding takes much more.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume videos, thumbnails, logs and the administration's settings are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: peertube
+      username: peertube
+  - name: redis
+    title: Job queue
+    template: valkey
+    version: "9.1"
+    params:
+      # The job queue lives here: nothing may be evicted.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "8.3"
+    release: "8.3.1"
+    default: true
+    image: chocobozzz/peertube:v8.3.1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Started without its domain, PeerTube would federate as "undefined" for good. Then the
+      # image's own start: it hands the volume to its user and runs the server as it.
+      command: >-
+        sh -c 'if [ -z "$PEERTUBE_WEBSERVER_HOSTNAME" ]; then
+        echo "hivepaas: PeerTube needs its domain before it starts: add one in the routing settings" >&2;
+        exit 1; fi; exec /usr/local/bin/entrypoint.sh node dist/server'
+    storage:
+      mounts:
+        /data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: data}
+        # Only what the administration saves: the defaults come with the image.
+        /config:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:9000/api/v1/ping
+        interval: 30s
+        timeout: 5s
+        # The first start creates the schema.
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: peertube
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PEERTUBE_WEBSERVER_HOSTNAME, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: PEERTUBE_WEBSERVER_PORT, v: "443"}
+        - {k: PEERTUBE_WEBSERVER_HTTPS, v: "true"}
+        # The proxy's address, among these, is where the visitor's comes from.
+        - {k: PEERTUBE_TRUST_PROXY, v: '["loopback", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]'}
+        - {k: PEERTUBE_SECRET, v: "${secrets.SECRET}"}
+        - {k: PEERTUBE_DB_HOSTNAME, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: PEERTUBE_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: PEERTUBE_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: PEERTUBE_DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: PEERTUBE_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: PEERTUBE_DB_SSL, v: "false"}
+        - {k: PEERTUBE_REDIS_HOSTNAME, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+        - {k: PEERTUBE_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+        - {k: PEERTUBE_REDIS_AUTH, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: PEERTUBE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: PT_INITIAL_ROOT_PASSWORD, v: "${secrets.ROOT_PASSWORD}"}
+        - {k: PEERTUBE_SMTP_HOSTNAME, v: "${{ params.smtpHost }}"}
+        - {k: PEERTUBE_SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: PEERTUBE_SMTP_TLS, v: "${{ params.smtpTls }}"}
+        - {k: PEERTUBE_SMTP_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: PEERTUBE_SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: PEERTUBE_SMTP_FROM, v: "${{ params.mailFrom }}"}
+    secrets:
+      SECRET:
+        value: "${{ params.secret }}"
+      ROOT_PASSWORD:
+        value: "${{ params.rootPassword }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
