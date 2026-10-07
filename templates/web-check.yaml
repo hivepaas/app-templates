@@ -1,0 +1,100 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: web-check
+  title: Web-Check
+  tagline: Everything about a website on one page - DNS, TLS, headers, ports, trackers
+  description: |
+    Web-Check looks a website over from the outside and puts what it finds on one page: its
+    IP and DNS records, the TLS certificate and cipher suites, HTTP and security headers,
+    cookies, open ports, redirects, the server's location, the technologies it is built
+    with, whether it is on block lists, a screenshot, and more - about forty checks for one
+    address.
+
+    **This template sets up**
+
+    - the Web-Check app, with the browser it takes screenshots with
+    - a memory limit you choose
+
+    It keeps nothing: every check runs when it is asked for.
+
+    **Who can use it**
+
+    Web-Check has no accounts. Whoever reaches the address can make your server check any
+    host - the apps on its own network included, by name or private address. Put basic
+    authentication in front of it in the app's routing settings, or keep it without a
+    domain. Hosts that must never be checked go in `API_BLOCKED_HOSTS`, comma-separated
+    domains, addresses or CIDR ranges.
+
+    **Checks that need a key**
+
+    A few checks ask an outside service and are skipped without its key. Add the ones you
+    want to the app's environment variables: `GOOGLE_CLOUD_API_KEY` for the quality report
+    and Safe Browsing, `SHODAN_API_KEY` for known services and vulnerabilities, and
+    `CLOUDMERSIVE_API_KEY` for a malware scan of the site.
+  categories: [webapps/security, webapps/networking]
+  tags: [networking, monitoring, open-source]
+  aliases: [web-check, website analysis, osint, dns lookup, ssl checker, security headers, site audit]
+  icon: icons/web-check.svg
+  links:
+    website: https://web-check.xyz
+    documentation: https://github.com/Lissy93/web-check#readme
+    source: https://github.com/Lissy93/web-check
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Web-Check answers at. Put basic authentication in front of it in the app's
+      routing settings: without it anyone can run checks from your server.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: The screenshot check runs a browser; 512MB lets a few checks run at once.
+    type: size
+    default: 512MB
+    min: 256MB
+
+versions:
+  - name: "2.3"
+    release: "2.3.2"
+    default: true
+    image: lissy93/web-check:2.3.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own probe of /healthz: it has neither curl nor wget.
+        command: node /app/healthcheck.js
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: web-check
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Behind the proxy: the visitor's address comes from its header.
+        - {k: TRUST_PROXY, v: "1"}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

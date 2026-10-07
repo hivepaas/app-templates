@@ -14999,6 +14999,48 @@
       }
     },
     {
+      "name": "web-check",
+      "file": {
+        "path": "templates/web-check.yaml",
+        "sha256": "2863b0ad1e0b4d92647315cd81282dc60c76517caae85ba6670ea02735db8de4"
+      },
+      "icon": {
+        "path": "icons/web-check.svg",
+        "sha256": "d2c2e97bfd503d198dfccce5bce9c940f7c1272c193c89064171083ced87109d"
+      },
+      "title": "Web-Check",
+      "tagline": "Everything about a website on one page - DNS, TLS, headers, ports, trackers",
+      "categories": [
+        "webapps/security",
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "web-check",
+        "website analysis",
+        "osint",
+        "dns lookup",
+        "ssl checker",
+        "security headers",
+        "site audit"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.3",
+          "release": "2.3.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "wekan",
       "file": {
         "path": "templates/wekan.yaml",
