@@ -1,0 +1,155 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: myspeed
+  title: MySpeed
+  tagline: Runs internet speed tests on a schedule and charts the results
+  description: |
+    MySpeed tests your server's internet connection on a schedule - with Ookla's
+    Speedtest, LibreSpeed or Cloudflare - and keeps every result: download, upload and
+    ping over time, averages per day, and alerts through Discord, Telegram, Gotify or
+    other services when a test falls below what you expect.
+
+    **This template sets up**
+
+    - MySpeed, with its results and settings on a volume
+    - a password, set on the first start
+    - a memory limit you choose
+
+    **What it measures**
+
+    The connection of the server the app runs on - its bandwidth to the internet, not
+    yours to the server; LibreSpeed, also in this store, measures that.
+
+    **The password**
+
+    MySpeed starts with none, and anyone who reaches it could change its settings. Here
+    the first start sets the password below, which is under this app's Secrets; change it
+    later in MySpeed's own settings. There you can also let visitors see the results
+    without it.
+
+    **First test**
+
+    Open MySpeed, choose the test provider and accept its terms; it then tests on the
+    schedule you set, every hour by default.
+  categories: [webapps/networking, observability/monitoring]
+  tags: [networking, monitoring, open-source]
+  aliases: [myspeed, speedtest, speed test, internet speed, bandwidth, ookla, monitoring]
+  icon: icons/myspeed.png
+  links:
+    website: https://myspeed.dev
+    documentation: https://docs.myspeed.dev
+    source: https://github.com/gnmyt/MySpeed
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address MySpeed answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam, for the schedule and the charts.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the results and settings are kept on.
+    type: volume
+
+versions:
+  - name: "1.0"
+    release: "1.0.9"
+    default: true
+    image: germannewsmaker/myspeed:1.0.9@sha256:3a3e774b3f78d930a5a962d625b99bcb3d71730bfeb4a6b93e04fd38cfe7d9a9
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's start, with the script that sets the password beside it.
+      command: sh -c 'node /hivepaas/set-password.js & exec node server'
+    storage:
+      mounts:
+        /myspeed/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has neither curl nor wget.
+        command: >-
+          node -e "fetch('http://127.0.0.1:5216/').then((r) => process.exit(r.ok ? 0 : 1),
+          () => process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: myspeed
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_PASSWORD, v: "${secrets.PASSWORD}"}
+    secrets:
+      PASSWORD:
+        value: "${{ params.password }}"
+    configFiles:
+      set-password.js:
+        content: |
+          // MySpeed starts with no password, and while it has none anyone who reaches it can
+          // change its settings. Once it answers, it is given the password from this app's
+          // Secrets - only while it still has none, so one changed in MySpeed is kept.
+          const base = 'http://127.0.0.1:5216/api/config';
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+          (async () => {
+            for (;;) {
+              try {
+                const res = await fetch(base);
+                if (res.status === 401) {
+                  console.log('hivepaas: MySpeed has a password');
+                  return;
+                }
+                if (res.ok) break;
+              } catch {}
+              await sleep(2000);
+            }
+            const res = await fetch(base + '/password', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ value: process.env.HIVEPAAS_PASSWORD }),
+            });
+            console.log(res.ok ? 'hivepaas: password set' : 'hivepaas: setting the password failed: ' + res.status + ' ' + (await res.text()));
+          })();
+        swarmRef:
+          file: {name: /hivepaas/set-password.js, mode: 444}
+    routing:
+      port: 5216
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -9920,6 +9920,48 @@
       }
     },
     {
+      "name": "myspeed",
+      "file": {
+        "path": "templates/myspeed.yaml",
+        "sha256": "9aa166bf2e69d9f1dd349f44cc4b2f875cfc10d44f3b16f1479839dffd31fbd5"
+      },
+      "icon": {
+        "path": "icons/myspeed.png",
+        "sha256": "41f153daf381d77a31129b9da29afafae6c4bbf47557673d633ee569621578ac"
+      },
+      "title": "MySpeed",
+      "tagline": "Runs internet speed tests on a schedule and charts the results",
+      "categories": [
+        "webapps/networking",
+        "observability/monitoring"
+      ],
+      "tags": [
+        "networking",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "myspeed",
+        "speedtest",
+        "speed test",
+        "internet speed",
+        "bandwidth",
+        "ookla",
+        "monitoring"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.0",
+          "release": "1.0.9",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "mysql",
       "file": {
         "path": "templates/mysql.yaml",
