@@ -1,0 +1,105 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: seerr
+  title: Seerr
+  tagline: Let people request films and shows for your Jellyfin, Plex or Emby
+  description: |
+    Seerr is the front desk of a media server: people browse and search films and series,
+    see what is already there, and request what is not. Requests go to Sonarr and Radarr
+    once approved, and people are told when their request is ready to watch. It is what
+    Jellyseerr and Overseerr became when the two projects merged.
+
+    **What this template creates**
+
+    One app, with its settings and request database on a volume. The volume is the backup.
+
+    **Set it up before sharing the address**
+
+    The first person to open Seerr runs its setup wizard: they choose the media server - the
+    Jellyfin template in this store works, at `http://<its app key>:8096` - and sign in with
+    an account on it, which becomes the administrator. Finish the setup yourself as soon as
+    the app is up. Then connect Sonarr and Radarr if you have them.
+
+    **Coming from Jellyseerr or Overseerr**
+
+    Seerr migrates their settings and database on its first start. An app made from this
+    store's Jellyseerr template can move to it in place: its description says how.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [seerr, jellyseerr, overseerr, jellyfin requests, plex requests, emby requests, media requests]
+  icon: icons/seerr.svg
+  links:
+    website: https://seerr.dev
+    documentation: https://docs.seerr.dev
+    source: https://github.com/seerr-team/seerr
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: About 400MB once it has started.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the settings and the request database are kept on.
+    type: volume
+
+versions:
+  - name: "3.5"
+    release: "3.5.0"
+    default: true
+    image: ghcr.io/seerr-team/seerr:v3.5.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /app/config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has wget and no curl.
+        command: wget -q -O /dev/null http://127.0.0.1:5055/api/v1/status
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: seerr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 5055
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

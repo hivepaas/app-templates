@@ -6278,7 +6278,7 @@
       "name": "jellyseerr",
       "file": {
         "path": "templates/jellyseerr.yaml",
-        "sha256": "caf438ef6aa7083fa5408d4cc939f420d0027ebb63f9e9e77fd7cfe4ed0cb4d9"
+        "sha256": "fc50e294f6898617bdded033ca4af3805389fb2d52355f238bb4faefe237f140"
       },
       "icon": {
         "path": "icons/jellyseerr.svg",
@@ -6299,6 +6299,7 @@
         "media requests"
       ],
       "license": "MIT",
+      "internal": true,
       "versions": [
         {
           "name": "2.7",
@@ -13417,6 +13418,45 @@
         {
           "name": "4.47",
           "release": "4.47",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
+      "name": "seerr",
+      "file": {
+        "path": "templates/seerr.yaml",
+        "sha256": "bd285acae90edf2c7baf57e5d84617901c648df16cca27d0b2005f1beb0a5025"
+      },
+      "icon": {
+        "path": "icons/seerr.svg",
+        "sha256": "b12e5dfd641d961cfb68360da33fe28873b95ea9b64c23233d5b87a37cbfa4c4"
+      },
+      "title": "Seerr",
+      "tagline": "Let people request films and shows for your Jellyfin, Plex or Emby",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "seerr",
+        "jellyseerr",
+        "overseerr",
+        "jellyfin requests",
+        "plex requests",
+        "emby requests",
+        "media requests"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "3.5",
+          "release": "3.5.0",
           "default": true
         }
       ],
