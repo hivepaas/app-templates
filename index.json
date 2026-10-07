@@ -10416,6 +10416,55 @@
       }
     },
     {
+      "name": "onedev",
+      "file": {
+        "path": "templates/onedev.yaml",
+        "sha256": "11b0d531f632e7eaaf789c13bd49a69bb8659db87f3c04521738d76d62e551fd"
+      },
+      "icon": {
+        "path": "icons/onedev.svg",
+        "sha256": "a3afb81cff9cff617cedf6740a5cfb872a7dfb567aa546f4b0ef9de338e21dec"
+      },
+      "title": "OneDev",
+      "tagline": "Git hosting with CI/CD, issues, kanban and packages in one server",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "onedev",
+        "git server",
+        "ci",
+        "cd",
+        "pipelines",
+        "issues",
+        "kanban",
+        "code review",
+        "gitlab alternative"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "16.8",
+          "release": "16.8.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "onetimesecret",
       "file": {
         "path": "templates/onetimesecret.yaml",

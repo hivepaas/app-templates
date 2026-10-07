@@ -1,0 +1,150 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: onedev
+  title: OneDev
+  tagline: Git hosting with CI/CD, issues, kanban and packages in one server
+  description: |
+    OneDev is a Git server with everything around the code built in: pull requests with
+    code review, issues and kanban boards, CI/CD pipelines defined in the repository and
+    edited visually, a package registry, and code search with symbol navigation - one Java
+    server, nothing else to wire up.
+
+    **This template creates two apps**
+
+    - **OneDev**, with the repositories and its site data on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    The database and the volume together are the backup.
+
+    **The administrator**
+
+    The first start makes the administrator from the values below and skips the setup
+    wizard. The password is under this app's Secrets.
+
+    **Builds**
+
+    CI jobs run on job executors, which OneDev sets up under **Administration → Job
+    Executors**. Its Docker executors need Docker, which this template does not give it; use
+    the shell executor on the server, or OneDev agents on machines of your own.
+
+    **Cloning**
+
+    Clone over HTTPS at the app's domain. Git over SSH is on port 6611 in the container; to
+    use it, publish that port in the app's network settings.
+  categories: [webapps/dev-tools]
+  tags: [git, open-source]
+  aliases: [onedev, git server, ci, cd, pipelines, issues, kanban, code review, gitlab alternative]
+  icon: icons/onedev.svg
+  links:
+    website: https://onedev.io
+    documentation: https://docs.onedev.io
+    source: https://github.com/theonedev/onedev
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address OneDev answers at, which its links and clone URLs use. Leave it empty
+      only to set it later, in the app's routing settings and in OneDev's system settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the repositories, build artifacts and OneDev's site data are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: onedev
+      username: onedev
+
+versions:
+  - name: "16.8"
+    release: "16.8.5"
+    default: true
+    image: 1dev/server:16.8.5@sha256:6f1b6650cbd7d48b8366467b069155440756d2a8f5444064d728ccf869330708
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The first start needs the server's address to finish setting up; without a domain,
+      # the one OneDev would use itself, to be changed in its system settings.
+      command: >-
+        bash -c 'export initial_server_url="${HIVEPAAS_DOMAIN:+https://$HIVEPAAS_DOMAIN}";
+        export initial_server_url="${initial_server_url:-http://localhost:6610}";
+        exec /root/bin/entrypoint.sh'
+    storage:
+      mounts:
+        /opt/onedev: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:6610/
+        interval: 30s
+        timeout: 10s
+        # The first start unpacks OneDev onto the volume and creates the schema.
+        startPeriod: 180s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: onedev
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: hibernate_dialect, v: io.onedev.server.persistence.PostgreSQLDialect}
+        - {k: hibernate_connection_driver_class, v: org.postgresql.Driver}
+        - k: hibernate_connection_url
+          v: >-
+            jdbc:postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: hibernate_connection_username, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: hibernate_connection_password, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        # Read only by the first start, which makes the administrator from them.
+        - {k: initial_user, v: "${{ params.adminUser }}"}
+        - {k: initial_email, v: "${{ params.adminEmail }}"}
+        - {k: initial_password, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 6610
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
