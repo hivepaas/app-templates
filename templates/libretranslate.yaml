@@ -1,0 +1,163 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: libretranslate
+  title: LibreTranslate
+  tagline: A machine translation API that runs on your own server, offline
+  description: |
+    LibreTranslate translates text, and documents - Word, PowerPoint, OpenDocument, PDF,
+    EPUB and subtitles - with models that run on the server itself: nothing you translate
+    leaves it. It answers a simple JSON API that apps such as Mastodon, Discourse and
+    Weblate can translate with, and has a web page for translating by hand.
+
+    **What this template creates**
+
+    One app, with the language models on a volume. They are downloaded on the first
+    start - about 125MB for each language to and from English - and updated on later
+    starts. The volume also holds the API key.
+
+    **Languages**
+
+    Only the languages listed below are downloaded and offered. Add or remove some later by
+    changing `LT_LOAD_ONLY` in the app's environment variables; the next start fetches what
+    is missing. Each worker loads the models it is asked for, so more languages take more
+    memory as well as disk.
+
+    **The API key**
+
+    With an API key set, every request to the API has to carry it as `api_key`, except
+    those made by the web page on this app's own address, which keeps working. The key is
+    under this app's Secrets as `API_KEY`; changing it there replaces the old one on the
+    next start. Without one, anyone who reaches the address can use the API.
+  categories: [webapps/ai]
+  tags: [ai, privacy, open-source]
+  aliases: [libretranslate, translation, translate, machine translation, deepl alternative, google translate alternative, argos translate]
+  icon: icons/libretranslate.svg
+  links:
+    website: https://libretranslate.com
+    documentation: https://docs.libretranslate.com
+    source: https://github.com/LibreTranslate/LibreTranslate
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the API and the web page answer at. Leave it empty for an API only the
+      apps in this project reach, by the app's key on port 5000.
+    type: domain
+    optional: true
+  - name: languages
+    title: Languages
+    description: >-
+      Language codes, comma-separated, English included: en, es, fr, de, it, pt, zh, ja, ru,
+      ar, ko, vi and some forty more.
+    type: string
+    default: en,es,fr,de,it,pt,zh,ja
+    pattern: '^[a-z]{2}(,[a-z]{2})*$'
+  - name: apiKey
+    title: API key
+    description: >-
+      Asked of every request to the API but the web page's. Leave it empty for an API anyone
+      who reaches it can use.
+    type: secret
+    optional: true
+    minLength: 16
+  - name: memoryLimit
+    title: Memory limit
+    description: About 500MB with a few languages in use; more as more are.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Models volume
+    description: The volume the language models and the API key are kept on.
+    type: volume
+
+versions:
+  - name: "1.9"
+    release: "1.9.6"
+    default: true
+    image: libretranslate/libretranslate:v1.9.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Seeds the API key, then hands over to the image's entrypoint. See the file.
+      entrypoint: /usr/local/bin/libretranslate-start
+    storage:
+      mounts:
+        /home/libretranslate/.local: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check; it passes while the models are being downloaded.
+        command: /app/venv/bin/python /app/scripts/healthcheck.py
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: libretranslate
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LT_LOAD_ONLY, v: "${{ params.languages }}"}
+        - {k: LT_UPDATE_MODELS, v: "true"}
+        - {k: LT_API_KEYS_DB_PATH, v: /home/libretranslate/.local/db/api_keys.db}
+        - {k: API_KEY, v: "${secrets.API_KEY}"}
+        - {k: APP_URL, v: "${HIVEPAAS_APP_URL}"}
+    secrets:
+      API_KEY:
+        value: "${{ params.apiKey }}"
+    configFiles:
+      libretranslate-start:
+        content: |
+          #!/bin/bash
+          # With API_KEY set, make it the one key in the keys database - a key changed in
+          # the app's Secrets replaces the old one - and require a key of every request
+          # but those from the web page on the app's own address. Then start as the image
+          # does.
+          set -e
+          cd /app
+          if [ -n "$API_KEY" ]; then
+            mkdir -p "$(dirname "$LT_API_KEYS_DB_PATH")"
+            ./venv/bin/python - <<'PY'
+          import os
+          from libretranslate.api_keys import Database
+          db = Database(os.environ["LT_API_KEYS_DB_PATH"])
+          key = os.environ["API_KEY"]
+          for row in db.all():
+              if row[0] != key:
+                  db.remove(row[0])
+          if db.lookup(key) is None:
+              db.add(100000, key)
+          PY
+            export LT_API_KEYS=true
+            # LibreTranslate's own way of letting its page through, a secret in the page,
+            # does not work with more than one worker: each makes its own.
+            if [ -n "$APP_URL" ]; then
+              export LT_REQUIRE_API_KEY_ORIGIN="^$(printf '%s' "$APP_URL" | sed 's/[.^$*+?()|[\]/\\&/g')\$"
+            else
+              export LT_REQUIRE_API_KEY_ORIGIN='(?!)'
+            fi
+          fi
+          exec ./scripts/entrypoint.sh "$@"
+        swarmRef:
+          file: {name: /usr/local/bin/libretranslate-start, mode: 555}
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -7211,6 +7211,47 @@
       }
     },
     {
+      "name": "libretranslate",
+      "file": {
+        "path": "templates/libretranslate.yaml",
+        "sha256": "60fb00db417049707144431553d47f935772994dd56f351d4c838ca2d8fafe55"
+      },
+      "icon": {
+        "path": "icons/libretranslate.svg",
+        "sha256": "6b26795fb755ec545cc46a11162f89f2b1f98e07d405c84bde3122f8508e21a8"
+      },
+      "title": "LibreTranslate",
+      "tagline": "A machine translation API that runs on your own server, offline",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "libretranslate",
+        "translation",
+        "translate",
+        "machine translation",
+        "deepl alternative",
+        "google translate alternative",
+        "argos translate"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.9",
+          "release": "1.9.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "linkding",
       "file": {
         "path": "templates/linkding.yaml",
