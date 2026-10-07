@@ -1,0 +1,121 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dashy
+  title: Dashy
+  tagline: A start page for your services, with status checks, widgets and themes
+  description: |
+    Dashy puts the services you run on one page: links grouped into sections, a dot by each
+    that shows whether it is up, widgets for the weather, feeds and system stats, a search
+    across everything, and dozens of themes. The whole page is one YAML file, which you can
+    edit in Dashy's own config editor.
+
+    **This template creates one app**
+
+    - **Dashy**, with its configuration and the backups it makes of it on a volume
+
+    **Signing in**
+
+    With a user name below, the page asks for that user and the password before it shows your
+    dashboard: the browser's own sign-in prompt, checked by Dashy's server. The password is
+    under this app's Secrets; change it there and deploy to change it. Leave the user name
+    empty to make the dashboard public - then anyone who reaches the address can read it and
+    change its configuration.
+
+    **Configuration**
+
+    The first start writes Dashy's sample configuration to the volume. Edit it in the page
+    (the pencil, then **Edit Config**): it is saved back to the volume, and the previous
+    version is kept beside it under `config-backups`.
+  categories: [webapps/dev-tools]
+  tags: [dashboards, monitoring, open-source]
+  aliases: [dashy, dashboard, start page, homepage, homelab, launcher, bookmarks]
+  icon: icons/dashy.png
+  links:
+    website: https://dashy.to
+    documentation: https://dashy.to/docs
+    source: https://github.com/lissy93/dashy
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Dashy answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: loginUser
+    title: User name
+    description: >-
+      The user the page asks for. Leave it empty to make the dashboard public, its
+      configuration editable by anyone who reaches it.
+    type: string
+    default: admin
+    optional: true
+    pattern: '^[A-Za-z0-9@._-]{1,64}$'
+  - name: loginPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration and its backups are kept on.
+    type: volume
+
+versions:
+  - name: "4.7"
+    release: "4.7.19"
+    default: true
+    image: lissy93/dashy:4.7.19@sha256:0cad7b1dd9ca1712d12223bb0913723f922ff1ebf6f910bb5fcfbcb401e045e4
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # An empty volume is given the image's sample conf.yml on the first start.
+        /app/user-data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: node /app/services/healthcheck.js
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: dashy
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Both set, the server asks for them on the configuration and every endpoint;
+        # with the user name empty, Dashy runs with no sign-in at all.
+        - {k: BASIC_AUTH_USERNAME, v: "${{ params.loginUser }}"}
+        - {k: BASIC_AUTH_PASSWORD, v: "${secrets.LOGIN_PASSWORD}"}
+    secrets:
+      LOGIN_PASSWORD:
+        value: "${{ params.loginPassword }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

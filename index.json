@@ -2364,6 +2364,47 @@
       }
     },
     {
+      "name": "dashy",
+      "file": {
+        "path": "templates/dashy.yaml",
+        "sha256": "91e51cbf712b07ff329415e8438a0c05d1fbff518e62eacbe9a98389dae966b9"
+      },
+      "icon": {
+        "path": "icons/dashy.png",
+        "sha256": "5eb50fae178836622ba01784c9f410491f02f2017009b96c16900954923a002c"
+      },
+      "title": "Dashy",
+      "tagline": "A start page for your services, with status checks, widgets and themes",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "dashboards",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "dashy",
+        "dashboard",
+        "start page",
+        "homepage",
+        "homelab",
+        "launcher",
+        "bookmarks"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "4.7",
+          "release": "4.7.19",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "databend",
       "file": {
         "path": "templates/databend.yaml",
