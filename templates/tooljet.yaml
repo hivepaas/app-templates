@@ -1,0 +1,266 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: tooljet
+  title: ToolJet
+  tagline: Internal tools, dashboards and workflows built on your databases and APIs
+  description: |
+    ToolJet builds the apps a team runs on - admin panels, dashboards, approval tools - by
+    dragging tables, forms and charts onto a page and connecting them to PostgreSQL, MySQL,
+    MongoDB, REST and GraphQL APIs, Google Sheets, S3 and dozens of other sources. Queries
+    and JavaScript fill the gaps, workflows run steps on a schedule or a webhook, and the
+    ToolJet database gives an app its own tables without a server of your own.
+
+    **This template creates three apps**
+
+    - **ToolJet**, as two components:
+      - **app**, the editor, the apps you build and their API
+      - **rest**, PostgREST, which serves the ToolJet database's tables to the app
+    - **a PostgreSQL database**, named after the app with `-db` added, holding ToolJet's
+      own data and, in a second database it creates, the ToolJet database's tables
+
+    The database is the backup: ToolJet keeps nothing else.
+
+    **Signing in**
+
+    The super admin below, and its workspace, are created as soon as ToolJet first answers;
+    its password is under the app component's Secrets as `ADMIN_PASSWORD`, read only then.
+    Others join by invitation - sign-up is off - and invitations need email, set up under
+    *Settings > Email* or with the `SMTP_*` variables.
+
+    **x86-64 only, and large**
+
+    ToolJet publishes this image for `linux/amd64` alone, so it will not start on an ARM
+    server. The image is about 6GB, and the first start runs the migrations: allow some
+    minutes before it answers.
+  categories: [webapps/low-code]
+  tags: [low-code, automation, dashboards, open-source]
+  aliases: [tooljet, internal tools, admin panel, retool alternative, appsmith alternative, low-code, workflows]
+  icon: icons/tooljet.svg
+  links:
+    website: https://www.tooljet.com
+    documentation: https://docs.tooljet.com/docs/setup/docker
+    source: https://github.com/ToolJet/ToolJet
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address ToolJet answers at; links in its emails use it. Leave it empty only to add
+      one later, in the routing settings of the app component.
+    type: domain
+    optional: true
+  - name: adminName
+    title: Super admin's name
+    type: string
+    default: Admin
+    maxLength: 100
+  - name: adminEmail
+    title: Super admin's email
+    description: What the super admin signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Super admin's password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: workspaceName
+    title: First workspace
+    type: string
+    default: My workspace
+    maxLength: 100
+  - name: lockboxKey
+    title: Lockbox master key
+    description: >-
+      Encrypts the credentials of the data sources you connect, 64 hex characters. Leave
+      empty to generate one, and keep it with the backups: without it they cannot be read.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: secretKeyBase
+    title: Session secret
+    description: Signs sessions, 128 hex characters. Leave empty to generate one.
+    type: secret
+    minLength: 128
+    maxLength: 128
+    generate: {length: 128, charset: hex}
+  - name: jwtSecret
+    title: ToolJet database secret
+    description: Shared by the app and PostgREST. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: For the app component; about 900MB once it has started.
+    type: size
+    default: 2GB
+    min: 1GB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: tooljet
+      username: tooljet
+
+versions:
+  - name: "3.20"
+    release: "3.20.239-lts"
+    default: true
+    components:
+      app: {image: "tooljet/tooljet-ce:v3.20.239-lts"}
+      rest: {image: "postgrest/postgrest:v12.0.2"}
+
+components:
+  # ── App ────────────────────────────────────────────────────────────────
+  - name: app
+    title: App
+    primary: true
+    needs: [rest]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # The image's entrypoint starts its Redis, creates and migrates the databases,
+          # then runs this: the server, and beside it the script that makes the super admin.
+          # TOOLJET_HOST is needed even while the app has no domain.
+          command: >-
+            bash -c '[ -n "$TOOLJET_HOST" ] || export TOOLJET_HOST=http://localhost:3000;
+            node /hivepaas/bootstrap.mjs & exec npm run start:prod'
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fs -o /dev/null http://127.0.0.1:3000/api/health
+            interval: 30s
+            timeout: 10s
+            # The first start runs the migrations.
+            startPeriod: 600s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: tooljet, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: TOOLJET_HOST, v: "${HIVEPAAS_APP_URL}"}
+            - {k: PORT, v: "3000"}
+            - {k: SERVE_CLIENT, v: "true"}
+            - {k: LOCKBOX_MASTER_KEY, v: "${secrets.LOCKBOX_MASTER_KEY}"}
+            - {k: SECRET_KEY_BASE, v: "${secrets.SECRET_KEY_BASE}"}
+            - {k: PG_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: PG_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: PG_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: PG_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: PG_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            # The ToolJet database: a second database on the same server, created at start.
+            - {k: TOOLJET_DB, v: tooljet_db}
+            - {k: TOOLJET_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: TOOLJET_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: TOOLJET_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: TOOLJET_DB_PASS, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: PGRST_HOST, v: "http://${{ comp.rest.key }}:3000"}
+            - {k: PGRST_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - {k: PGRST_DB_PRE_CONFIG, v: postgrest.pre_config}
+            - {k: DEPLOYMENT_PLATFORM, v: docker}
+            - {k: DISABLE_TOOLJET_TELEMETRY, v: "true"}
+            - {k: HIVEPAAS_ADMIN_NAME, v: "${{ params.adminName }}"}
+            - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+            - {k: HIVEPAAS_WORKSPACE_NAME, v: "${{ params.workspaceName }}"}
+        secrets:
+          LOCKBOX_MASTER_KEY:
+            value: "${{ params.lockboxKey }}"
+          SECRET_KEY_BASE:
+            value: "${{ params.secretKeyBase }}"
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+        configFiles:
+          bootstrap.mjs:
+            content: |
+              // As soon as ToolJet answers, the super admin and its workspace, from the values
+              // above. Until there is one, ToolJet hands that role to whoever opens it first;
+              // once there is, it refuses this, and the script ends.
+              const base = "http://127.0.0.1:" + process.env.PORT;
+              const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+              for (;;) {
+                try {
+                  if ((await fetch(base + "/api/health")).ok) break;
+                } catch {}
+                await sleep(1000);
+              }
+              const res = await fetch(base + "/api/onboarding/setup-super-admin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: process.env.HIVEPAAS_ADMIN_NAME,
+                  email: process.env.HIVEPAAS_ADMIN_EMAIL,
+                  password: process.env.HIVEPAAS_ADMIN_PASSWORD,
+                  workspaceName: process.env.HIVEPAAS_WORKSPACE_NAME,
+                }),
+              });
+              console.log(
+                res.ok
+                  ? "hivepaas: super admin created"
+                  : "hivepaas: super admin not created, ToolJet answered " + res.status,
+              );
+            swarmRef:
+              file: {name: /hivepaas/bootstrap.mjs, mode: 444}
+        routing:
+          port: 3000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── PostgREST ──────────────────────────────────────────────────────────
+  - name: rest
+    title: PostgREST
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # No HTTP client in the image: bash asks the admin server whether it is ready.
+            command: >-
+              bash -c 'exec 3<>/dev/tcp/127.0.0.1/3001; printf "GET /ready HTTP/1.0\r\n\r\n" >&3;
+              head -1 <&3 | grep -q " 200"'
+            interval: 30s
+            timeout: 5s
+            # It waits for the app to create the ToolJet database.
+            startPeriod: 600s
+            retries: 3
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: tooljet, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - k: PGRST_DB_URI
+              v: >-
+                postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/tooljet_db
+            - {k: PGRST_DB_PRE_CONFIG, v: postgrest.pre_config}
+            - {k: PGRST_SERVER_PORT, v: "3000"}
+            - {k: PGRST_ADMIN_SERVER_PORT, v: "3001"}
+            - {k: PGRST_JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        secrets:
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"

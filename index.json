@@ -14114,6 +14114,66 @@
       }
     },
     {
+      "name": "tooljet",
+      "file": {
+        "path": "templates/tooljet.yaml",
+        "sha256": "d9ea0568b9c44beb21610e89542c504393d17e7feced2ab8c16ab4c486958d9b"
+      },
+      "icon": {
+        "path": "icons/tooljet.svg",
+        "sha256": "86d1e3e225d7eeb9510aa4f26cbdd458a7b8584825fc7bfe37dd52d679582770"
+      },
+      "title": "ToolJet",
+      "tagline": "Internal tools, dashboards and workflows built on your databases and APIs",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "automation",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "tooljet",
+        "internal tools",
+        "admin panel",
+        "retool alternative",
+        "appsmith alternative",
+        "low-code",
+        "workflows"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "components": [
+        {
+          "name": "app",
+          "title": "App",
+          "primary": true
+        },
+        {
+          "name": "rest",
+          "title": "PostgREST"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.20",
+          "release": "3.20.239-lts",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "traccar",
       "file": {
         "path": "templates/traccar.yaml",
