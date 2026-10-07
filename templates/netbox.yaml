@@ -1,0 +1,254 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: netbox
+  title: NetBox
+  tagline: The source of truth for your network - racks, devices, cables, IP addresses
+  description: |
+    NetBox models a network as it should be: sites and racks, the devices in them and their
+    interfaces, the cables between them, circuits from providers, and the IP space - prefixes,
+    addresses, VLANs and VRFs - with who uses what. Automation tools read and write it through
+    its REST and GraphQL APIs, webhooks tell them when something changed, and custom scripts
+    run inside it.
+
+    **This template creates three apps**
+
+    - **NetBox**, as two components sharing a volume for uploaded images, attachments and
+      custom scripts:
+      - **web**, the interface and the API
+      - **worker**, which runs scripts, webhooks, data syncs and housekeeping in the
+        background
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Valkey**, named after the app with `-redis` added, holding the task queue and the
+      cache
+
+    The database and the volume together are the backup.
+
+    **Signing in**
+
+    The superuser below is created on the first start; its password is under the web
+    component's Secrets as `SUPERUSER_PASSWORD`, read only then. Everything needs a sign-in;
+    add people under *Admin > Users*.
+
+    **Two keys it is created with**
+
+    The secret key signs sessions; the API token pepper protects the API tokens people
+    create. Both are under the components' Secrets - keep them with the backup: without the
+    pepper, every API token stops working.
+  categories: [webapps/networking]
+  tags: [networking, documents, open-source]
+  aliases: [netbox, ipam, dcim, network documentation, source of truth, racks, ip address management]
+  icon: icons/netbox.svg
+  links:
+    website: https://netboxlabs.com/oss/netbox/
+    documentation: https://netboxlabs.com/docs/netbox/
+    source: https://github.com/netbox-community/netbox
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address NetBox answers at. Leave it empty to add one later, in the routing settings
+      of the web component.
+    type: domain
+    optional: true
+  - name: superuserName
+    title: Superuser name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@.+_-]{1,150}$'
+  - name: superuserEmail
+    title: Superuser email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: superuserPassword
+    title: Superuser password
+    description: What the superuser signs in with the first time. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: Signs sessions, 50 characters or more. Leave empty to generate one.
+    type: secret
+    minLength: 50
+    generate: {length: 64}
+  - name: tokenPepper
+    title: API token pepper
+    description: >-
+      Protects the API tokens, 50 characters or more. Leave empty to generate one, and keep
+      it with the backups.
+    type: secret
+    minLength: 50
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: For the web component; about 1GB once it has started.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded images, attachments and custom scripts are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: netbox
+      username: netbox
+  - name: redis
+    title: Queue and cache
+    template: valkey
+    version: "9.1"
+    params:
+      # The task queue lives here too: nothing may be evicted.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "4.7"
+    release: "4.7.2"
+    default: true
+    components:
+      web: {image: "netboxcommunity/netbox:v4.7.2-5.1.1"}
+      worker: {image: "netboxcommunity/netbox:v4.7.2-5.1.1"}
+
+components:
+  # ── Web ────────────────────────────────────────────────────────────────
+  - name: web
+    title: Web
+    primary: true
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /opt/netbox/netbox/media:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: media}
+            /opt/netbox/netbox/scripts:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: scripts}
+            /opt/netbox/netbox/reports:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: reports}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: /opt/netbox/health.sh
+            interval: 30s
+            timeout: 5s
+            # Every start runs the migrations first; the first one creates the schema.
+            startPeriod: 300s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: netbox, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_DATABASE, v: "0"}
+            - {k: REDIS_CACHE_DATABASE, v: "1"}
+            - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - {k: API_TOKEN_PEPPER_1, v: "${secrets.API_TOKEN_PEPPER}"}
+            # Behind the proxy, the sign-in form is posted from the HTTPS address.
+            - {k: CSRF_TRUSTED_ORIGINS, v: "${HIVEPAAS_APP_URL}"}
+            - {k: CENSUS_REPORTING_ENABLED, v: "false"}
+            - {k: SKIP_SUPERUSER, v: "false"}
+            - {k: SUPERUSER_NAME, v: "${{ params.superuserName }}"}
+            - {k: SUPERUSER_EMAIL, v: "${{ params.superuserEmail }}"}
+            - {k: SUPERUSER_PASSWORD, v: "${secrets.SUPERUSER_PASSWORD}"}
+        secrets:
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+          API_TOKEN_PEPPER:
+            value: "${{ params.tokenPepper }}"
+          SUPERUSER_PASSWORD:
+            value: "${{ params.superuserPassword }}"
+        routing:
+          port: 8080
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Worker ─────────────────────────────────────────────────────────────
+  - name: worker
+    title: Worker
+    needs: [web]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Only the queue worker: the web component migrates the database.
+          command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker
+        storage:
+          mounts:
+            /opt/netbox/netbox/media:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: media}
+            /opt/netbox/netbox/scripts:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: scripts}
+            /opt/netbox/netbox/reports:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: reports}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # It serves nothing to ask: is the worker still running?
+            command: ps aux | grep -v grep | grep -q rqworker
+            interval: 30s
+            timeout: 5s
+            startPeriod: 60s
+            retries: 3
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: netbox, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_DATABASE, v: "0"}
+            - {k: REDIS_CACHE_DATABASE, v: "1"}
+            - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+            - {k: API_TOKEN_PEPPER_1, v: "${secrets.API_TOKEN_PEPPER}"}
+            - {k: CENSUS_REPORTING_ENABLED, v: "false"}
+        secrets:
+          SECRET_KEY:
+            value: "${{ params.secretKey }}"
+          API_TOKEN_PEPPER:
+            value: "${{ params.tokenPepper }}"

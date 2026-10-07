@@ -9437,6 +9437,70 @@
       }
     },
     {
+      "name": "netbox",
+      "file": {
+        "path": "templates/netbox.yaml",
+        "sha256": "50e151889e72d638e272a315abddf507b9a3808444cf226788cb6cfe3c06808a"
+      },
+      "icon": {
+        "path": "icons/netbox.svg",
+        "sha256": "0b115212c5826066af71bd0995eea4883a6f6189617d94826ab7d72494326af4"
+      },
+      "title": "NetBox",
+      "tagline": "The source of truth for your network - racks, devices, cables, IP addresses",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "netbox",
+        "ipam",
+        "dcim",
+        "network documentation",
+        "source of truth",
+        "racks",
+        "ip address management"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Queue and cache",
+          "template": "valkey"
+        }
+      ],
+      "components": [
+        {
+          "name": "web",
+          "title": "Web",
+          "primary": true
+        },
+        {
+          "name": "worker",
+          "title": "Worker"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.7",
+          "release": "4.7.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "nextcloud",
       "file": {
         "path": "templates/nextcloud.yaml",
