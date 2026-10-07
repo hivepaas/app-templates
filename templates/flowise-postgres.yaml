@@ -85,9 +85,9 @@ versions:
   # failing to load ("Package subpath './utils/uuid' is not defined by exports") and the
   # process exiting. Checked on this exact image, both architectures published.
   - name: "3.1"
-    release: "3.1.2"
+    release: "3.1.4"
     default: true
-    image: flowiseai/flowise:3.1.2
+    image: flowiseai/flowise:3.1.4
 
 app:
   deployment:

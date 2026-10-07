@@ -48,9 +48,9 @@ parameters:
 
 versions:
   - name: "2026.9"
-    release: "2026.9.0"
+    release: "2026.9.1"
     default: true
-    image: ghcr.io/esphome/esphome:2026.9.0
+    image: ghcr.io/esphome/esphome:2026.9.1
 
 app:
   deployment:

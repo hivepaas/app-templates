@@ -84,9 +84,9 @@ dependencies:
 
 versions:
   - name: "26.7"
-    release: "26.7.4"
+    release: "26.7.5"
     default: true
-    image: quay.io/keycloak/keycloak:26.7.4
+    image: quay.io/keycloak/keycloak:26.7.5-0
 
 app:
   deployment:

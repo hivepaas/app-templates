@@ -77,9 +77,9 @@ parameters:
 
 versions:
   - name: "6.10"
-    release: "6.10.3"
+    release: "6.10.5"
     default: true
-    image: verdaccio/verdaccio:6.10.3
+    image: verdaccio/verdaccio:6.10.5
 
 app:
   deployment:

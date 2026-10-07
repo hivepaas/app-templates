@@ -63,9 +63,9 @@ parameters:
 
 versions:
   - name: "1.2"
-    release: "1.2.947"
+    release: "1.2.951"
     default: true
-    image: datafuselabs/databend:v1.2.947-nightly
+    image: datafuselabs/databend:v1.2.951-nightly
 
 app:
   deployment:

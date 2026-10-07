@@ -88,9 +88,9 @@ parameters:
 
 versions:
   - name: "0.9"
-    release: "0.9.73"
+    release: "0.9.74rc16"
     default: true
-    image: archivebox/archivebox:0.9.73
+    image: archivebox/archivebox:0.9.74rc16
 
 app:
   deployment:

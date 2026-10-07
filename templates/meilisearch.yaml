@@ -53,9 +53,9 @@ parameters:
 
 versions:
   - name: "1.53"
-    release: "1.53.2"
+    release: "1.53.3"
     default: true
-    image: getmeili/meilisearch:v1.53.2
+    image: getmeili/meilisearch:v1.53.3
 
 app:
   deployment:

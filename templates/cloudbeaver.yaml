@@ -65,12 +65,12 @@ parameters:
 
 versions:
   - name: "26.2"
-    release: "26.2.0"
+    release: "26.2.2"
     default: true
-    image: dbeaver/cloudbeaver:26.2.0
+    image: dbeaver/cloudbeaver:26.2.2
   - name: "25.3"
-    release: "25.3.0"
-    image: dbeaver/cloudbeaver:25.3.0
+    release: "25.3.5"
+    image: dbeaver/cloudbeaver:25.3.5
 
 app:
   deployment:

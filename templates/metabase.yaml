@@ -65,9 +65,9 @@ dependencies:
 
 versions:
   - name: "0.63"
-    release: "0.63.18"
+    release: "0.63.19.3"
     default: true
-    image: metabase/metabase:v0.63.18
+    image: metabase/metabase:v0.63.19.3
 
 app:
   deployment:

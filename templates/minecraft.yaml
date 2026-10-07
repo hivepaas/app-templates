@@ -118,11 +118,11 @@ parameters:
 
 versions:
   - name: "2026.9"
-    release: "2026.9.1"
+    release: "2026.9.2"
     default: true
     # Java 25: Minecraft 26.1 and later refuse anything older, and it runs the
     # older releases too.
-    image: itzg/minecraft-server:2026.9.1-java25
+    image: itzg/minecraft-server:2026.9.2-java8
 
 app:
   deployment:

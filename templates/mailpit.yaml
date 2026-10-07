@@ -85,9 +85,9 @@ parameters:
 
 versions:
   - name: "1.31"
-    release: "1.31.1"
+    release: "1.31.4"
     default: true
-    image: axllent/mailpit:v1.31.1
+    image: axllent/mailpit:v1.31.4
 
 app:
   deployment:

@@ -78,9 +78,9 @@ parameters:
 
 versions:
   - name: "3.8"
-    release: "3.8.0.0"
+    release: "3.8.1.1"
     default: true
-    image: tomsquest/docker-radicale:3.8.0.0
+    image: tomsquest/docker-radicale:3.8.1.1
 
 app:
   deployment:

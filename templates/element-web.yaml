@@ -62,9 +62,9 @@ parameters:
 
 versions:
   - name: "1.12"
-    release: "1.12.28"
+    release: "1.12.30"
     default: true
-    image: vectorim/element-web:v1.12.28
+    image: vectorim/element-web:v1.12.30
 
 app:
   deployment:

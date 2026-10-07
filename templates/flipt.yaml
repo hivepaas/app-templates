@@ -114,9 +114,9 @@ parameters:
 
 versions:
   - name: "2.13"
-    release: "2.13.0"
+    release: "2.13.1"
     default: true
-    image: flipt/flipt:v2.13.0
+    image: flipt/flipt:v2.13.1
 
 app:
   deployment:

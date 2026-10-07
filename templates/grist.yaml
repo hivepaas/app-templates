@@ -85,9 +85,9 @@ parameters:
 
 versions:
   - name: "1.7"
-    release: "1.7.6"
+    release: "1.7.20"
     default: true
-    image: gristlabs/grist-oss:1.7.6
+    image: gristlabs/grist-oss:1.7.20
 
 app:
   deployment:

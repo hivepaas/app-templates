@@ -120,9 +120,9 @@ dependencies:
 
 versions:
   - name: "4.15"
-    release: "4.15.2"
+    release: "4.15.4"
     default: true
-    image: lukevella/rallly:4.15.2
+    image: lukevella/rallly:4.15.4
 
 app:
   deployment:

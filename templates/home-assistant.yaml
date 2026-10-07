@@ -90,9 +90,9 @@ parameters:
 
 versions:
   - name: "2026.9"
-    release: "2026.9.3"
+    release: "2026.9.4"
     default: true
-    image: ghcr.io/home-assistant/home-assistant:2026.9.3
+    image: ghcr.io/home-assistant/home-assistant:2026.9.4
 
 app:
   deployment:

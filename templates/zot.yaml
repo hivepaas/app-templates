@@ -77,9 +77,9 @@ parameters:
 
 versions:
   - name: "2.1"
-    release: "2.1.21"
+    release: "2.1.22"
     default: true
-    image: ghcr.io/project-zot/zot:v2.1.21
+    image: ghcr.io/project-zot/zot:v2.1.22
 
 app:
   deployment:

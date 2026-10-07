@@ -95,9 +95,9 @@ dependencies:
 
 versions:
   - name: "2.2"
-    release: "2.2.16"
+    release: "2.2.21"
     default: true
-    image: nocobase/nocobase:2.2.16
+    image: nocobase/nocobase:2.2.21
 
 app:
   deployment:

@@ -117,9 +117,9 @@ parameters:
 
 versions:
   - name: "8.10"
-    release: "8.10.1"
+    release: "8.10.2"
     default: true
-    image: redis:8.10.1-alpine3.23
+    image: redis:8.10.2-alpine3.23
   - name: "7.4"
     release: "7.4.11"
     image: redis:7.4.11-alpine3.21

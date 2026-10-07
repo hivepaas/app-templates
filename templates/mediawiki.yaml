@@ -123,9 +123,9 @@ dependencies:
 
 versions:
   - name: "1.46"
-    release: "1.46.0"
+    release: "1.46.2"
     default: true
-    image: mediawiki:1.46.0
+    image: mediawiki:1.46.2
 
 app:
   deployment:

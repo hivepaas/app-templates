@@ -85,9 +85,9 @@ parameters:
 
 versions:
   - name: "0.30"
-    release: "0.30.0"
+    release: "0.30.4"
     default: true
-    image: ghcr.io/muchobien/pocketbase:0.30.0
+    image: ghcr.io/muchobien/pocketbase:0.30.4
 
 app:
   deployment:

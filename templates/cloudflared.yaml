@@ -78,9 +78,9 @@ parameters:
 
 versions:
   - name: "2026.8"
-    release: "2026.8.1"
+    release: "2026.8.3"
     default: true
-    image: cloudflare/cloudflared:2026.8.1
+    image: cloudflare/cloudflared:2026.8.3
 
 app:
   deployment:

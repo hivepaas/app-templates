@@ -79,9 +79,9 @@ parameters:
 
 versions:
   - name: "6.4"
-    release: "6.4.4"
+    release: "6.4.5"
     default: true
-    image: crate:6.4.4
+    image: crate:6.4.5
 
 app:
   deployment:
