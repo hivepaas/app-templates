@@ -1,0 +1,132 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: cap
+  title: Cap
+  tagline: A self-hosted CAPTCHA that asks the browser for work, not the user for puzzles
+  description: |
+    Cap protects your forms from bots without image puzzles: the visitor's browser solves a
+    small proof-of-work, and the page checks it on your server, with optional checks that
+    catch headless browsers. No tracking and no third party - the widget talks only to the
+    Cap you run here. Its `siteverify` API works the way reCAPTCHA's does, so swapping it in
+    is a small change.
+
+    **This template creates two apps**
+
+    - **Cap Standalone**, the API the widget talks to and a dashboard for site keys and
+      their statistics
+    - **a Valkey store**, named after the app with `-cache` added, where Cap keeps its keys,
+      challenges and statistics - it is the backup
+
+    **Using it**
+
+    Sign in to the dashboard with the admin key below, which is under this app's Secrets,
+    and create a site key. On your page, point the widget at
+    `https://<this app's domain>/<site key>/`; on your server, check each token by posting
+    it with the key's secret to `https://<this app's domain>/<site key>/siteverify` - or,
+    from an app in this project, `http://<this app's key>:3000/<site key>/siteverify`.
+
+    The widget has to reach Cap from your visitors' browsers, so give it a domain.
+  categories: [webapps/security, webapps/dev-tools]
+  tags: [privacy, open-source]
+  aliases: [cap, captcha, recaptcha alternative, hcaptcha alternative, turnstile alternative, bot protection, proof of work]
+  icon: icons/cap.png
+  links:
+    website: https://capjs.js.org
+    documentation: https://capjs.js.org/guide/standalone/
+    source: https://github.com/tiagozip/cap
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the widget and the dashboard reach Cap at. Leave it empty only to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminKey
+    title: Admin key
+    description: The dashboard's sign-in, 32 characters or more. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: corsOrigin
+    title: Allowed origins
+    description: >-
+      The sites whose pages may use this Cap, comma separated, such as
+      https://example.com. * allows any.
+    type: string
+    default: "*"
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+dependencies:
+  - name: cache
+    title: Store
+    template: valkey
+    version: "9.1"
+    params:
+      # It holds the site keys and their secrets, not a cache: Valkey refuses writes when
+      # it is full rather than evict one.
+      evictionPolicy: noeviction
+
+versions:
+  - name: "3.1"
+    release: "3.1.14"
+    default: true
+    image: tiago2/cap:3.1.14@sha256:8a83e06c4fde9ada7cfe15528c79885bbdfdf886863fd97c02666e40014cfa9c
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD
+        command: bun /hivepaas/health.js
+        interval: 30s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: cap
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ADMIN_KEY, v: "${secrets.ADMIN_KEY}"}
+        - k: REDIS_URL
+          v: >-
+            redis://:${{ deps.cache.ref.HIVEPAAS_PASSWORD }}@${{ deps.cache.ref.HIVEPAAS_HOST }}:${{
+            deps.cache.ref.HIVEPAAS_PORT }}
+        - {k: CORS_ORIGIN, v: "${{ params.corsOrigin }}"}
+    secrets:
+      ADMIN_KEY:
+        value: "${{ params.adminKey }}"
+    configFiles:
+      health.js:
+        content: |
+          // The image has no shell, so the health check is this, run by Bun. /health/live answers
+          // while Cap runs even if Valkey does not, so an outage there does not restart Cap too.
+          const res = await fetch('http://127.0.0.1:3000/health/live').catch(() => null);
+          process.exit(res?.ok ? 0 : 1);
+        swarmRef:
+          file: {name: /hivepaas/health.js, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -1875,6 +1875,54 @@
       }
     },
     {
+      "name": "cap",
+      "file": {
+        "path": "templates/cap.yaml",
+        "sha256": "0ed397d8de8d8321540a3f748670cb6119190850f5b070f35cee3473e3abedfb"
+      },
+      "icon": {
+        "path": "icons/cap.png",
+        "sha256": "6fa3264ee850131a8acd68a7a313b7878f00b5e67b854c3eb4377e9f5d869d5d"
+      },
+      "title": "Cap",
+      "tagline": "A self-hosted CAPTCHA that asks the browser for work, not the user for puzzles",
+      "categories": [
+        "webapps/security",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "cap",
+        "captcha",
+        "recaptcha alternative",
+        "hcaptcha alternative",
+        "turnstile alternative",
+        "bot protection",
+        "proof of work"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "cache",
+          "title": "Store",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.14",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "changedetection",
       "file": {
         "path": "templates/changedetection.yaml",
