@@ -1,0 +1,208 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: monica
+  title: Monica
+  tagline: A personal CRM - remember the people you care about, and when to call them
+  description: |
+    Monica keeps what you know about the people in your life: how you met, their family and
+    pets, gifts given and received, debts, conversations and activities you shared, and the
+    dates that matter. Reminders tell you when a birthday is coming or when you have not
+    talked to someone in a while.
+
+    **This template creates two apps**
+
+    - **Monica**, with its storage - photos, documents, sessions and its signing keys - on a volume
+    - **a MariaDB database**, named after the app with `-db` added
+
+    The database and the volume together are the backup.
+
+    **The first account**
+
+    Open Monica and register: the first account is created even with sign-up closed. After
+    it, sign-up stays closed while **Close sign-up** is on, so nobody else can make an
+    account on your server.
+
+    **Reminders**
+
+    Reminders are sent by Monica's scheduler, which runs inside the same app. They arrive by
+    email, so set up SMTP below or later under the app's environment variables.
+
+    **Two keys it is created with**
+
+    The application key encrypts sessions and stored data, the hash salt the identifiers
+    Monica shows in links. Both are under this app's Secrets; keep them with the backup.
+  categories: [webapps/business]
+  tags: [collaboration, privacy, open-source]
+  aliases: [monica, personal crm, crm, contacts, relationships, birthdays, reminders]
+  icon: icons/monica.svg
+  links:
+    website: https://www.monicahq.com
+    documentation: https://github.com/monicahq/monica/tree/4.x/docs
+    source: https://github.com/monicahq/monica
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Monica answers at. Links in reminder emails use it: leave it empty only to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: closeSignup
+    title: Close sign-up
+    description: >-
+      On, only the first account can be made. Turn it off to let anyone who reaches the
+      address create an account.
+    type: bool
+    default: true
+  - name: appKey
+    title: Application key
+    description: Encrypts sessions and stored data, 32 characters. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: hashSalt
+    title: Hash salt
+    description: Salts the identifiers in links, 20 characters or more. Leave empty to generate one.
+    type: secret
+    minLength: 20
+    generate: {length: 32}
+  - name: smtpHost
+    title: SMTP host
+    description: For reminders and invitations. Leave empty to send no email.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpEncryption
+    title: SMTP encryption
+    type: select
+    default: tls
+    options:
+      - {value: tls, title: "STARTTLS (usually port 587)"}
+      - {value: ssl, title: "TLS from the first byte (usually port 465)"}
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: mailFrom
+    title: Sender address
+    description: The address reminders come from.
+    type: string
+    default: monica@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Storage volume
+    description: The volume photos, documents, sessions and the signing keys are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: monica
+      username: monica
+
+versions:
+  - name: "4.1"
+    release: "4.1.2"
+    default: true
+    image: monica:4.1.2-apache
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entrypoint migrates the database before a command starting with
+      # "apache"; this one also starts the scheduler. See its file.
+      command: apache2-with-cron
+    storage:
+      mounts:
+        /var/www/html/storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1/login
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema.
+        startPeriod: 300s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: monica
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_ENV, v: production}
+        - {k: APP_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        - {k: HASH_SALT, v: "${secrets.HASH_SALT}"}
+        # Behind the proxy, which says the request came in over HTTPS.
+        - {k: APP_TRUSTED_PROXIES, v: "*"}
+        - {k: APP_DISABLE_SIGNUP, v: "${{ params.closeSignup }}"}
+        - {k: LOG_CHANNEL, v: stderr}
+        - {k: DB_CONNECTION, v: mysql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: MAIL_MAILER, v: smtp}
+        - {k: MAIL_HOST, v: "${{ params.smtpHost }}"}
+        - {k: MAIL_PORT, v: "${{ params.smtpPort }}"}
+        - {k: MAIL_ENCRYPTION, v: "${{ params.smtpEncryption }}"}
+        - {k: MAIL_USERNAME, v: "${{ params.smtpUser }}"}
+        - {k: MAIL_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: MAIL_FROM_ADDRESS, v: "${{ params.mailFrom }}"}
+        - {k: MAIL_FROM_NAME, v: Monica}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+      HASH_SALT:
+        value: "${{ params.hashSalt }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    configFiles:
+      apache2-with-cron:
+        content: |
+          #!/bin/sh
+          # Monica's scheduler - reminders, and the emails they send - runs beside the web
+          # server, as the image's cron.sh would in a container of its own. Its crontab runs
+          # `artisan schedule:run` every minute.
+          busybox crond -l 2 -L /dev/stderr
+          exec apache2-foreground
+        swarmRef:
+          file: {name: /usr/local/bin/apache2-with-cron, mode: 555}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

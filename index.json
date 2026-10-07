@@ -8596,6 +8596,54 @@
       }
     },
     {
+      "name": "monica",
+      "file": {
+        "path": "templates/monica.yaml",
+        "sha256": "a0ccf0153ba82b8600bf665e5b775edab17c5f069f295889f54b98fdd2dadb1c"
+      },
+      "icon": {
+        "path": "icons/monica.svg",
+        "sha256": "2c3ad3c583a1aeabf7d20bca311d2ad4be72aa9a26ee4681cec2ef0773e63559"
+      },
+      "title": "Monica",
+      "tagline": "A personal CRM - remember the people you care about, and when to call them",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "collaboration",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "monica",
+        "personal crm",
+        "crm",
+        "contacts",
+        "relationships",
+        "birthdays",
+        "reminders"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.1",
+          "release": "4.1.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "moodle",
       "file": {
         "path": "templates/moodle.yaml",
