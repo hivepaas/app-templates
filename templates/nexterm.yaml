@@ -1,0 +1,181 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: nexterm
+  title: Nexterm
+  tagline: SSH, RDP and VNC to your servers from a browser, with files and Proxmox too
+  description: |
+    Nexterm opens your servers in the browser: SSH terminals, RDP and VNC desktops, and
+    their files over SFTP, from a list of servers organized in folders and shared between
+    people through organizations. It keeps identities and keys encrypted, runs snippets and
+    scripts on several servers at once, manages Proxmox containers and VMs, and signs in
+    with two-factor authentication or OIDC.
+
+    **What this template creates**
+
+    One app - the server, the web client and the engine that makes the connections - with
+    its database, keys and logs on a volume. The volume is the backup.
+
+    **Signing in**
+
+    The administrator below is created as soon as Nexterm first answers; its password is
+    under this app's Secrets as `ADMIN_PASSWORD`, read only then. Self-registration stays
+    off until an administrator turns it on.
+
+    **The encryption key**
+
+    Passwords, keys and passphrases are encrypted with it. It is under this app's Secrets
+    as `ENCRYPTION_KEY`; keep it with the backup, or they cannot be read.
+
+    **A beta**
+
+    Nexterm calls this release a beta.
+  categories: [webapps/networking, webapps/dev-tools]
+  tags: [networking, open-source]
+  aliases: [nexterm, ssh, rdp, vnc, web terminal, sftp, guacamole alternative, termius alternative]
+  icon: icons/nexterm.svg
+  links:
+    website: https://nexterm.dev
+    documentation: https://docs.nexterm.dev
+    source: https://github.com/gnmyt/Nexterm
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Nexterm answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    description: 3 to 15 letters and digits.
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9]{3,15}$'
+  - name: adminFirstName
+    title: Administrator first name
+    type: string
+    default: Admin
+    maxLength: 50
+  - name: adminLastName
+    title: Administrator last name
+    type: string
+    default: User
+    maxLength: 50
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: encryptionKey
+    title: Encryption key
+    description: 64 hex characters. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 64
+    maxLength: 64
+    generate: {length: 64, charset: hex}
+  - name: memoryLimit
+    title: Memory limit
+    description: About 100MB at rest; each open desktop session takes more.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database, keys and logs are kept on.
+    type: volume
+
+versions:
+  - name: "1.2"
+    release: "1.2.2-BETA"
+    default: true
+    image: nexterm/aio:1.2.2-BETA
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own start, with the script that makes the administrator beside it.
+      command: sh -c 'node /hivepaas/create-admin.mjs & exec /bin/sh docker-start.sh'
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:6989/api/service/is-fts
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: nexterm
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_FIRST_NAME, v: "${{ params.adminFirstName }}"}
+        - {k: HIVEPAAS_ADMIN_LAST_NAME, v: "${{ params.adminLastName }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ENCRYPTION_KEY:
+        value: "${{ params.encryptionKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      create-admin.mjs:
+        content: |
+          // Once Nexterm answers, its administrator, from the values above. Until there is
+          // one, its first-time setup lets whoever opens it first make it; once there is,
+          // this does nothing.
+          const api = 'http://127.0.0.1:6989/api';
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          let fts;
+          for (;;) {
+            try {
+              const res = await fetch(api + '/service/is-fts');
+              if (res.ok) {
+                fts = await res.json();
+                break;
+              }
+            } catch {}
+            await sleep(1000);
+          }
+          if (fts !== true) {
+            console.log('hivepaas: no administrator created: there is one already');
+          } else {
+            const res = await fetch(api + '/accounts/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                username: process.env.HIVEPAAS_ADMIN_USER,
+                password: process.env.HIVEPAAS_ADMIN_PASSWORD,
+                firstName: process.env.HIVEPAAS_ADMIN_FIRST_NAME,
+                lastName: process.env.HIVEPAAS_ADMIN_LAST_NAME,
+              }),
+            });
+            console.log(res.ok
+              ? 'hivepaas: administrator ' + process.env.HIVEPAAS_ADMIN_USER + ' created'
+              : 'hivepaas: creating the administrator failed: ' + res.status + ' ' + (await res.text()));
+          }
+        swarmRef:
+          file: {name: /hivepaas/create-admin.mjs, mode: 444}
+    routing:
+      port: 6989
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

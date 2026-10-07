@@ -9720,6 +9720,48 @@
       }
     },
     {
+      "name": "nexterm",
+      "file": {
+        "path": "templates/nexterm.yaml",
+        "sha256": "0c7b0a864340c63572f562736f63b67f0c28d2b871a36ef551f1b579f27c5d1a"
+      },
+      "icon": {
+        "path": "icons/nexterm.svg",
+        "sha256": "cc15bb1414d93e017670deae205d98f1efd95481d1095332ce0bf3f107fd5885"
+      },
+      "title": "Nexterm",
+      "tagline": "SSH, RDP and VNC to your servers from a browser, with files and Proxmox too",
+      "categories": [
+        "webapps/networking",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "networking",
+        "open-source"
+      ],
+      "aliases": [
+        "nexterm",
+        "ssh",
+        "rdp",
+        "vnc",
+        "web terminal",
+        "sftp",
+        "guacamole alternative",
+        "termius alternative"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "1.2",
+          "release": "1.2.2-BETA",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "nocobase",
       "file": {
         "path": "templates/nocobase.yaml",
