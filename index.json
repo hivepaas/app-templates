@@ -1001,6 +1001,49 @@
       }
     },
     {
+      "name": "archivebox",
+      "file": {
+        "path": "templates/archivebox.yaml",
+        "sha256": "dcb20c5f84abb59d2d98b6361c71d858b658f071627b7df8a3b1d30d5614fdc7"
+      },
+      "icon": {
+        "path": "icons/archivebox.svg",
+        "sha256": "0cbfd74c84a146ed63b5f016fbb4c2db1a7cfd9f609b503ea231e7acadb094f4"
+      },
+      "title": "ArchiveBox",
+      "tagline": "Your own web archive - save pages, articles and videos before they disappear",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "search",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "archivebox",
+        "web archive",
+        "archive",
+        "wayback machine",
+        "bookmarks",
+        "read later",
+        "pocket alternative",
+        "warc"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "0.9",
+          "release": "0.9.73",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "audiobookshelf",
       "file": {
         "path": "templates/audiobookshelf.yaml",

@@ -1,0 +1,165 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: archivebox
+  title: ArchiveBox
+  tagline: Your own web archive - save pages, articles and videos before they disappear
+  description: |
+    ArchiveBox saves a copy of every page you give it, in formats that will still open in
+    twenty years: the page as a single HTML file, a PDF, a screenshot, a WARC, the readable
+    article text, and the media and git repositories it links to. Add a link, a list of
+    links or your browser bookmarks, then search the full text of everything saved.
+
+    **What this template creates**
+
+    One app, with the collection - its index, every snapshot and the search index - on a
+    volume. The volume is the backup; give it room, as a page with its media can take
+    tens of megabytes.
+
+    **Signing in**
+
+    The administrator account below is created on the first start. Its password is under
+    this app's Secrets as `ADMIN_PASSWORD`; it is read only that once, so change the
+    password later in ArchiveBox itself.
+
+    **Who can see what you saved**
+
+    **Who can see snapshots** sets the default for new snapshots: only you after signing in,
+    anyone with a snapshot's link, or everyone, with the list of snapshots shown on the home
+    page. Each snapshot can be changed when it is added. Saved pages are shown without their
+    scripts, so a page cannot act inside your ArchiveBox.
+
+    **Adding from the browser**
+
+    The ArchiveBox Exporter extension for Chrome and Firefox sends the page you are on, or
+    your bookmarks and history, to this server. Give it the address, and an API key made in
+    the admin under API keys.
+  categories: [webapps/knowledge]
+  tags: [documents, search, privacy, open-source]
+  aliases: [archivebox, web archive, archive, wayback machine, bookmarks, read later, pocket alternative, warc]
+  icon: icons/archivebox.svg
+  links:
+    website: https://archivebox.io
+    documentation: https://github.com/ArchiveBox/ArchiveBox/wiki
+    source: https://github.com/ArchiveBox/ArchiveBox
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address ArchiveBox answers at. Signing in and snapshot links need it: leave it
+      empty only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@.+_-]{1,150}$'
+  - name: adminPassword
+    title: Administrator password
+    description: What that account signs in with the first time. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: visibility
+    title: Who can see snapshots
+    description: The default for new snapshots; each one can be changed when it is added.
+    type: select
+    default: private
+    options:
+      - {value: private, title: "Only me, signed in"}
+      - {value: unlisted, title: "Anyone with a snapshot's link"}
+      - {value: public, title: "Everyone, with the list on the home page"}
+  - name: memoryLimit
+    title: Memory limit
+    description: Archiving runs a browser; 2GB lets it save a few pages at once.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Collection volume
+    description: The volume the index, the snapshots and the search index are kept on.
+    type: volume
+
+versions:
+  - name: "0.9"
+    release: "0.9.73"
+    default: true
+    image: archivebox/archivebox:0.9.73
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entrypoint gives the collection to its user and runs this as that user.
+      # See the file.
+      command: /usr/local/bin/archivebox-server
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS --max-time 5 http://127.0.0.1:5797/health/ | grep -q OK
+        interval: 30s
+        timeout: 10s
+        # The first start sets up the collection and its tools.
+        startPeriod: 180s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: archivebox
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Links are made with it, and behind the proxy it tells ArchiveBox the site is
+        # HTTPS, which the sign-in form checks.
+        - {k: BASE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: ADMIN_USERNAME, v: "${{ params.adminUser }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: PERMISSIONS, v: "${{ params.visibility }}"}
+        - {k: PUBLIC_ADD_VIEW, v: "False"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      archivebox-server:
+        content: |
+          #!/bin/bash
+          # The image comes with a collection already set up, whose Default persona makes
+          # every new snapshot public whatever PERMISSIONS says. Set the collection up or
+          # upgrade it, give that persona PERMISSIONS, then serve. The home page lists
+          # snapshots only when they are public.
+          set -e
+          if [ -z "$PUBLIC_INDEX" ]; then
+            if [ "$PERMISSIONS" = public ]; then export PUBLIC_INDEX=True; else export PUBLIC_INDEX=False; fi
+          fi
+          archivebox manage shell --init -c '
+          import os
+          from archivebox.personas.models import Persona
+          persona = Persona.get_or_create_default()
+          wanted = os.environ.get("PERMISSIONS", "private").strip().lower()
+          if persona.config.get("PERMISSIONS") != wanted:
+              persona.config = {**persona.config, "PERMISSIONS": wanted}
+              persona.save(update_fields=["config"])
+              print(f"New snapshots are {wanted}")
+          '
+          exec archivebox server 0.0.0.0:5797
+        swarmRef:
+          file: {name: /usr/local/bin/archivebox-server, mode: 555}
+    routing:
+      port: 5797
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
