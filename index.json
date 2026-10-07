@@ -11948,6 +11948,54 @@
       }
     },
     {
+      "name": "reactive-resume",
+      "file": {
+        "path": "templates/reactive-resume.yaml",
+        "sha256": "0f94445c1ca32a2687421b18bad7519e11062c3f9af94b325b241e1e652804a0"
+      },
+      "icon": {
+        "path": "icons/reactive-resume.svg",
+        "sha256": "12e86d3a578fecf8a6dce14fd329aa91bc836405575541dca858b7d604d564b2"
+      },
+      "title": "Reactive Resume",
+      "tagline": "A resume builder that keeps your CV, cover letters and job hunt in one place",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "reactive resume",
+        "resume",
+        "cv",
+        "resume builder",
+        "cv builder",
+        "cover letter",
+        "job tracker"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.0",
+          "release": "6.0.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "readeck",
       "file": {
         "path": "templates/readeck.yaml",

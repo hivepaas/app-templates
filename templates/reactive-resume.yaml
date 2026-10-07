@@ -1,0 +1,189 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: reactive-resume
+  title: Reactive Resume
+  tagline: A resume builder that keeps your CV, cover letters and job hunt in one place
+  description: |
+    Reactive Resume builds resumes in the browser: write in its editor, pick one of its
+    templates, adjust fonts, colours and layout, and download the PDF it renders on the
+    server. It checks a resume against a job posting's keywords, keeps cover letters and
+    versions beside it, tracks job applications from saved to offer, and shares a resume
+    by a public link. Resumes import from LinkedIn exports, JSON Resume and older versions.
+
+    **This template creates two apps**
+
+    - **Reactive Resume**, with uploaded pictures and files on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    The database and the volume together are the backup.
+
+    **Accounts**
+
+    Anyone who reaches the address can sign up. Make your own accounts, then turn on
+    **Close sign-up** - or `FLAG_DISABLE_SIGNUPS` in the app's environment variables - so
+    nobody else can. Sign-in with Google, GitHub, LinkedIn or your own OAuth provider is
+    set with the `GOOGLE_*`, `GITHUB_*`, `LINKEDIN_*` and `OAUTH_*` variables.
+
+    **Email**
+
+    Verification and password-reset emails need SMTP below; without it they are only
+    written to the app's log, and nobody can reset a forgotten password.
+
+    **The AI assistant**
+
+    Each person connects their own AI provider in their settings, kept encrypted with a key
+    this app is created with. To give everyone one provider instead, set `AI_PROVIDER`,
+    `AI_MODEL` and `AI_API_KEY`.
+  categories: [webapps/documents]
+  tags: [documents, privacy, open-source]
+  aliases: [reactive resume, resume, cv, resume builder, cv builder, cover letter, job tracker]
+  icon: icons/reactive-resume.svg
+  links:
+    website: https://rxresu.me
+    documentation: https://docs.rxresu.me
+    source: https://github.com/reactive-resume/reactive-resume
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Reactive Resume answers at. Signing in only works on it: leave it empty
+      only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: closeSignup
+    title: Close sign-up
+    description: On, nobody can make a new account. Leave it off until your own accounts are made.
+    type: bool
+    default: false
+  - name: authSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: encryptionSecret
+    title: Encryption secret
+    description: Encrypts the AI providers' keys people save. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: smtpHost
+    title: SMTP host
+    description: For verification and password-reset emails. Leave empty to send none.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: TLS from the first byte
+    description: On for port 465; off for STARTTLS on 587.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: mailFrom
+    title: Sender
+    type: string
+    default: Reactive Resume <resume@example.com>
+  - name: memoryLimit
+    title: Memory limit
+    description: About 600MB while it renders a PDF.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Storage volume
+    description: The volume uploaded pictures and files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: resume
+      username: resume
+
+versions:
+  - name: "6.0"
+    release: "6.0.0"
+    default: true
+    image: ghcr.io/reactive-resume/reactive-resume:v6.0.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # It will not start without an APP_URL, which the app lacks while it has no domain.
+      command: >-
+        sh -c '[ -n "$APP_URL" ] || export APP_URL=http://localhost:3000;
+        exec node apps/server/dist/index.mjs'
+    storage:
+      mounts:
+        /app/data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: >-
+          node -e "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1),
+          () => process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema.
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: reactive-resume
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_URL, v: "${HIVEPAAS_APP_URL}"}
+        # Behind the proxy: the visitor's address, for rate limits, comes from its header.
+        - {k: TRUSTED_PROXIES, v: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"}
+        - {k: DATABASE_URL, v: "postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: AUTH_SECRET, v: "${secrets.AUTH_SECRET}"}
+        - {k: ENCRYPTION_SECRET, v: "${secrets.ENCRYPTION_SECRET}"}
+        - {k: STORAGE_BACKEND, v: local}
+        - {k: FLAG_DISABLE_SIGNUPS, v: "${{ params.closeSignup }}"}
+        - {k: SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+        - {k: SMTP_USER, v: "${{ params.smtpUser }}"}
+        - {k: SMTP_PASS, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: SMTP_FROM, v: "${{ params.mailFrom }}"}
+    secrets:
+      AUTH_SECRET:
+        value: "${{ params.authSecret }}"
+      ENCRYPTION_SECRET:
+        value: "${{ params.encryptionSecret }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
