@@ -1,0 +1,86 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: omni-tools
+  title: OmniTools
+  tagline: Everyday tools for images, PDFs, video, text and data, all in the browser
+  description: |
+    OmniTools is a page of small tools for the chores in between: resize, convert or edit an
+    image, trim a video, split or merge PDFs, change a text's case or shuffle a list,
+    calculate dates and time zones, and format or convert JSON, CSV and XML. Every file is
+    processed in the browser that opened it: nothing is uploaded to the server.
+
+    **This template sets up**
+
+    - the OmniTools web app, served by nginx
+    - a memory limit you choose
+
+    It keeps nothing, so a restart loses nothing and an upgrade is a redeploy.
+
+    **Keeping it to your team**
+
+    There is no login. If it is exposed publicly, put basic authentication in front of it in
+    the app's routing settings, or leave it on the project network and reach it from inside.
+  categories: [webapps/dev-tools]
+  tags: [documents, privacy, open-source]
+  aliases: [omnitools, omni-tools, tools, utilities, pdf tools, image converter, it-tools alternative]
+  icon: icons/omni-tools.png
+  links:
+    website: https://omnitools.app
+    documentation: https://github.com/iib0011/omni-tools#readme
+    source: https://github.com/iib0011/omni-tools
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    description: An nginx serving static files needs very little.
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "2026.10"
+    release: "2026.10.04"
+    default: true
+    # The last version tag, 0.6.0, is a year old; the project publishes main as latest.
+    # This is latest as it was built on the date above, pinned by its digest.
+    image: iib0011/omni-tools:latest@sha256:38c628c20414636ee049386975d552ab34d928024556a980c26b0fcd2f52e94d
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: omni-tools
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

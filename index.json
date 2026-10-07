@@ -9929,6 +9929,47 @@
       }
     },
     {
+      "name": "omni-tools",
+      "file": {
+        "path": "templates/omni-tools.yaml",
+        "sha256": "b96a40084afe01d221e78b4d8fd19a1fc574c583bcc29760e8c89132b033d8a4"
+      },
+      "icon": {
+        "path": "icons/omni-tools.png",
+        "sha256": "d10909f37f9c3cb20fcfd9dad61fc3cc3c2cb9e011ccde612c3765a86214e4a8"
+      },
+      "title": "OmniTools",
+      "tagline": "Everyday tools for images, PDFs, video, text and data, all in the browser",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "documents",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "omnitools",
+        "omni-tools",
+        "tools",
+        "utilities",
+        "pdf tools",
+        "image converter",
+        "it-tools alternative"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2026.10",
+          "release": "2026.10.04",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "onetimesecret",
       "file": {
         "path": "templates/onetimesecret.yaml",
