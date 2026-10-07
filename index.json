@@ -3881,6 +3881,46 @@
       }
     },
     {
+      "name": "flaresolverr",
+      "file": {
+        "path": "templates/flaresolverr.yaml",
+        "sha256": "a53b35faa485479680bd570ba3470c8f95536e6ebffe49b92b5965fa0c954da9"
+      },
+      "icon": {
+        "path": "icons/flaresolverr.svg",
+        "sha256": "9fc8281bce6e9d6f1ce3d45b5ea64362df77c8b81f5eb62ffb8979b77c147bb3"
+      },
+      "title": "FlareSolverr",
+      "tagline": "Gets Jackett and Prowlarr past Cloudflare's browser challenge",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "flaresolverr",
+        "cloudflare",
+        "captcha",
+        "proxy",
+        "prowlarr",
+        "jackett",
+        "servarr",
+        "arr"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "3.5",
+          "release": "3.5.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "flarum",
       "file": {
         "path": "templates/flarum.yaml",

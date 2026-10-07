@@ -1,0 +1,88 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: flaresolverr
+  title: FlareSolverr
+  tagline: Gets Jackett and Prowlarr past Cloudflare's browser challenge
+  description: |
+    Some torrent trackers sit behind Cloudflare, which answers a script with a challenge
+    meant for a browser. FlareSolverr opens those pages in a real, headless Chromium,
+    waits for the challenge to pass, and hands the page and its cookies back - so Jackett
+    and Prowlarr can search those trackers like the rest.
+
+    **This template sets up**
+
+    - FlareSolverr, with its API on port 8191 on the project network
+    - a memory limit you choose
+
+    It has no page of its own and no domain: anything that can reach it can use it to
+    fetch the web, so it stays on the project network.
+
+    **Using it**
+
+    In Prowlarr, add an indexer proxy of type FlareSolverr at `http://<this app's key>:8191`
+    and give it a tag; the indexers with that tag go through it. In Jackett, set the same
+    address as the FlareSolverr API URL in its settings.
+
+    Each challenge solved starts a browser for a few seconds: allow it memory, and expect
+    the first search through it to be slow.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [flaresolverr, cloudflare, captcha, proxy, prowlarr, jackett, servarr, arr]
+  icon: icons/flaresolverr.svg
+  links:
+    website: https://github.com/FlareSolverr/FlareSolverr
+    documentation: https://github.com/FlareSolverr/FlareSolverr#readme
+    source: https://github.com/FlareSolverr/FlareSolverr
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+versions:
+  - name: "3.5"
+    release: "3.5.2"
+    default: true
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.2@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8191/health
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: flaresolverr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LOG_LEVEL, v: info}
+        - {k: TZ, v: "${{ params.timezone }}"}
+    routing:
+      port: 8191
