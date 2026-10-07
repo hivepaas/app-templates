@@ -10515,6 +10515,66 @@
       }
     },
     {
+      "name": "overleaf",
+      "file": {
+        "path": "templates/overleaf.yaml",
+        "sha256": "cabe5ba69f7554f6613f37f0ef389ec9b1eafa794c3b4e0adec9001bfd3715f7"
+      },
+      "icon": {
+        "path": "icons/overleaf.svg",
+        "sha256": "6d650e5c58c1a08a3c72ece100ed097e92b0c80d2dca6dd61bc29658cdc9fb11"
+      },
+      "title": "Overleaf",
+      "tagline": "Collaborative LaTeX editing in the browser, compiled on your own server",
+      "categories": [
+        "webapps/documents",
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "documents",
+        "collaboration",
+        "open-source"
+      ],
+      "aliases": [
+        "overleaf",
+        "latex",
+        "tex",
+        "sharelatex",
+        "scientific writing",
+        "papers",
+        "thesis"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "redis",
+          "title": "Sessions and editing state",
+          "template": "valkey"
+        }
+      ],
+      "components": [
+        {
+          "name": "web",
+          "title": "Web",
+          "primary": true
+        },
+        {
+          "name": "mongo",
+          "title": "MongoDB"
+        }
+      ],
+      "versions": [
+        {
+          "name": "6.3",
+          "release": "6.3.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "owncast",
       "file": {
         "path": "templates/owncast.yaml",

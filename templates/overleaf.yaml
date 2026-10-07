@@ -1,0 +1,308 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: overleaf
+  title: Overleaf
+  tagline: Collaborative LaTeX editing in the browser, compiled on your own server
+  description: |
+    Overleaf is the LaTeX editor in a browser: write in its source or visual editor, see the
+    PDF as it compiles, and work on the same document with others at the same time, with
+    comments and a history of every change. This is the Community Edition, the open-source
+    core of overleaf.com.
+
+    **This template creates three apps**
+
+    - **Overleaf**, as two components sharing a volume:
+      - **web**, the editor and the compiler, with projects, history and compiled output
+      - **mongo**, its MongoDB, run as the single-node replica set Overleaf requires
+    - **a Valkey**, named after the app with `-redis` added, holding sessions and
+      real-time editing state
+
+    The volume is the backup.
+
+    **Signing in**
+
+    The administrator below is created as soon as Overleaf first answers; its password is
+    under the web component's Secrets as `ADMIN_PASSWORD`, read only then. There is no
+    sign-up: the administrator adds people under *Admin > Manage Users*, and each gets a
+    link to set a password - by email when SMTP is set up below.
+
+    **Compiling**
+
+    Documents compile inside the web component with TeX Live's basic scheme; packages it
+    lacks are missing from compiles. Compiles are not sandboxed - Overleaf's sandbox needs
+    Docker on the host - so give accounts only to people you trust.
+
+    **x86-64 only**
+
+    Overleaf publishes this image for `linux/amd64` alone, so it will not start on an ARM
+    server.
+  categories: [webapps/documents, webapps/knowledge]
+  tags: [documents, collaboration, open-source]
+  aliases: [overleaf, latex, tex, sharelatex, scientific writing, papers, thesis]
+  icon: icons/overleaf.svg
+  links:
+    website: https://www.overleaf.com
+    documentation: https://github.com/overleaf/overleaf/wiki
+    source: https://github.com/overleaf/overleaf
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Overleaf answers at. Its cookies need HTTPS, so signing in only works on
+      it: leave it empty only to add one later, in the routing settings of the web component.
+    type: domain
+    optional: true
+  - name: siteName
+    title: Site name
+    type: string
+    default: Overleaf
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    description: What the administrator signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: sessionSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: inviteSecret
+    title: Invitation secret
+    description: Signs project invitations. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: smtpHost
+    title: SMTP host
+    description: For invitations and password links. Leave empty to send no email.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: TLS from the first byte
+    description: On for port 465; off for STARTTLS on 587.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: mailFrom
+    title: Sender address
+    type: string
+    default: overleaf@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: memoryLimit
+    title: Memory limit
+    description: For the web component, compiles included.
+    type: size
+    default: 4GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume projects, history, compiled output and the MongoDB data are kept on.
+    type: volume
+
+dependencies:
+  - name: redis
+    title: Sessions and editing state
+    template: valkey
+    version: "9.1"
+    params:
+      evictionPolicy: noeviction
+
+versions:
+  - name: "6.3"
+    release: "6.3.0"
+    default: true
+    components:
+      web: {image: "sharelatex/sharelatex:6.3.0"}
+      mongo: {image: "mongo:8.2.12-noble"}
+
+components:
+  # ── Web ────────────────────────────────────────────────────────────────
+  - name: web
+    title: Web
+    primary: true
+    needs: [mongo]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/lib/overleaf:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: overleaf}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fs -o /dev/null http://127.0.0.1/status
+            interval: 30s
+            timeout: 10s
+            # The first start migrates the database.
+            startPeriod: 600s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: overleaf, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: OVERLEAF_APP_NAME, v: "${{ params.siteName }}"}
+            - {k: OVERLEAF_SITE_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: OVERLEAF_BEHIND_PROXY, v: "true"}
+            - {k: OVERLEAF_SECURE_COOKIE, v: "true"}
+            # The replica set names this member by the loopback address it was set up with:
+            # connect to it directly rather than through that name.
+            - {k: OVERLEAF_MONGO_URL, v: "mongodb://${{ comp.mongo.key }}:27017/sharelatex?directConnection=true"}
+            - {k: OVERLEAF_REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: OVERLEAF_REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: OVERLEAF_REDIS_PASS, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: REDIS_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: REDIS_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: REDIS_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: OVERLEAF_SESSION_SECRET, v: "${secrets.SESSION_SECRET}"}
+            - {k: OVERLEAF_INVITE_TOKEN_SECRET, v: "${secrets.INVITE_SECRET}"}
+            - {k: ENABLED_LINKED_FILE_TYPES, v: "project_file,project_output_file"}
+            - {k: ENABLE_CONVERSIONS, v: "true"}
+            - {k: OVERLEAF_EMAIL_FROM_ADDRESS, v: "${{ params.mailFrom }}"}
+            - {k: OVERLEAF_EMAIL_SMTP_HOST, v: "${{ params.smtpHost }}"}
+            - {k: OVERLEAF_EMAIL_SMTP_PORT, v: "${{ params.smtpPort }}"}
+            - {k: OVERLEAF_EMAIL_SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+            - {k: OVERLEAF_EMAIL_SMTP_USER, v: "${{ params.smtpUser }}"}
+            - {k: OVERLEAF_EMAIL_SMTP_PASS, v: "${secrets.SMTP_PASSWORD}"}
+            - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          SESSION_SECRET:
+            value: "${{ params.sessionSecret }}"
+          INVITE_SECRET:
+            value: "${{ params.inviteSecret }}"
+          SMTP_PASSWORD:
+            value: "${{ params.smtpPassword }}"
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+        configFiles:
+          990_hivepaas.sh:
+            content: |
+              #!/bin/bash
+              # Run by the image's init at every start, before Overleaf's services, which take
+              # their environment from /etc/container_environment.
+              #
+              # Overleaf turns email on whenever a sender is set: leave it off without an SMTP
+              # host, and send no empty user name or password to the one there is.
+              if [ -z "$OVERLEAF_EMAIL_SMTP_HOST" ]; then
+                rm -f /etc/container_environment/OVERLEAF_EMAIL_*
+              fi
+              for v in OVERLEAF_EMAIL_SMTP_USER OVERLEAF_EMAIL_SMTP_PASS; do
+                [ -s "/etc/container_environment/$v" ] || rm -f "/etc/container_environment/$v"
+              done
+              # The administrator is created in the background, once Overleaf answers.
+              bash /hivepaas/create-admin.sh &
+            swarmRef:
+              file: {name: /etc/my_init.d/990_hivepaas.sh, mode: 555}
+          create-admin.sh:
+            content: |
+              #!/bin/bash
+              # Once Overleaf answers, its first administrator, from HIVEPAAS_ADMIN_EMAIL and
+              # HIVEPAAS_ADMIN_PASSWORD. Until there is one, the launchpad lets whoever opens
+              # it first become it; once there is, it refuses, and this does nothing.
+              jar=$(mktemp)
+              page=$(mktemp)
+              code=000
+              for i in $(seq 1 360); do
+                code=$(curl -s -o "$page" -w '%{http_code}' -c "$jar" -H 'X-Forwarded-Proto: https' http://127.0.0.1/launchpad)
+                case "$code" in 200|30?) break ;; esac
+                sleep 5
+              done
+              csrf=$(grep -o 'name="ol-csrfToken" content="[^"]*"' "$page" | sed 's/.*content="//;s/"$//')
+              rm -f "$page"
+              if [ "$code" != 200 ] || [ -z "$csrf" ]; then
+                echo "hivepaas: no administrator created: the launchpad answered $code, as it does once there is one"
+                rm -f "$jar"
+                exit 0
+              fi
+              body=$(node -e 'console.log(JSON.stringify({email: process.env.HIVEPAAS_ADMIN_EMAIL, password: process.env.HIVEPAAS_ADMIN_PASSWORD, _csrf: process.argv[1]}))' "$csrf")
+              code=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -H 'X-Forwarded-Proto: https' \
+                -H 'Content-Type: application/json' -d "$body" http://127.0.0.1/launchpad/register_admin)
+              if [ "$code" = 200 ]; then
+                echo "hivepaas: administrator $HIVEPAAS_ADMIN_EMAIL created"
+              else
+                echo "hivepaas: creating the administrator failed: HTTP $code"
+              fi
+              rm -f "$jar"
+            swarmRef:
+              file: {name: /hivepaas/create-admin.sh, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── MongoDB ────────────────────────────────────────────────────────────
+  - name: mongo
+    title: MongoDB
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # Overleaf needs a replica set, for its transactions: a single member is enough.
+          command: --replSet overleaf
+        storage:
+          mounts:
+            /data/db:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: mongo}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true
+            interval: 30s
+            timeout: 10s
+            startPeriod: 60s
+            retries: 3
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: overleaf, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: MONGO_INITDB_DATABASE, v: sharelatex}
+        configFiles:
+          init-replica-set.js:
+            # Run once, by the image, on a new data directory.
+            content: |
+              rs.initiate({ _id: 'overleaf', members: [{ _id: 0, host: '127.0.0.1:27017' }] })
+            swarmRef:
+              file: {name: /docker-entrypoint-initdb.d/init-replica-set.js, mode: 444}
