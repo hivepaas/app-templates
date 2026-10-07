@@ -42,8 +42,11 @@ jobs:
       - name: Count stars
         working-directory: hivepaas
         continue-on-error: true
+        # Apart, so that the run says which of them it counted with: an organization
+        # secret this repository is not given access to is simply empty here.
         env:
-          GITHUB_TOKEN: ${{ secrets.STATS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          STATS_GITHUB_TOKEN: ${{ secrets.STATS_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: go run ./tools/apptemplate stats ../app-templates
 
       # The pull request is opened with GITHUB_TOKEN, and GitHub does not run
