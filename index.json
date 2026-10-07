@@ -2492,6 +2492,48 @@
       }
     },
     {
+      "name": "dbgate",
+      "file": {
+        "path": "templates/dbgate.yaml",
+        "sha256": "2bcb72a05f2e7711babc95692edc1d6462e6bf7262870da145abba058ccde850"
+      },
+      "icon": {
+        "path": "icons/dbgate.png",
+        "sha256": "7193d9d2e1086b3f4678dc9be92062c50cab85c8bee97a307eb333e9fe9c699a"
+      },
+      "title": "DbGate",
+      "tagline": "A web database manager for PostgreSQL, MySQL, MongoDB, Redis and more",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source"
+      ],
+      "aliases": [
+        "dbgate",
+        "database client",
+        "database manager",
+        "sql client",
+        "postgres gui",
+        "mysql gui",
+        "mongodb gui",
+        "adminer alternative"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "7.3",
+          "release": "7.3.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "dependency-track",
       "file": {
         "path": "templates/dependency-track.yaml",

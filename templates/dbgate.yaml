@@ -1,0 +1,117 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dbgate
+  title: DbGate
+  tagline: A web database manager for PostgreSQL, MySQL, MongoDB, Redis and more
+  description: |
+    DbGate is a database client in the browser for SQL and NoSQL alike - PostgreSQL,
+    MySQL and MariaDB, SQL Server, Oracle, SQLite, MongoDB, Redis, ClickHouse, CockroachDB
+    and others. Browse and edit data in a grid, write queries with completion, compare and
+    synchronize schemas, draw diagrams, and import or export CSV, Excel, JSON and SQL.
+
+    **This template sets up**
+
+    - DbGate, with its saved connections, queries and settings on a volume
+    - a sign-in, with a password generated unless you give one
+    - a memory limit you choose
+
+    **Connecting to your databases**
+
+    DbGate runs on the project network, so it reaches the databases in this project by
+    their app keys - a PostgreSQL app as host `<its app key>`, port 5432, with the user
+    and password from that app's details. Nothing has to be published for it.
+
+    **Signing in**
+
+    DbGate asks for the user name and password below. The password is under this app's
+    Secrets: change it there and deploy. Whoever signs in can use every connection saved
+    in it.
+  categories: [webapps/dev-tools]
+  tags: [sql, relational, open-source]
+  aliases: [dbgate, database client, database manager, sql client, postgres gui, mysql gui, mongodb gui, adminer alternative]
+  icon: icons/dbgate.png
+  links:
+    website: https://dbgate.io
+    documentation: https://docs.dbgate.io
+    source: https://github.com/dbgate/dbgate
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address DbGate answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: username
+    title: User name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@._-]{2,64}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the saved connections, queries and settings are kept on.
+    type: volume
+
+versions:
+  - name: "7.3"
+    release: "7.3.1"
+    default: true
+    image: dbgate/dbgate:7.3.1-alpine@sha256:09c37ff3ee5c53abd6c6de887a81ab329935fe3bcef789337cd996c3e887c7b1
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /root/.dbgate: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has neither curl nor wget.
+        command: >-
+          node -e "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1),
+          () => process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: dbgate
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LOGIN, v: "${{ params.username }}"}
+        - {k: PASSWORD, v: "${secrets.PASSWORD}"}
+    secrets:
+      PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
