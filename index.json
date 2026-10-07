@@ -7611,6 +7611,47 @@
       }
     },
     {
+      "name": "localai",
+      "file": {
+        "path": "templates/localai.yaml",
+        "sha256": "a0a58a10772e15deccc0e999e9c0f526b0f67618b6a3a9f66bbcd4c634c921eb"
+      },
+      "icon": {
+        "path": "icons/localai.svg",
+        "sha256": "b169a6930ee68b2ab2c59fd9b16177c7668d9dbc4647e168a4e307c3c1e3006e"
+      },
+      "title": "LocalAI",
+      "tagline": "An OpenAI-compatible API for models that run on your own server",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "open-source"
+      ],
+      "aliases": [
+        "localai",
+        "local ai",
+        "openai api",
+        "llm",
+        "inference",
+        "models",
+        "self-hosted openai"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "4.11",
+          "release": "4.11.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "logto",
       "file": {
         "path": "templates/logto.yaml",

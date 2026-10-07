@@ -1,0 +1,120 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: localai
+  title: LocalAI
+  tagline: An OpenAI-compatible API for models that run on your own server
+  description: |
+    LocalAI serves open models behind the same API as OpenAI: chat and completions,
+    embeddings, image generation, speech to text and text to speech. Anything written for
+    OpenAI's API - a library, Open WebUI, an IDE plugin - works against it by changing the
+    base URL. Its web interface installs models from a gallery of about two thousand, and
+    chats with them.
+
+    **What this template creates**
+
+    One app, with the models, the backends that run them, and its settings on a volume. It
+    starts with none: install models from the gallery in the web interface. Each model
+    brings the backend it needs, downloaded the first time. Models are large - a small chat
+    model is 500MB, a 7B one about 4GB - and fill a volume quickly.
+
+    **The API key**
+
+    Every request - the API and the web interface alike - needs the key below, sent as
+    `Authorization: Bearer <key>`; the web interface asks for it. It is under this app's
+    Secrets as `API_KEY`.
+
+    **On the CPU**
+
+    This image runs models on the CPU. A model of up to 3B parameters answers at reading
+    speed on a modern server; larger ones are slower. Give the app more memory than the
+    largest model it will load, plus a gigabyte.
+  categories: [webapps/ai]
+  tags: [ai, llm, open-source]
+  aliases: [localai, local ai, openai api, llm, inference, models, self-hosted openai]
+  icon: icons/localai.svg
+  links:
+    website: https://localai.io
+    documentation: https://localai.io/docs/
+    source: https://github.com/mudler/LocalAI
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the API and the web interface answer at. Leave it empty for an API only
+      the apps in this project reach, at http://<this app's key>:8080/v1.
+    type: domain
+    optional: true
+  - name: apiKey
+    title: API key
+    description: Asked of every request. Leave empty to generate one.
+    type: secret
+    minLength: 16
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: The largest model you will load, plus a gigabyte.
+    type: size
+    default: 4GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume models, backends and settings are kept on.
+    type: volume
+
+versions:
+  - name: "4.11"
+    release: "4.11.0"
+    default: true
+    image: localai/localai:v4.11.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /localai: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check, of /readyz.
+        command: /healthcheck.sh
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: localai
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: LOCALAI_API_KEY, v: "${secrets.API_KEY}"}
+        - {k: LOCALAI_EXTERNAL_BASE_URL, v: "${HIVEPAAS_APP_URL}"}
+        # Everything on the one volume, where the image would spread it over four.
+        - {k: LOCALAI_MODELS_PATH, v: /localai/models}
+        - {k: LOCALAI_BACKENDS_PATH, v: /localai/backends}
+        - {k: LOCALAI_CONFIG_DIR, v: /localai/configuration}
+        - {k: LOCALAI_DATA_PATH, v: /localai/data}
+        - {k: LOCALAI_GENERATED_CONTENT_PATH, v: /localai/generated}
+        - {k: LOCALAI_UPLOAD_PATH, v: /localai/upload}
+    secrets:
+      API_KEY:
+        value: "${{ params.apiKey }}"
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
