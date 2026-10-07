@@ -1,0 +1,133 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: silo
+  title: Silo
+  tagline: The MinIO server and its full web console, kept alive and maintained
+  description: |
+    Silo is MinIO, continued. When MinIO stopped publishing its community edition, Pigsty
+    kept a release line of the open-source server going - security fixes, multi-arch
+    images, and the complete web console upstream had cut down. The S3 API, the `MINIO_*`
+    settings, the `mc` client and the data on disk are all the same, so anything that
+    worked with MinIO works with Silo, and an existing MinIO volume can be mounted as it is.
+
+    **This template sets up**
+
+    - Silo on a volume, with the S3 API on port 9000
+    - the web console on port 9001, at its own domain if you give one
+    - a root user and password, the password generated unless you give one
+    - a memory limit you choose
+
+    **Connecting**
+
+    Other apps in the project use `http://<the app's key>:9000` with the root user and
+    password, or with keys made for them in the console, and path-style addressing:
+
+    ```sh
+    mcli alias set silo http://<the app's key>:9000 <user> <password>
+    mcli mb silo/backups
+    ```
+
+    The image carries the client as `mcli`, so the app's terminal can run that too. Most
+    SDKs default to virtual-hosted style - `bucket.host` - which needs a wildcard domain;
+    set `force_path_style` (or `s3_use_path_style`) in the client instead.
+
+    **One node, one disk**
+
+    Here Silo is one process over one volume, so the volume is the only copy of what it
+    holds. Back it up, or replicate buckets to another server from the console.
+  categories: [storage/object-storage, storage/files]
+  tags: [object-storage, s3, files, open-source]
+  aliases: [silo, minio, minio fork, minio console, s3, buckets, object store, pigsty]
+  icon: icons/silo.svg
+  links:
+    website: https://silo.pgsty.com
+    documentation: https://silo.pgsty.com/docs/
+    source: https://github.com/pgsty/silo
+  license: AGPL-3.0-or-later
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: rootUser
+    title: Root user
+    description: What clients and the console sign in with as the root account.
+    type: string
+    default: siloadmin
+    pattern: '^[A-Za-z0-9._-]{3,64}$'
+  - name: rootPassword
+    title: Root password
+    description: Eight characters or more. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 40}
+  - name: domain
+    title: S3 domain
+    description: >-
+      A domain for the S3 endpoint, if clients outside the project use it. Leave it empty
+      to keep the endpoint on the project network.
+    type: domain
+    optional: true
+  - name: consoleDomain
+    title: Console domain
+    description: The address of the web console. Leave it empty to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the buckets and their objects are kept on.
+    type: volume
+
+versions:
+  - name: "2026.09"
+    release: "RELEASE.2026-09-16T00-00-00Z"
+    default: true
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: silo server /data --console-address :9001
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fsS -o /dev/null http://127.0.0.1:9000/minio/health/live
+        interval: 20s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: silo
+      version: "${{ version.name }}"
+    envVars:
+      data:
+        - {k: MINIO_ROOT_USER, v: "${{ params.rootUser }}"}
+        # The image reads the password from /run/secrets/secret_key, so it is not in the
+        # service's environment for anything that can read it there.
+    secrets:
+      MINIO_ROOT_PASSWORD:
+        value: "${{ params.rootPassword }}"
+        swarmRef:
+          file: {name: /run/secrets/secret_key, mode: 444}
+    routing:
+      port: 9000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+        - {domain: "${{ params.consoleDomain }}", enabled: true, forceHttps: true, containerPort: 9001}

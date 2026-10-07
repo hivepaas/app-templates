@@ -13941,6 +13941,50 @@
       }
     },
     {
+      "name": "silo",
+      "file": {
+        "path": "templates/silo.yaml",
+        "sha256": "c8fe430fc6b67b8c4058cb5a20b3948994f6e7ebfb79812efe6f420403276f33"
+      },
+      "icon": {
+        "path": "icons/silo.svg",
+        "sha256": "f1c726121e09a5a202a5e0cd893229b8767946805b5675905f50cea537d3bcb6"
+      },
+      "title": "Silo",
+      "tagline": "The MinIO server and its full web console, kept alive and maintained",
+      "categories": [
+        "storage/object-storage",
+        "storage/files"
+      ],
+      "tags": [
+        "object-storage",
+        "s3",
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "silo",
+        "minio",
+        "minio fork",
+        "minio console",
+        "s3",
+        "buckets",
+        "object store",
+        "pigsty"
+      ],
+      "license": "AGPL-3.0-or-later",
+      "versions": [
+        {
+          "name": "2026.09",
+          "release": "RELEASE.2026-09-16T00-00-00Z",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "siyuan",
       "file": {
         "path": "templates/siyuan.yaml",
