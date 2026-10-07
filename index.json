@@ -784,6 +784,56 @@
       }
     },
     {
+      "name": "apache-answer",
+      "file": {
+        "path": "templates/apache-answer.yaml",
+        "sha256": "717601d1e43858b887a4bbb22ecf4d80a7d59900c06e75e5bb2649c86b8abef2"
+      },
+      "icon": {
+        "path": "icons/apache-answer.svg",
+        "sha256": "6611c3c3162be753cceb137cf451bfd598bb90605bb3bddaad1e17115b05d2c2"
+      },
+      "title": "Apache Answer",
+      "tagline": "A question-and-answer site for your community or team, like Stack Overflow",
+      "categories": [
+        "webapps/communication",
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "collaboration",
+        "search",
+        "open-source"
+      ],
+      "aliases": [
+        "answer",
+        "apache answer",
+        "q&a",
+        "questions and answers",
+        "stack overflow alternative",
+        "forum",
+        "community",
+        "knowledge base"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.0",
+          "release": "2.0.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "apprise",
       "file": {
         "path": "templates/apprise.yaml",

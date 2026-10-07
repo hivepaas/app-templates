@@ -1,0 +1,176 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: apache-answer
+  title: Apache Answer
+  tagline: A question-and-answer site for your community or team, like Stack Overflow
+  description: |
+    Apache Answer runs a Q&A site: people ask, others answer, the best answers are voted up
+    and accepted, and questions are found again by tag and by search. Reputation and badges
+    reward the people who help, and moderators review flags, suggested edits and held
+    posts. It suits a product's community forum as well as a team's internal knowledge
+    base.
+
+    **This template creates two apps**
+
+    - **Answer**, with its uploads and settings on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    The database and the volume together are the backup.
+
+    **Signing in**
+
+    The site is set up on the first start with the administrator account below. Its
+    password is under this app's Secrets as `ADMIN_PASSWORD`, read only that once, so
+    change it later in Answer itself. Sign-up is open to anyone who reaches the site;
+    restrict it under *Admin > Login*.
+
+    **Email**
+
+    Answer confirms new accounts and resets passwords by email: set up SMTP under
+    *Admin > SMTP* before inviting anybody.
+  categories: [webapps/communication, webapps/knowledge]
+  tags: [collaboration, search, open-source]
+  aliases: [answer, apache answer, q&a, questions and answers, stack overflow alternative, forum, community, knowledge base]
+  icon: icons/apache-answer.svg
+  links:
+    website: https://answer.apache.org
+    documentation: https://answer.apache.org/docs
+    source: https://github.com/apache/answer
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Answer answers at, kept as its site URL. Without one the site URL is
+      http://localhost: with a domain added later, change it under Admin > General.
+    type: domain
+    optional: true
+  - name: siteName
+    title: Site name
+    type: string
+    default: Answers
+    maxLength: 30
+  - name: language
+    title: Language
+    description: The site's language, such as en_US, de_DE, fr_FR, ja_JP, vi_VN or zh_CN.
+    type: string
+    default: en_US
+    pattern: '^[a-z]{2,3}_[A-Z]{2}$'
+  - name: adminName
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9_.-]{2,30}$'
+  - name: adminEmail
+    title: Administrator email
+    description: The administrator's sign-in, and the site's contact address.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: What that account signs in with the first time, 8 to 32 characters. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    maxLength: 32
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploads, settings and the cache are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: answer
+      username: answer
+
+versions:
+  - name: "2.0"
+    release: "2.0.2"
+    default: true
+    image: apache/answer:2.0.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Gives the site a URL without a domain, then starts as the image does. See the file.
+      entrypoint: /usr/local/bin/answer-start
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # Port 80 answers only once the site is set up; see INSTALL_PORT.
+        command: curl -fs -o /dev/null http://127.0.0.1/healthz
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: apache-answer
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: UTC}
+        # Set the site up on the first start; ignored once it is.
+        - {k: AUTO_INSTALL, v: "true"}
+        # If that fails - the database not up yet - Answer opens its installer instead, which
+        # anybody could finish. On this port the domain does not lead to it, and the app
+        # stays unhealthy until a restart sets the site up.
+        - {k: INSTALL_PORT, v: "8081"}
+        - {k: DB_TYPE, v: postgres}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: SITE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: SITE_NAME, v: "${{ params.siteName }}"}
+        - {k: LANGUAGE, v: "${{ params.language }}"}
+        - {k: CONTACT_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: EXTERNAL_CONTENT_DISPLAY, v: ask_before_display}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      answer-start:
+        content: |
+          #!/bin/bash
+          # Answer will not be set up without a site URL; the app has none while it has no
+          # domain.
+          if [ -z "$SITE_URL" ]; then
+            export SITE_URL=http://localhost
+          fi
+          exec /entrypoint.sh
+        swarmRef:
+          file: {name: /usr/local/bin/answer-start, mode: 555}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
