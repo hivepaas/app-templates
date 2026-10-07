@@ -17068,6 +17068,66 @@
       }
     },
     {
+      "name": "wanderer",
+      "file": {
+        "path": "templates/wanderer.yaml",
+        "sha256": "e1d20ff2656349cd562d3d955fd3f944cac12e845143143b617fa6ed03a9aa20"
+      },
+      "icon": {
+        "path": "icons/wanderer.svg",
+        "sha256": "f3825fd284c30905d41311798675bd0a610cd3b5ba9159c69efede43ef091391"
+      },
+      "title": "wanderer",
+      "tagline": "Your own trail database - plan, record and share hikes and rides on a map",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "geospatial",
+        "open-source"
+      ],
+      "aliases": [
+        "wanderer",
+        "hiking",
+        "trails",
+        "gpx",
+        "routes",
+        "cycling",
+        "outdoor",
+        "komoot alternative",
+        "strava alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "search",
+          "title": "Search",
+          "template": "meilisearch"
+        }
+      ],
+      "components": [
+        {
+          "name": "web",
+          "title": "Web",
+          "primary": true
+        },
+        {
+          "name": "db",
+          "title": "Database"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.21",
+          "release": "0.21.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "weaviate",
       "file": {
         "path": "templates/weaviate.yaml",

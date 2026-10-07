@@ -1,0 +1,253 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wanderer
+  title: wanderer
+  tagline: Your own trail database - plan, record and share hikes and rides on a map
+  description: |
+    wanderer keeps your outdoor routes: upload GPX, FIT or KML tracks or draw a route on
+    the map with routing along real paths, and it shows distance, elevation profile,
+    duration and difficulty. Add photos, waypoints and a summit log, organize trails in
+    lists, find them again by place or filters, and share them - or follow people on
+    other servers through ActivityPub.
+
+    **This template creates three apps**
+
+    - **wanderer**, as two components: the web app, and its PocketBase database
+    - **a Meilisearch server**, named after the app with `-search` added, for searching
+      trails
+
+    The volume holds the database, the plugins and the uploaded tracks and photos; with
+    Meilisearch's own volume it is the backup.
+
+    **The first account**
+
+    With sign-up closed, wanderer has no way to make one, so the first start makes it from
+    the values below. The password is under the web component's Secrets. Turn off **Close
+    sign-up** to let others make accounts.
+
+    **Maps and routing**
+
+    Drawing routes and looking up places use public OpenStreetMap services - Valhalla,
+    Nominatim and Overpass - from the web component's environment variables, which you
+    can point at servers of your own.
+  categories: [webapps/media]
+  tags: [geospatial, open-source]
+  aliases: [wanderer, hiking, trails, gpx, routes, cycling, outdoor, komoot alternative, strava alternative]
+  icon: icons/wanderer.svg
+  links:
+    website: https://wanderer.to
+    documentation: https://wanderer.to/getting-started/installation
+    source: https://github.com/open-wanderer/wanderer
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address wanderer answers at. Its links and sign-in depend on it: leave it empty
+      only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: userName
+    title: User name
+    description: The first account.
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9_][A-Za-z0-9_.]{2,63}$'
+  - name: userEmail
+    title: Email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: userPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    maxLength: 72
+    generate: {length: 24}
+  - name: closeSignup
+    title: Close sign-up
+    description: On, only the account below exists. Off, anyone who reaches the address can make one.
+    type: bool
+    default: true
+  - name: encryptionKey
+    title: Encryption key
+    description: Encrypts the settings PocketBase stores, 32 characters. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: proxySecret
+    title: Proxy secret
+    description: Shared by the two components. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    description: For the web component; the database takes a fraction of it.
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database, the plugins and the uploaded tracks and photos are kept on.
+    type: volume
+
+dependencies:
+  - name: search
+    title: Search
+    template: meilisearch
+    version: "1.53"
+
+versions:
+  - name: "0.21"
+    release: "0.21.0"
+    default: true
+    components:
+      web: {image: "flomp/wanderer-web:v0.21.0@sha256:af721ffac56fd33243043211fc49e4d5c5651f784551ae7b5b05d845c7c41147"}
+      db: {image: "flomp/wanderer-db:v0.21.0@sha256:ba7bd45b8177fec7a31d297ecaf3c98e94aabb4fc043f167df35aeba8b93468c"}
+
+components:
+  # ── Web ────────────────────────────────────────────────────────────────
+  - name: web
+    title: Web
+    primary: true
+    needs: [db]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # The image's start, with the script that makes the first account beside it.
+          command: sh -c 'node /hivepaas/create-user.mjs & exec npm run start'
+        storage:
+          mounts:
+            /app/uploads:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: uploads}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fs -o /dev/null http://127.0.0.1:3000/
+            interval: 30s
+            timeout: 10s
+            startPeriod: 60s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: wanderer, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: ORIGIN, v: "${HIVEPAAS_APP_URL}"}
+            - {k: PUBLIC_POCKETBASE_URL, v: "http://${{ comp.db.key }}:8090"}
+            - {k: POCKETBASE_PROXY_SECRET, v: "${secrets.PROXY_SECRET}"}
+            - k: MEILI_URL
+              v: "http://${{ deps.search.ref.HIVEPAAS_HOST }}:${{ deps.search.ref.HIVEPAAS_PORT }}"
+            - {k: MEILI_MASTER_KEY, v: "${{ deps.search.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: PUBLIC_DISABLE_SIGNUP, v: "${{ params.closeSignup }}"}
+            - {k: BODY_SIZE_LIMIT, v: Infinity}
+            - {k: UPLOAD_FOLDER, v: /app/uploads}
+            - {k: OVERPASS_API_URL, v: "https://overpass-api.de"}
+            - {k: VALHALLA_URL, v: "https://valhalla1.openstreetmap.de"}
+            - {k: NOMINATIM_URL, v: "https://nominatim.openstreetmap.org"}
+            - {k: PUBLIC_MAP_MAX_POLYLINES, v: "100"}
+            - {k: HIVEPAAS_USER_NAME, v: "${{ params.userName }}"}
+            - {k: HIVEPAAS_USER_EMAIL, v: "${{ params.userEmail }}"}
+            - {k: HIVEPAAS_USER_PASSWORD, v: "${secrets.USER_PASSWORD}"}
+        secrets:
+          PROXY_SECRET:
+            value: "${{ params.proxySecret }}"
+          USER_PASSWORD:
+            value: "${{ params.userPassword }}"
+        configFiles:
+          create-user.mjs:
+            content: |
+              // With sign-up closed, wanderer has no way to make the first account. Once its database
+              // answers, this makes it there from the values above; when an account with that name or
+              // email exists, the database refuses, so this is safe to run on every start.
+              const db = process.env.PUBLIC_POCKETBASE_URL;
+              const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+              for (;;) {
+                try {
+                  if ((await fetch(db + '/api/health')).ok) break;
+                } catch {}
+                await sleep(2000);
+              }
+              const password = process.env.HIVEPAAS_USER_PASSWORD;
+              const res = await fetch(db + '/api/collections/users/records', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  username: process.env.HIVEPAAS_USER_NAME,
+                  email: process.env.HIVEPAAS_USER_EMAIL,
+                  password,
+                  passwordConfirm: password,
+                }),
+              });
+              console.log(res.ok ? 'hivepaas: account ' + process.env.HIVEPAAS_USER_NAME + ' created'
+                                 : 'hivepaas: the account exists (' + res.status + ')');
+            swarmRef:
+              file: {name: /hivepaas/create-user.mjs, mode: 444}
+        routing:
+          port: 3000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Database ───────────────────────────────────────────────────────────
+  - name: db
+    title: Database
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /pb_data:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: pb_data}
+            /data/plugins:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: plugins}
+        container:
+          healthcheck:
+            enabled: true
+            # The image has no shell; it carries a curl for this.
+            mode: CMD
+            command: /curl -fs -o /dev/null http://127.0.0.1:8090/api/health
+            interval: 30s
+            timeout: 10s
+            startPeriod: 30s
+            retries: 3
+        resources:
+          limits: {memory: 256MB}
+      settings:
+        kind: {category: webapp, engine: wanderer, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: ORIGIN, v: "${HIVEPAAS_APP_URL}"}
+            - {k: POCKETBASE_ENCRYPTION_KEY, v: "${secrets.ENCRYPTION_KEY}"}
+            - {k: POCKETBASE_PROXY_SECRET, v: "${secrets.PROXY_SECRET}"}
+            - k: MEILI_URL
+              v: "http://${{ deps.search.ref.HIVEPAAS_HOST }}:${{ deps.search.ref.HIVEPAAS_PORT }}"
+            - {k: MEILI_MASTER_KEY, v: "${{ deps.search.ref.HIVEPAAS_PASSWORD }}"}
+        secrets:
+          ENCRYPTION_KEY:
+            value: "${{ params.encryptionKey }}"
+          PROXY_SECRET:
+            value: "${{ params.proxySecret }}"
+        routing:
+          port: 8090
