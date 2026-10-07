@@ -8022,6 +8022,47 @@
       }
     },
     {
+      "name": "librespeed",
+      "file": {
+        "path": "templates/librespeed.yaml",
+        "sha256": "4d3f8c685b937623a4dfef24a00bba68229083ec6bea77d3b2e3e2b063854ec9"
+      },
+      "icon": {
+        "path": "icons/librespeed.svg",
+        "sha256": "2c350e379499021ec113821accfc88199532fcbe364843b18a898f7c4ad2b30f"
+      },
+      "title": "LibreSpeed",
+      "tagline": "A lightweight speed test you host - download, upload, ping and jitter",
+      "categories": [
+        "webapps/networking"
+      ],
+      "tags": [
+        "networking",
+        "monitoring",
+        "open-source"
+      ],
+      "aliases": [
+        "librespeed",
+        "speedtest",
+        "speed test",
+        "bandwidth",
+        "ping",
+        "jitter",
+        "network test"
+      ],
+      "license": "LGPL-3.0-only",
+      "versions": [
+        {
+          "name": "6.3",
+          "release": "6.3.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "libretranslate",
       "file": {
         "path": "templates/libretranslate.yaml",

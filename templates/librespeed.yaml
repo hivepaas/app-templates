@@ -1,0 +1,99 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: librespeed
+  title: LibreSpeed
+  tagline: A lightweight speed test you host - download, upload, ping and jitter
+  description: |
+    LibreSpeed measures the connection between a browser and your server: download and
+    upload speed, ping and jitter, in a simple page that works on phones too. No Flash,
+    no app, no third-party service - the test traffic goes only to this server.
+
+    **This template sets up**
+
+    - LibreSpeed in standalone mode: the page and the test endpoints in one app
+    - a memory limit you choose
+
+    It keeps no results, so it needs no volume.
+
+    **What it measures**
+
+    The path from the browser to this server, through HivePaaS' proxy - useful to check
+    how fast users reach the apps you run here, or a server's bandwidth before you put
+    something on it.
+
+    **The provider name**
+
+    The page shows the visitor's ISP and distance, looked up in an offline database that
+    comes with the image; give an ipinfo.io API key in the app's environment variables
+    (`IPINFO_APIKEY`) for more precise results.
+  categories: [webapps/networking]
+  tags: [networking, monitoring, open-source]
+  aliases: [librespeed, speedtest, speed test, bandwidth, ping, jitter, network test]
+  icon: icons/librespeed.svg
+  links:
+    website: https://librespeed.org
+    documentation: https://github.com/librespeed/speedtest/blob/master/doc_docker.md
+    source: https://github.com/librespeed/speedtest
+  license: LGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the speed test answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: title
+    title: Page title
+    type: string
+    default: LibreSpeed
+    pattern: '^.{1,64}$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 128MB
+    min: 64MB
+
+versions:
+  - name: "6.3"
+    release: "6.3.0"
+    default: true
+    image: ghcr.io/librespeed/speedtest:6.3.0-alpine@sha256:6ac033cd117bff1b0158cf702c6cafcff31a84d7e3dd812421306ed0c8fd8b5a
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q --spider http://127.0.0.1:8080/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: librespeed
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: MODE, v: standalone}
+        - {k: TITLE, v: "${{ params.title }}"}
+        - {k: TELEMETRY, v: "false"}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
