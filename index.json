@@ -11779,6 +11779,75 @@
       }
     },
     {
+      "name": "postiz",
+      "file": {
+        "path": "templates/postiz.yaml",
+        "sha256": "dd8485b42dd3b9b31cd925cf7e1e5736f233b8fb67cb0cabbcde52441989d643"
+      },
+      "icon": {
+        "path": "icons/postiz.svg",
+        "sha256": "57123c87abbcf7159eaba923b4bd3e17ad33859fcb2e138cd2e6984c84715327"
+      },
+      "title": "Postiz",
+      "tagline": "Schedule and publish posts to every social network from one calendar",
+      "categories": [
+        "webapps/business",
+        "webapps/social"
+      ],
+      "tags": [
+        "automation",
+        "scheduling",
+        "open-source"
+      ],
+      "aliases": [
+        "postiz",
+        "social media",
+        "scheduler",
+        "buffer alternative",
+        "hootsuite alternative",
+        "social posts",
+        "content calendar"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Cache and queues",
+          "template": "valkey"
+        }
+      ],
+      "components": [
+        {
+          "name": "app",
+          "title": "App",
+          "primary": true
+        },
+        {
+          "name": "temporal",
+          "title": "Temporal"
+        },
+        {
+          "name": "tadmin",
+          "title": "Temporal admin tools"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.25",
+          "release": "2.25.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "prestashop",
       "file": {
         "path": "templates/prestashop.yaml",

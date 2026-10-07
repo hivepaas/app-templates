@@ -1,0 +1,275 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: postiz
+  title: Postiz
+  tagline: Schedule and publish posts to every social network from one calendar
+  description: |
+    Postiz plans social media: write a post once, adapt it per network, and schedule it on a
+    calendar for X, LinkedIn, Bluesky, Mastodon, Threads, Instagram, Facebook, YouTube,
+    TikTok, Reddit, Pinterest, Discord, Telegram and more. Teams review drafts together,
+    and an AI assistant helps write them.
+
+    **This template creates three apps**
+
+    - **Postiz**, as three components:
+      - **app**, the web app, its API and the workers that publish
+      - **temporal**, the Temporal server that runs the scheduled work
+      - **tadmin**, the Temporal admin tools, which set up Temporal's databases and
+        namespace, then wait
+    - **a PostgreSQL database**, named after the app with `-db` added, holding Postiz's data
+      and, in two more databases beside it, Temporal's
+    - **a Valkey**, named after the app with `-redis` added
+
+    Uploaded media is on a volume; the database and the volume together are the backup.
+
+    **The first account**
+
+    Postiz needs its domain before anyone signs in. The first person to sign up creates the
+    organization; with **Close sign-up** on, nobody can sign up after that, and others join
+    by invitation.
+
+    **Connecting networks**
+
+    Each network needs an app of your own registered with it, and its keys in this app's
+    environment variables - `X_API_KEY` and `X_API_SECRET`, `LINKEDIN_CLIENT_ID` and
+    `LINKEDIN_CLIENT_SECRET`, and so on, as Postiz's documentation lists per network. Its
+    callback addresses are on your domain.
+  categories: [webapps/business, webapps/social]
+  tags: [automation, scheduling, open-source]
+  aliases: [postiz, social media, scheduler, buffer alternative, hootsuite alternative, social posts, content calendar]
+  icon: icons/postiz.svg
+  links:
+    website: https://postiz.com
+    documentation: https://docs.postiz.com
+    source: https://github.com/gitroomhq/postiz-app
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Postiz answers at; signing in and the networks' callbacks need it. Leave it
+      empty only to add one later, in the routing settings of the app component.
+    type: domain
+    optional: true
+  - name: closeSignup
+    title: Close sign-up
+    description: On, only the first account - the one that creates the organization - can sign up.
+    type: bool
+    default: true
+  - name: jwtSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    description: For the app component; about 2GB once it has started.
+    type: size
+    default: 3GB
+    min: 2GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded media is kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: postiz
+      username: postiz
+  - name: redis
+    title: Cache and queues
+    template: valkey
+    version: "9.1"
+    params:
+      evictionPolicy: noeviction
+
+versions:
+  - name: "2.25"
+    release: "2.25.0"
+    default: true
+    components:
+      app: {image: "ghcr.io/gitroomhq/postiz-app:v2.25.0"}
+      temporal: {image: "temporalio/server:1.31.3"}
+      tadmin: {image: "temporalio/admin-tools:1.31.3"}
+
+components:
+  # ── App ────────────────────────────────────────────────────────────────
+  - name: app
+    title: App
+    primary: true
+    needs: [temporal]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /uploads:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: uploads}
+            /config:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              volumeOptions: {subpath: config}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # Through the image's nginx to the API: both are up. The image has no curl.
+            command: >-
+              node -e "require('http').get('http://127.0.0.1:5000/api/',
+              (r) => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
+            interval: 30s
+            timeout: 10s
+            # The first start migrates the database.
+            startPeriod: 300s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: postiz, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: MAIN_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: FRONTEND_URL, v: "${HIVEPAAS_APP_URL}"}
+            - {k: NEXT_PUBLIC_BACKEND_URL, v: "${HIVEPAAS_APP_URL}/api"}
+            - {k: BACKEND_INTERNAL_URL, v: "http://localhost:3000"}
+            - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+            - k: DATABASE_URL
+              v: >-
+                postgresql://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+            - k: REDIS_URL
+              v: >-
+                redis://default:${{ deps.redis.ref.HIVEPAAS_PASSWORD }}@${{
+                deps.redis.ref.HIVEPAAS_HOST }}:${{ deps.redis.ref.HIVEPAAS_PORT }}
+            - {k: TEMPORAL_ADDRESS, v: "${{ comp.temporal.key }}:7233"}
+            - {k: IS_GENERAL, v: "true"}
+            - {k: DISABLE_REGISTRATION, v: "${{ params.closeSignup }}"}
+            - {k: RUN_CRON, v: "true"}
+            - {k: STORAGE_PROVIDER, v: local}
+            - {k: UPLOAD_DIRECTORY, v: /uploads}
+            - {k: NEXT_PUBLIC_UPLOAD_DIRECTORY, v: /uploads}
+            - {k: NX_ADD_PLUGINS, v: "false"}
+        secrets:
+          JWT_SECRET:
+            value: "${{ params.jwtSecret }}"
+        routing:
+          port: 5000
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Temporal server ────────────────────────────────────────────────────
+  - name: temporal
+    title: Temporal
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # The frontend's gRPC port. It opens only once the schema is in place: until
+            # the admin tools have set it up, the server exits and is started again.
+            command: nc -z 127.0.0.1 7233
+            interval: 15s
+            timeout: 5s
+            startPeriod: 120s
+            retries: 5
+        resources:
+          limits: {memory: 1GB}
+      settings:
+        kind: {category: webapp, engine: postiz, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            # Read by the configuration template built into the server. Its databases are
+            # beside Postiz's, on the same server.
+            - {k: DB, v: postgres12}
+            - {k: POSTGRES_SEEDS, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: POSTGRES_PWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DBNAME, v: temporal}
+            - {k: VISIBILITY_DBNAME, v: temporal_visibility}
+            - {k: NUM_HISTORY_SHARDS, v: "4"}
+            # Listen on every address: Postiz arrives on the project's network.
+            - {k: BIND_ON_IP, v: "0.0.0.0"}
+        configFiles:
+          dynamicconfig.yaml:
+            # The server refuses to start without a dynamic configuration file.
+            content: |
+              limit.maxIDLength:
+                - value: 255
+                  constraints: {}
+            swarmRef:
+              file: {name: /etc/temporal/config/dynamicconfig/docker.yaml, mode: 444}
+
+  # ── Temporal admin tools ───────────────────────────────────────────────
+  - name: tadmin
+    title: Temporal admin tools
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: sh /hivepaas/setup.sh
+        container:
+          healthcheck:
+            # It serves nothing; its log says what the setup did.
+            enabled: false
+        resources:
+          limits: {memory: 128MB}
+      settings:
+        kind: {category: webapp, engine: postiz, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: POSTGRES_SEEDS, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: POSTGRES_PWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: DBNAME, v: temporal}
+            - {k: VISIBILITY_DBNAME, v: temporal_visibility}
+            - {k: TEMPORAL_ADDRESS, v: "${{ comp.temporal.key }}:7233"}
+        configFiles:
+          setup.sh:
+            # Every step is safe to repeat: an existing database is kept, and a schema
+            # already at the image's version gets no update.
+            content: |
+              set -e
+              schema=/etc/temporal/schema/postgresql/v12
+              sql() {
+                temporal-sql-tool --plugin postgres12 --ep "$POSTGRES_SEEDS" -p "$DB_PORT" \
+                  -u "$POSTGRES_USER" --pw "$POSTGRES_PWD" "$@"
+              }
+              until nc -z "$POSTGRES_SEEDS" "$DB_PORT"; do sleep 2; done
+              for db in "$DBNAME:temporal" "$VISIBILITY_DBNAME:visibility"; do
+                name=${db%%:*}
+                dir=${db##*:}
+                sql --db "$name" create 2>/dev/null || true
+                sql --db "$name" setup-schema -v 0.0
+                sql --db "$name" update-schema -d "$schema/$dir/versioned"
+              done
+              echo "hivepaas: schema up to date"
+              until temporal operator namespace describe -n default >/dev/null 2>&1 ||
+                temporal operator namespace create -n default; do
+                sleep 5
+              done
+              echo "hivepaas: namespace default ready"
+              exec sleep infinity
+            swarmRef:
+              file: {name: /hivepaas/setup.sh, mode: 444}
