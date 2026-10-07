@@ -1,0 +1,131 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: filestash
+  title: Filestash
+  tagline: One web file manager for S3, SFTP, FTP, WebDAV, Git and more
+  description: |
+    Filestash is a file manager in the browser for storage you already have. Sign in to an
+    S3 bucket, an SFTP or FTP server, WebDAV, SMB, a Git repository, Backblaze, Dropbox or
+    Google Drive, and browse, upload, preview, edit and share as on a desktop - images,
+    video, audio, PDFs and code open in place.
+
+    **This template creates one app**
+
+    - **Filestash**, with its configuration, share links and search index on a volume
+
+    It holds no files of its own: they stay where they are, and Filestash signs in to
+    them with the credentials whoever uses it gives.
+
+    **The administrator**
+
+    The admin console, at `/admin`, decides which storage the sign-in page offers, with what
+    defaults, and how sharing works. Its password is the one below, under this app's
+    Secrets: change it there and deploy, since every start sets it again.
+
+    **Adding storage**
+
+    A new Filestash has no storage set up: the administrator adds the connections the
+    sign-in page offers in the console - S3, SFTP, WebDAV and the rest. Fill in
+    a connection's host or bucket there to fix it, so that people signing in give only
+    their credentials and cannot point Filestash at a server of their own.
+  categories: [webapps/documents, storage/files]
+  tags: [files, file-transfer, s3, open-source]
+  aliases: [filestash, file manager, s3 browser, sftp client, webdav, ftp, web client, nextcloud alternative]
+  icon: icons/filestash.svg
+  links:
+    website: https://www.filestash.app
+    documentation: https://www.filestash.app/docs/
+    source: https://github.com/mickael-kerjean/filestash
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Filestash answers at; it checks requests come in by it. Leave it empty to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Administrator password
+    description: For the admin console. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the configuration, share links and search index are kept on.
+    type: volume
+
+versions:
+  - name: "2026.10"
+    release: "2026.10.07"
+    default: true
+    # Filestash publishes only latest; this is latest as it was built on the date above,
+    # pinned by its digest.
+    image: machines/filestash:latest@sha256:f1d6defe1930d2a9c5b352c9fd8c302ce9b716f3309f22a94f250763e65305b9
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      command: /hivepaas/start.sh
+    storage:
+      mounts:
+        /app/data/state: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8334/healthz
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: filestash
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APPLICATION_URL, v: "${HIVEPAAS_DOMAIN}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      start.sh:
+        content: |
+          #!/bin/sh
+          # Filestash takes the administrator's password as a bcrypt hash. It is given in
+          # plain, from this app's Secrets, and hashed here by the system's crypt(), which
+          # Perl reaches.
+          set -e
+          ADMIN_PASSWORD=$(perl -e '
+            my @chars = (".", "/", 0..9, "A".."Z", "a".."z");
+            my $salt = join "", map { $chars[rand @chars] } 1..22;
+            print crypt($ENV{HIVEPAAS_ADMIN_PASSWORD}, "\$2b\$10\$" . $salt);')
+          export ADMIN_PASSWORD
+          unset HIVEPAAS_ADMIN_PASSWORD
+          exec /app/filestash
+        swarmRef:
+          file: {name: /hivepaas/start.sh, mode: 555}
+    routing:
+      port: 8334
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

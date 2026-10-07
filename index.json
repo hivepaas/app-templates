@@ -3663,6 +3663,50 @@
       }
     },
     {
+      "name": "filestash",
+      "file": {
+        "path": "templates/filestash.yaml",
+        "sha256": "07a888f7d9ffe683d8e56d64779666797f1a366b4ba2d4ef14b11a9a55677de9"
+      },
+      "icon": {
+        "path": "icons/filestash.svg",
+        "sha256": "3c0d903ee2b3b5a51113700955e806286cbb524266f65c3cd7b1b2209dae76c7"
+      },
+      "title": "Filestash",
+      "tagline": "One web file manager for S3, SFTP, FTP, WebDAV, Git and more",
+      "categories": [
+        "webapps/documents",
+        "storage/files"
+      ],
+      "tags": [
+        "files",
+        "file-transfer",
+        "s3",
+        "open-source"
+      ],
+      "aliases": [
+        "filestash",
+        "file manager",
+        "s3 browser",
+        "sftp client",
+        "webdav",
+        "ftp",
+        "web client",
+        "nextcloud alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "2026.10",
+          "release": "2026.10.07",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "firefly-iii",
       "file": {
         "path": "templates/firefly-iii.yaml",
