@@ -6686,6 +6686,55 @@
       }
     },
     {
+      "name": "kener",
+      "file": {
+        "path": "templates/kener.yaml",
+        "sha256": "156b6995a12942577fd3d651738790215ef1196ddc28b9632e47e98a5484a30f"
+      },
+      "icon": {
+        "path": "icons/kener.svg",
+        "sha256": "4aac05eac9956b9e624a6c82eb56f9acbfaae450faac986470563829db062f27"
+      },
+      "title": "Kener",
+      "tagline": "A status page with built-in monitors, incidents and maintenance windows",
+      "categories": [
+        "observability/monitoring"
+      ],
+      "tags": [
+        "monitoring",
+        "uptime",
+        "notifications",
+        "open-source"
+      ],
+      "aliases": [
+        "kener",
+        "status page",
+        "uptime",
+        "incidents",
+        "statuspage alternative",
+        "uptime kuma alternative",
+        "monitoring"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "redis",
+          "title": "Queues and cache",
+          "template": "valkey"
+        }
+      ],
+      "versions": [
+        {
+          "name": "4.1",
+          "release": "4.1.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "kestra",
       "file": {
         "path": "templates/kestra.yaml",

@@ -1,0 +1,181 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kener
+  title: Kener
+  tagline: A status page with built-in monitors, incidents and maintenance windows
+  description: |
+    Kener publishes a status page and keeps it true: it checks your APIs, hosts, ports, DNS
+    records, TLS certificates, databases and heartbeats on a schedule, draws their uptime
+    history, and alerts by email, webhook, Slack or Discord when one fails. Incidents and
+    maintenance windows are posted with updates for your users to follow, and several
+    branded status pages can come from one install.
+
+    **This template creates two apps**
+
+    - **Kener**, with its SQLite database on a volume
+    - **a Valkey**, named after the app with `-redis` added, for its queues and cache
+
+    The volume is the backup.
+
+    **Signing in**
+
+    The administrator below is created as soon as Kener first answers; its password is
+    under this app's Secrets as `ADMIN_PASSWORD`, read only then. The administration is at
+    `/manage`, where people are invited to it.
+
+    **Email**
+
+    Alerts and invitations by email need SMTP, set under the `SMTP_*` environment
+    variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` and
+    `SMTP_FROM_EMAIL`.
+  categories: [observability/monitoring]
+  tags: [monitoring, uptime, notifications, open-source]
+  aliases: [kener, status page, uptime, incidents, statuspage alternative, uptime kuma alternative, monitoring]
+  icon: icons/kener.svg
+  links:
+    website: https://kener.ing
+    documentation: https://kener.ing/docs
+    source: https://github.com/rajnandan1/kener
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the status page answers at; signing in only works on it. Leave it empty
+      only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Admin
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    description: What the administrator signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: timezone
+    title: Timezone
+    description: The zone the server's schedules run in, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: About 400MB with a few monitors.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database is kept on.
+    type: volume
+
+dependencies:
+  - name: redis
+    title: Queues and cache
+    template: valkey
+    version: "9.1"
+    params:
+      evictionPolicy: noeviction
+
+versions:
+  - name: "4.1"
+    release: "4.1.5"
+    default: true
+    image: rajnandan1/kener:4.1.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Kener will not start on an empty ORIGIN, which the app has while it has no domain.
+      # Then its own start, with the script that makes the administrator beside it.
+      command: >-
+        sh -c '[ -n "$ORIGIN" ] || export ORIGIN=http://localhost:3000;
+        sh /hivepaas/create-admin.sh & exec node build/main.js'
+    storage:
+      mounts:
+        /app/database: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:3000/healthcheck
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kener
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Form posts are only accepted from this address.
+        - {k: ORIGIN, v: "${HIVEPAAS_APP_URL}"}
+        - {k: KENER_SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: DATABASE_URL, v: "sqlite://./database/kener.sqlite.db"}
+        - k: REDIS_URL
+          v: >-
+            redis://default:${{ deps.redis.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.redis.ref.HIVEPAAS_HOST }}:${{ deps.redis.ref.HIVEPAAS_PORT }}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      create-admin.sh:
+        content: |
+          #!/bin/sh
+          # Once Kener answers, its administrator, from the values above. Until there is one,
+          # the sign-in page offers to create it to whoever opens it first; once there is, it
+          # refuses, and this does nothing.
+          base="http://127.0.0.1:$PORT"
+          until curl -fs -o /dev/null "$base/healthcheck"; do sleep 2; done
+          out=$(curl -s -H "Origin: $ORIGIN" -H 'Accept: application/json' -H 'x-sveltekit-action: true' \
+            --data-urlencode "name=$HIVEPAAS_ADMIN_NAME" \
+            --data-urlencode "email=$HIVEPAAS_ADMIN_EMAIL" \
+            --data-urlencode "password=$HIVEPAAS_ADMIN_PASSWORD" \
+            "$base/account/signin?/signup")
+          case "$out" in
+            *'"type":"redirect"'*) echo "hivepaas: administrator $HIVEPAAS_ADMIN_EMAIL created" ;;
+            *'already done'*) echo "hivepaas: no administrator created: there is one already" ;;
+            *) echo "hivepaas: creating the administrator failed: $out" ;;
+          esac
+        swarmRef:
+          file: {name: /hivepaas/create-admin.sh, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
