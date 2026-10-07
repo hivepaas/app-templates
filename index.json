@@ -7730,6 +7730,45 @@
       }
     },
     {
+      "name": "lidarr",
+      "file": {
+        "path": "templates/lidarr.yaml",
+        "sha256": "9494c96d08a1b857f96e48465d0fed29d4f0c1f01b9a3ed578e28cebbbc6d4c2"
+      },
+      "icon": {
+        "path": "icons/lidarr.svg",
+        "sha256": "5e38cd9ac3dec58d53efa2bba6ef14ac90002ebb5ad1e8d4f24bd18ab2db07d1"
+      },
+      "title": "Lidarr",
+      "tagline": "Automatically find, download and organise music",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "music",
+        "albums",
+        "artists",
+        "pvr",
+        "servarr",
+        "arr",
+        "musicbrainz"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.1",
+          "release": "3.1.0.4875",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "linkding",
       "file": {
         "path": "templates/linkding.yaml",
