@@ -34,12 +34,16 @@ jobs:
         working-directory: hivepaas
         run: go run ./tools/apptemplate bump ../app-templates
 
-      # The stars the store orders by, and those of the last four weeks. Read-only
-      # queries of public repositories: the job's own token is enough.
+      # The stars the store orders by, and those of the last four weeks. The job's
+      # own token reads the stars; who starred when - what Trending counts - may
+      # need a token of a person or a GitHub App, as the STATS_GITHUB_TOKEN secret
+      # (read-only, public repositories only). Without one, Trending stays empty.
+      # A count that fails costs the stars, not the week's image bumps.
       - name: Count stars
         working-directory: hivepaas
+        continue-on-error: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.STATS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: go run ./tools/apptemplate stats ../app-templates
 
       # The pull request is opened with GITHUB_TOKEN, and GitHub does not run
