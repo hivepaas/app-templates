@@ -1,0 +1,86 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: drawdb
+  title: drawDB
+  tagline: Draw database diagrams in the browser, and get the SQL to create them
+  description: |
+    drawDB is an entity-relationship diagram editor: lay out tables, columns, keys and the
+    relationships between them, then export the schema as SQL for MySQL, MariaDB,
+    PostgreSQL, SQLite, SQL Server or Oracle. It goes the other way too - paste a schema's
+    SQL or DBML and it draws the diagram - and exports pictures and PDFs for the docs.
+
+    **This template sets up**
+
+    - the drawDB web app, served by nginx
+    - a memory limit you choose
+
+    It keeps nothing: diagrams live in each browser's own storage until they are exported to
+    a file, so the app can be deleted and created again without losing anything. Export a
+    diagram before clearing the browser, or to open it on another computer.
+
+    **What it does not include**
+
+    Sharing a diagram by link goes through drawDB's server, a separate service that is not
+    part of this template. To use your own, set `VITE_BACKEND_URL` in the app's environment
+    variables to its address.
+  categories: [webapps/dev-tools]
+  tags: [sql, documents, open-source]
+  aliases: [drawdb, erd, er diagram, database diagram, schema designer, dbdiagram alternative, sql generator]
+  icon: icons/drawdb.png
+  links:
+    website: https://drawdb.app
+    documentation: https://drawdb-io.github.io/docs
+    source: https://github.com/drawdb-io/drawdb
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 64MB
+    min: 32MB
+
+versions:
+  - name: "1.8"
+    release: "1.8.2"
+    default: true
+    image: ghcr.io/drawdb-io/drawdb:v1.8.2
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 5s
+        startPeriod: 10s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: drawdb
+      version: "${{ version.name }}"
+      webapp: {}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -2809,6 +2809,47 @@
       }
     },
     {
+      "name": "drawdb",
+      "file": {
+        "path": "templates/drawdb.yaml",
+        "sha256": "c6d79c802fe0984e6d3e4dc089babbc2131b917912f90113e0fc8b9457c75967"
+      },
+      "icon": {
+        "path": "icons/drawdb.png",
+        "sha256": "b5ab9f87db2485874d459e2f04a491b4d0cc12f7da22ad878238e5fac57dbfe7"
+      },
+      "title": "drawDB",
+      "tagline": "Draw database diagrams in the browser, and get the SQL to create them",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "sql",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "drawdb",
+        "erd",
+        "er diagram",
+        "database diagram",
+        "schema designer",
+        "dbdiagram alternative",
+        "sql generator"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.8",
+          "release": "1.8.2",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "drawio",
       "file": {
         "path": "templates/drawio.yaml",
