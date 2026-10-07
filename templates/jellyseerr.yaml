@@ -6,6 +6,19 @@ metadata:
   title: Jellyseerr
   tagline: Let people request films and shows for your Jellyfin, Plex or Emby
   description: |
+    **Jellyseerr is now Seerr**
+
+    Jellyseerr and Overseerr merged into Seerr, and Jellyseerr gets no more releases. This
+    template is kept for the apps already made from it, and the store offers the Seerr
+    template instead. To move such an app to Seerr in place, keeping its requests and
+    settings - back the volume up first:
+
+    1. Set the app's command to `sh -c 'chown -R 1000:1000 /app/config'` and deploy. This
+       image runs as root and Seerr does not: it hands the volume to Seerr's user. The
+       container stops when it is done.
+    2. Change the image to `ghcr.io/seerr-team/seerr:v3.5.0`, clear the command, turn the
+       container's init on, and deploy. Seerr migrates the database on its first start.
+
     Jellyseerr is the front desk of a media server: people browse and search films and
     series, see what is already there, and request what is not. Requests go to Sonarr and
     Radarr once approved, and people are told when their request is ready to watch.
@@ -24,6 +37,8 @@ metadata:
   tags: [open-source]
   aliases: [overseerr, jellyfin requests, plex requests, media requests]
   icon: icons/jellyseerr.svg
+  # Superseded by the seerr template; kept for the apps made from it.
+  internal: true
   links:
     website: https://docs.jellyseerr.dev
     documentation: https://docs.jellyseerr.dev
