@@ -14545,6 +14545,48 @@
       }
     },
     {
+      "name": "silverbullet",
+      "file": {
+        "path": "templates/silverbullet.yaml",
+        "sha256": "4a5d1e89bcace68787c711353c8f274b92ebeb26ace6a678b26b9a1b6dd0f6ed"
+      },
+      "icon": {
+        "path": "icons/silverbullet.png",
+        "sha256": "d20ed1ec7ba490a8d7b8fa3520a5e391a8d9d99b120ca9402e9282ffb91bcf13"
+      },
+      "title": "SilverBullet",
+      "tagline": "A programmable notebook of Markdown pages, in the browser and offline",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "wiki",
+        "open-source"
+      ],
+      "aliases": [
+        "silverbullet",
+        "notes",
+        "markdown",
+        "knowledge base",
+        "pkm",
+        "wiki",
+        "obsidian alternative",
+        "lua"
+      ],
+      "license": "MIT",
+      "versions": [
+        {
+          "name": "2.12",
+          "release": "2.12.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "siyuan",
       "file": {
         "path": "templates/siyuan.yaml",

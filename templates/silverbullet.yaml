@@ -1,0 +1,114 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: silverbullet
+  title: SilverBullet
+  tagline: A programmable notebook of Markdown pages, in the browser and offline
+  description: |
+    SilverBullet is a note-taking app for people who like to tinker: plain Markdown pages
+    with links and backlinks, tasks, templates, and queries that turn your notes into live
+    lists and tables - extended with Lua right inside the pages. It runs in the browser,
+    keeps working offline, and syncs when it is back.
+
+    **This template sets up**
+
+    - SilverBullet, its pages as Markdown files on a volume - the backup
+    - a sign-in, with a password generated unless you give one
+    - a memory limit you choose
+
+    **Signing in**
+
+    SilverBullet asks for the user name and password below before it shows anything. The
+    password is under this app's Secrets: change it there and deploy.
+
+    **Your notes are files**
+
+    Every page is a `.md` file in the volume, named after the page, so they stay readable
+    and movable without SilverBullet.
+  categories: [webapps/knowledge]
+  tags: [notes, wiki, open-source]
+  aliases: [silverbullet, notes, markdown, knowledge base, pkm, wiki, obsidian alternative, lua]
+  icon: icons/silverbullet.png
+  links:
+    website: https://silverbullet.md
+    documentation: https://silverbullet.md/Manual
+    source: https://github.com/silverbulletmd/silverbullet
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address SilverBullet answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: username
+    title: User name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@._-]{2,64}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the pages are kept on, as Markdown files.
+    type: volume
+
+versions:
+  - name: "2.12"
+    release: "2.12.0"
+    default: true
+    image: ghcr.io/silverbulletmd/silverbullet:2.12.0@sha256:1b97ce0f7b5085c76e0e9363c88ed97673db62a3b0f78c7bb12868827fff8b37
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image's entrypoint is tini, which has to be process 1 to do its job.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /.instance answers without signing in.
+        command: curl -fs -o /dev/null http://127.0.0.1:3000/.instance
+        interval: 30s
+        timeout: 5s
+        startPeriod: 20s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: silverbullet
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SB_USER, v: "${{ params.username }}:${secrets.PASSWORD}"}
+    secrets:
+      PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
