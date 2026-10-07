@@ -102,6 +102,28 @@ app it was created for, and deleting an app deletes its logical children along w
 database created as a dependency is not something to keep past the app that used it; treat
 it the same as any other data on an app you are about to delete.
 
+## When a template needs a newer HivePaaS
+
+Every installation of a channel reads the templates the channel pins, whatever
+release it runs, and a template file is read strictly: a field or a value an
+older HivePaaS does not know is an error to it. What keeps that from reaching
+anyone is `requires.versionCode`:
+
+1. A HivePaaS release that adds something templates can use - a field, a block,
+   a parameter type, a value - adds a version code in `base/version.go` and
+   moves `CurrentVersion` to it, in that same release.
+2. A template using it says so with `requires.versionCode`. An older HivePaaS
+   lists it as needing a newer one and does not read its file - no error, no
+   form. Lint refuses a code newer than the HivePaaS it is built from, and a
+   template needing an older code than one of its dependencies.
+3. CI's `compat` job lints, with each supported release's own code, the
+   templates that release is offered. A failure there is a template whose
+   `requires.versionCode` is too low.
+4. Never rename, remove or change the meaning of a field: add a new one beside
+   it. `index.json` only ever gains fields; an entry an installation cannot
+   read is left out of its store and logged, and its `apiVersion` stays
+   `hivepaas.com/v1`.
+
 ## Working on templates
 
 The tool lives in the [hivepaas](https://github.com/hivepaas/hivepaas) repository,

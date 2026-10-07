@@ -20,10 +20,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: hivepaas/hivepaas
-          # The HivePaaS commit whose bump tool rewrites these templates. Pinned for
-          # the same reason lint.yml is: templates are checked and changed by the
-          # code that will read them.
-          ref: a5a72a4238c1864c87bec4d2186d5a1e2fbc9919
+          # HivePaaS as the next release will be, as in lint.yml: a pull request it
+          # opens is linted by the same code, and by every supported release there.
+          ref: main
           path: hivepaas
 
       - uses: actions/setup-go@v5

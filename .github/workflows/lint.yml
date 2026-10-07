@@ -16,10 +16,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: hivepaas/hivepaas
-          # The HivePaaS commit whose parser checks these templates. Pinned, so a
-          # template is checked by the code that will read it; move it when HivePaaS
-          # gains a block or a parameter type.
-          ref: a5a72a4238c1864c87bec4d2186d5a1e2fbc9919
+          # HivePaaS as the next release will be: what these templates are written
+          # for. The releases installations already run are checked by compat below,
+          # each with its own code.
+          ref: main
           path: hivepaas
 
       - uses: actions/setup-go@v5
@@ -34,3 +34,59 @@ jobs:
       - name: Check index.json is current
         working-directory: hivepaas
         run: go run ./tools/apptemplate index -check ../app-templates
+
+  # Every installation of a channel reads the templates the channel pins, whatever
+  # release it runs. So each release still supported lints - with its own code,
+  # from its tag - the templates it will be offered: those whose
+  # requires.versionCode is at most its version code. The rest it shows as needing
+  # a newer HivePaaS without reading them.
+  #
+  # A failure here is a template written for a newer HivePaaS than it says: raise
+  # its requires.versionCode to the code of the release that can read it.
+  compat:
+    runs-on: ubuntu-latest
+    env:
+      # The oldest release still supported. Older installations are expected to
+      # update; move this when a release stops being supported.
+      OLDEST_SUPPORTED: v1.0.0-beta2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app-templates
+
+      - uses: actions/checkout@v4
+        with:
+          repository: hivepaas/hivepaas
+          ref: main
+          path: hivepaas
+          # The release tags.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: hivepaas/go.mod
+          cache-dependency-path: hivepaas/go.sum
+
+      - name: Lint what each supported release is offered
+        working-directory: hivepaas
+        run: |
+          set -euo pipefail
+          # Release tags in release order - a beta before its release - from the
+          # oldest supported on.
+          tags=$(git -c versionsort.suffix=- tag --list 'v[0-9]*' --sort=version:refname |
+            awk -v oldest="$OLDEST_SUPPORTED" '$0 == oldest { on = 1 } on')
+          if [ -z "$tags" ]; then
+            echo "::error::no release tag from $OLDEST_SUPPORTED on"
+            exit 1
+          fi
+          for tag in $tags; do
+            rm -rf ../release ../offered
+            mkdir ../release
+            git archive "$tag" | tar -x -C ../release
+            # A release from before the command existed is v000001.
+            code=$(cd ../release && go run ./tools/apptemplate version-code 2>/dev/null || echo v000001)
+            go run ./tools/apptemplate subset -version-code "$code" ../app-templates ../offered
+            echo "::group::$tag ($code)"
+            (cd ../release && go run ./tools/apptemplate lint ../offered)
+            echo "::endgroup::"
+          done
