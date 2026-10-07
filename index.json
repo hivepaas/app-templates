@@ -7552,7 +7552,7 @@
       "name": "koel",
       "file": {
         "path": "templates/koel.yaml",
-        "sha256": "d4facfbc20a22ba89e992713d6dd8cc0f4bda205888f0a9b39e2ac80e75024de"
+        "sha256": "a59775b6c2896c33dcf53d8120969ae901fb429c6f35c1d9069ff10096c6f9ff"
       },
       "icon": {
         "path": "icons/koel.svg",
@@ -13933,7 +13933,7 @@
       "name": "romm",
       "file": {
         "path": "templates/romm.yaml",
-        "sha256": "883ed6f79cb37959dcef30a89be7b2da8a862693929cbdf7e40308ad204ca1d2"
+        "sha256": "11f66cc85260f531d6e680595e4aef52ca2e0ef73cfe11fb8660538517dba9d5"
       },
       "icon": {
         "path": "icons/romm.svg",
@@ -17071,7 +17071,7 @@
       "name": "wanderer",
       "file": {
         "path": "templates/wanderer.yaml",
-        "sha256": "e1d20ff2656349cd562d3d955fd3f944cac12e845143143b617fa6ed03a9aa20"
+        "sha256": "9ab06e9cd50b4b1a2ac9d5accf67c7a77c86fe1cf919a2784fea0a81caebb7c3"
       },
       "icon": {
         "path": "icons/wanderer.svg",

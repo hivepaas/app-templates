@@ -125,7 +125,11 @@ components:
           activeMethod: image
           imageSource: {image: "${{ image }}"}
           # The image's start, with the script that makes the first account beside it.
-          command: sh -c 'node /hivepaas/create-user.mjs & exec npm run start'
+          # ORIGIN has to be a URL - SvelteKit stops at an empty one - so without a
+          # domain it is the address wanderer answers at in the container.
+          command: >-
+            sh -c 'export ORIGIN="${ORIGIN:-http://localhost:3000}";
+            node /hivepaas/create-user.mjs & exec npm run start'
         storage:
           mounts:
             /app/uploads:

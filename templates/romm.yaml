@@ -27,8 +27,9 @@ metadata:
 
     **Adding games**
 
-    Upload games from RomM's own interface, or put them on the library volume as
-    `roms/<platform>/<game file>` - `roms/snes/`, `roms/gba/` and so on - then run a scan.
+    Upload games from RomM's own interface, or put them in the `library` folder of the
+    app's directory on the library volume, as `roms/<platform>/<game file>` -
+    `roms/snes/`, `roms/gba/` and so on - then run a scan.
 
     **Metadata**
 
@@ -149,7 +150,12 @@ app:
       command: sh -c 'python3 /hivepaas/create-admin.py & exec /init'
     storage:
       mounts:
-        /romm/library: {type: volume, source: "${{ params.libraryVolume }}"}
+        # Every mount has a subpath of its own: given one volume for the library and
+        # the data, RomM would otherwise read its own data folders as game platforms.
+        /romm/library:
+          type: volume
+          source: "${{ params.libraryVolume }}"
+          volumeOptions: {subpath: library}
         /romm/resources:
           type: volume
           source: "${{ params.dataVolume }}"

@@ -27,8 +27,8 @@ metadata:
 
     **Adding music**
 
-    Upload songs from Koel's own interface, or put files on the music volume in any folder
-    layout. The library is scanned every day; to scan at once after copying files, run
+    Upload songs from Koel's own interface, or put files in the `music` folder of the
+    app's directory on the music volume, in any folder layout. The library is scanned every day; to scan at once after copying files, run
     `php artisan koel:sync` from the app's terminal.
 
     **The application key**
@@ -112,7 +112,12 @@ app:
       command: /hivepaas/start.sh
     storage:
       mounts:
-        /music: {type: volume, source: "${{ params.musicVolume }}"}
+        # A subpath each, so that one volume for the music and the data keeps the
+        # artwork and the search index out of the library Koel scans.
+        /music:
+          type: volume
+          source: "${{ params.musicVolume }}"
+          volumeOptions: {subpath: music}
         /var/www/html/storage/app/public/images:
           type: volume
           source: "${{ params.dataVolume }}"
