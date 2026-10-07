@@ -1,0 +1,200 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: speakr
+  title: Speakr
+  tagline: Record or upload meetings and get transcripts, speakers and summaries
+  description: |
+    Speakr turns recordings into notes: record in the browser or upload audio, and it
+    transcribes it, tells the speakers apart, writes a title and a summary, and lets you
+    chat with the transcript to ask what was decided. Tags, folders and search keep a
+    library of meetings, calls and lectures; share one by link.
+
+    **This template sets up**
+
+    - Speakr, with its database and the uploaded recordings on a volume - the backup
+    - the administrator, from the values below
+    - a memory limit you choose
+
+    It runs the light image, without PyTorch: everything works, and searching across
+    recordings by meaning falls back to searching their text.
+
+    **The models it uses**
+
+    Speakr sends audio to a speech-to-text service and transcripts to a language model;
+    both are services you choose, with an OpenAI-style API. OpenAI itself works for both.
+    To keep everything on your servers, run LocalAI from this store and give
+    `http://<its app key>:8080/v1` for both, with its model names; any key will do.
+
+    For speaker diarization and voice profiles, a self-hosted WhisperX ASR service is what
+    Speakr recommends: set its address as `ASR_BASE_URL` in the app's environment
+    variables, which then takes over transcription.
+
+    **The administrator**
+
+    The first start creates it from the values below; its password is under this app's
+    Secrets. Sign-up is closed, and the administrator adds users.
+  categories: [webapps/ai]
+  tags: [ai, llm, notes, open-source]
+  aliases: [speakr, transcription, meeting notes, speech to text, whisper, summaries, diarization, otter alternative]
+  icon: icons/speakr.png
+  links:
+    website: https://github.com/murtaza-nasir/speakr
+    documentation: https://murtaza-nasir.github.io/speakr/
+    source: https://github.com/murtaza-nasir/speakr
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Speakr answers at. Recording in the browser needs HTTPS: leave it empty
+      only to add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: transcriptionBaseUrl
+    title: Speech-to-text API
+    description: An OpenAI-style API for transcription.
+    type: string
+    default: https://api.openai.com/v1
+    pattern: '^https?://\S+$'
+  - name: transcriptionApiKey
+    title: Speech-to-text API key
+    description: Speakr does not start without one; for a server that takes none, any value.
+    type: secret
+    minLength: 1
+  - name: transcriptionModel
+    title: Speech-to-text model
+    description: whisper-1, gpt-4o-transcribe, gpt-4o-transcribe-diarize, or the name your server uses.
+    type: string
+    default: whisper-1
+    pattern: '^\S{1,128}$'
+  - name: textModelBaseUrl
+    title: Language model API
+    description: An OpenAI-style API for titles, summaries and chat.
+    type: string
+    default: https://api.openai.com/v1
+    pattern: '^https?://\S+$'
+  - name: textModelApiKey
+    title: Language model API key
+    description: For a server that takes none, any value.
+    type: secret
+    minLength: 1
+  - name: textModelName
+    title: Language model
+    type: string
+    default: gpt-4o-mini
+    pattern: '^\S{1,128}$'
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    description: What the administrator signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Session key
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and the recordings are kept on.
+    type: volume
+
+versions:
+  - name: "0.10"
+    release: "0.10.13-alpha"
+    default: true
+    image: learnedmachine/speakr:0.10.13-alpha-lite@sha256:0064d80e415424074425c4dfd3a978b28093818f196cf69412dba5a6ccf6f3bb
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data/uploads:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: uploads}
+        /data/instance:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: instance}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has neither curl nor wget.
+        command: >-
+          python -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8899/login', timeout=5)"
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: speakr
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TRANSCRIPTION_BASE_URL, v: "${{ params.transcriptionBaseUrl }}"}
+        - {k: TRANSCRIPTION_API_KEY, v: "${secrets.TRANSCRIPTION_API_KEY}"}
+        - {k: TRANSCRIPTION_MODEL, v: "${{ params.transcriptionModel }}"}
+        - {k: TEXT_MODEL_BASE_URL, v: "${{ params.textModelBaseUrl }}"}
+        - {k: TEXT_MODEL_API_KEY, v: "${secrets.TEXT_MODEL_API_KEY}"}
+        - {k: TEXT_MODEL_NAME, v: "${{ params.textModelName }}"}
+        # Read by the start, which creates the administrator when there is none.
+        - {k: ADMIN_USERNAME, v: "${{ params.adminUser }}"}
+        - {k: ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: ALLOW_REGISTRATION, v: "false"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: TIMEZONE, v: "${{ params.timezone }}"}
+        - {k: LOG_LEVEL, v: INFO}
+    secrets:
+      TRANSCRIPTION_API_KEY:
+        value: "${{ params.transcriptionApiKey }}"
+      TEXT_MODEL_API_KEY:
+        value: "${{ params.textModelApiKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+    routing:
+      port: 8899
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

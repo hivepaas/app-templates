@@ -15008,6 +15008,49 @@
       }
     },
     {
+      "name": "speakr",
+      "file": {
+        "path": "templates/speakr.yaml",
+        "sha256": "54ac3cb9e4821f9d680402122b6996e6a509c1218c3b4601188db17359a03a59"
+      },
+      "icon": {
+        "path": "icons/speakr.png",
+        "sha256": "3ccdad0abd787540a10657edb275f35693358a3c7711844e6545aea9c7350f90"
+      },
+      "title": "Speakr",
+      "tagline": "Record or upload meetings and get transcripts, speakers and summaries",
+      "categories": [
+        "webapps/ai"
+      ],
+      "tags": [
+        "ai",
+        "llm",
+        "notes",
+        "open-source"
+      ],
+      "aliases": [
+        "speakr",
+        "transcription",
+        "meeting notes",
+        "speech to text",
+        "whisper",
+        "summaries",
+        "diarization",
+        "otter alternative"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "0.10",
+          "release": "0.10.13-alpha",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "stalwart",
       "file": {
         "path": "templates/stalwart.yaml",
