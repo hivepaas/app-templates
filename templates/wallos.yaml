@@ -1,0 +1,205 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: wallos
+  title: Wallos
+  tagline: Track your subscriptions and recurring payments, and what they cost a month
+  description: |
+    Wallos keeps the list of what you pay for every month or year - streaming, software,
+    hosting, insurance - with its price, currency, payment method and next due date, and
+    adds it up per month in your main currency. It reminds you before a payment by email,
+    Discord, Telegram, Gotify, Pushover or webhook, finds logos on its own, and shows where
+    the money goes by category and household member.
+
+    **What this template creates**
+
+    One app, with its SQLite database and the uploaded logos on a volume. The volume is the
+    backup.
+
+    **Signing in**
+
+    The account below is created as soon as Wallos first answers, and is the administrator;
+    its password is under this app's Secrets as `ADMIN_PASSWORD`, read only then. Sign-up
+    is closed after it: open it, or add people, under *Admin*.
+
+    **Exchange rates**
+
+    Totals across currencies need a free Fixer API key, entered in Wallos's settings.
+  categories: [webapps/business]
+  tags: [privacy, open-source]
+  aliases: [wallos, subscriptions, subscription tracker, recurring payments, budget, personal finance, expenses]
+  icon: icons/wallos.svg
+  links:
+    website: https://wallosapp.com
+    documentation: https://github.com/ellite/Wallos#readme
+    source: https://github.com/ellite/Wallos
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Wallos answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: What the administrator signs in with the first time. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: currency
+    title: Main currency
+    description: The one totals are shown in; change it later in Wallos's settings.
+    type: select
+    default: USD
+    options:
+      - {value: USD, title: US dollar}
+      - {value: EUR, title: Euro}
+      - {value: GBP, title: Pound sterling}
+      - {value: JPY, title: Japanese yen}
+      - {value: CNY, title: Chinese yuan}
+      - {value: INR, title: Indian rupee}
+      - {value: AUD, title: Australian dollar}
+      - {value: CAD, title: Canadian dollar}
+      - {value: CHF, title: Swiss franc}
+      - {value: BRL, title: Brazilian real}
+      - {value: MXN, title: Mexican peso}
+      - {value: KRW, title: South Korean won}
+      - {value: SGD, title: Singapore dollar}
+      - {value: HKD, title: Hong Kong dollar}
+      - {value: TWD, title: New Taiwan dollar}
+      - {value: THB, title: Thai baht}
+      - {value: MYR, title: Malaysian ringgit}
+      - {value: IDR, title: Indonesian rupiah}
+      - {value: PHP, title: Philippine peso}
+      - {value: NZD, title: New Zealand dollar}
+      - {value: ZAR, title: South African rand}
+      - {value: SEK, title: Swedish krona}
+      - {value: NOK, title: Norwegian krone}
+      - {value: DKK, title: Danish krone}
+      - {value: ISK, title: Icelandic króna}
+      - {value: PLN, title: Polish złoty}
+      - {value: CZK, title: Czech koruna}
+      - {value: HUF, title: Hungarian forint}
+      - {value: RON, title: Romanian leu}
+      - {value: BGN, title: Bulgarian lev}
+      - {value: TRY, title: Turkish lira}
+      - {value: UAH, title: Ukrainian hryvnia}
+      - {value: RUB, title: Russian ruble}
+      - {value: ILS, title: Israeli new shekel}
+  - name: timezone
+    title: Timezone
+    description: The zone due dates and reminders are reckoned in, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and the uploaded logos are kept on.
+    type: volume
+
+versions:
+  - name: "5.8"
+    release: "5.8.3"
+    default: true
+    image: bellamy/wallos:5.8.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own start, with the script that makes the first account beside it.
+      command: sh -c 'sh /hivepaas/create-admin.sh & exec /var/www/html/startup.sh'
+    storage:
+      mounts:
+        /var/www/html/db:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: db}
+        /var/www/html/images/uploads/logos:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: logos}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1/health.php
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: wallos
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: HIVEPAAS_CURRENCY, v: "${{ params.currency }}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      create-admin.sh:
+        content: |
+          #!/bin/sh
+          # Once Wallos answers, its first account - the administrator - from the values
+          # above. Until there is one, the registration page lets whoever opens it first make
+          # it; once there is, it is closed, and this does nothing.
+          until curl -fs -o /dev/null http://127.0.0.1/health.php; do sleep 2; done
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/registration.php)
+          if [ "$code" != 200 ]; then
+            echo "hivepaas: no account created: there is one already"
+            exit 0
+          fi
+          curl -s -o /dev/null \
+            --data-urlencode "username=$HIVEPAAS_ADMIN_USER" \
+            --data-urlencode "firstname=$HIVEPAAS_ADMIN_USER" \
+            --data-urlencode "lastname=" \
+            --data-urlencode "email=$HIVEPAAS_ADMIN_EMAIL" \
+            --data-urlencode "password=$HIVEPAAS_ADMIN_PASSWORD" \
+            --data-urlencode "confirm_password=$HIVEPAAS_ADMIN_PASSWORD" \
+            --data-urlencode "main_currency=$HIVEPAAS_CURRENCY" \
+            --data-urlencode "language=en" \
+            http://127.0.0.1/registration.php
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/registration.php)" = 200 ]; then
+            echo "hivepaas: creating the first account failed"
+          else
+            echo "hivepaas: account $HIVEPAAS_ADMIN_USER created"
+          fi
+        swarmRef:
+          file: {name: /hivepaas/create-admin.sh, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

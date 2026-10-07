@@ -15605,6 +15605,46 @@
       }
     },
     {
+      "name": "wallos",
+      "file": {
+        "path": "templates/wallos.yaml",
+        "sha256": "63f140314b795d07d7e744efd422b353ff3cec4312ce8d8009e949cb130326bc"
+      },
+      "icon": {
+        "path": "icons/wallos.svg",
+        "sha256": "4f1f664c67ef293c9a2c65c54f98f745147d86fb18d255cf6ef04c1218937618"
+      },
+      "title": "Wallos",
+      "tagline": "Track your subscriptions and recurring payments, and what they cost a month",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "wallos",
+        "subscriptions",
+        "subscription tracker",
+        "recurring payments",
+        "budget",
+        "personal finance",
+        "expenses"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "5.8",
+          "release": "5.8.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "weaviate",
       "file": {
         "path": "templates/weaviate.yaml",
