@@ -13077,6 +13077,53 @@
       }
     },
     {
+      "name": "ryot",
+      "file": {
+        "path": "templates/ryot.yaml",
+        "sha256": "e1d1a467b9c8e1355a40db2f4aa9824dd6b56e1d9f478cfd0e32b5c4d3f87bdd"
+      },
+      "icon": {
+        "path": "icons/ryot.svg",
+        "sha256": "388cfde4bacf05dc7c3f2b924138847493bc104bf7c60f332ecd70f0e781b84d"
+      },
+      "title": "Ryot",
+      "tagline": "Track what you watch, read, play and lift - media and fitness in one place",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "ryot",
+        "media tracker",
+        "trakt alternative",
+        "goodreads alternative",
+        "workout log",
+        "fitness tracker",
+        "watchlist"
+      ],
+      "license": "GPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "10.5",
+          "release": "10.5.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "s3proxy",
       "file": {
         "path": "templates/s3proxy.yaml",

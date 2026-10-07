@@ -1,0 +1,185 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: ryot
+  title: Ryot
+  tagline: Track what you watch, read, play and lift - media and fitness in one place
+  description: |
+    Ryot keeps a record of your life's habits: the movies, shows, anime, books, audiobooks,
+    podcasts, music and games you follow, with progress, ratings and reviews, and the
+    workouts you log against its database of exercises, with body measurements and graphs
+    of your progress. It imports from Goodreads, Trakt, MyAnimeList, Audiobookshelf and
+    others, follows what you play in Jellyfin, Plex, Kodi or Emby, and notifies by Discord,
+    ntfy or Apprise.
+
+    **This template creates two apps**
+
+    - **Ryot**, which keeps nothing of its own outside the database
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    The database is the backup.
+
+    **Signing in**
+
+    The administrator below is created when Ryot starts, if no account has that name; its
+    password is under this app's Secrets as `ADMIN_PASSWORD`. Sign-up is closed unless you
+    open it below; the administrator can also add people.
+
+    **The admin access token**
+
+    It lets the administrator's tools act on the instance as a whole, and is under this
+    app's Secrets as `ADMIN_ACCESS_TOKEN`.
+  categories: [webapps/media]
+  tags: [privacy, open-source]
+  aliases: [ryot, media tracker, trakt alternative, goodreads alternative, workout log, fitness tracker, watchlist]
+  icon: icons/ryot.svg
+  links:
+    website: https://ryot.io
+    documentation: https://docs.ryot.io
+    source: https://github.com/IgnisDa/ryot
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Ryot answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@._-]{2,64}$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: openSignup
+    title: Open sign-up
+    description: On, anyone who reaches the address can make an account.
+    type: bool
+    default: false
+  - name: adminAccessToken
+    title: Admin access token
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 20
+    generate: {length: 48}
+  - name: timezone
+    title: Timezone
+    description: The zone dates are reckoned in, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: ryot
+      username: ryot
+
+versions:
+  - name: "10.5"
+    release: "10.5.3"
+    default: true
+    image: ignisda/ryot:v10.5.3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own start, with the script that makes the administrator beside it.
+      command: sh -c 'node /hivepaas/create-admin.mjs & exec /usr/local/bin/run-container.sh'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8000/health
+        interval: 30s
+        timeout: 5s
+        # The first start creates the schema and downloads the exercise database.
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: ryot
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: FRONTEND_URL, v: "${HIVEPAAS_APP_URL}"}
+        - k: DATABASE_URL
+          v: >-
+            postgres://${{ deps.db.ref.HIVEPAAS_USER }}:${{ deps.db.ref.HIVEPAAS_PASSWORD }}@${{
+            deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: SERVER_ADMIN_ACCESS_TOKEN, v: "${secrets.ADMIN_ACCESS_TOKEN}"}
+        - {k: USERS_ALLOW_REGISTRATION, v: "${{ params.openSignup }}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_ACCESS_TOKEN:
+        value: "${{ params.adminAccessToken }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      create-admin.mjs:
+        content: |
+          // Once Ryot answers, the administrator from the values above, if no account has
+          // its name. The admin access token lets this through with sign-up closed.
+          const api = 'http://127.0.0.1:8000/backend/graphql';
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          for (;;) {
+            try {
+              if ((await fetch('http://127.0.0.1:8000/health')).ok) break;
+            } catch {}
+            await sleep(2000);
+          }
+          const res = await fetch(api, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: 'mutation($i: RegisterUserInput!) { registerUser(input: $i) { __typename ... on RegisterError { error } } }',
+              variables: {
+                i: {
+                  data: { password: { username: process.env.HIVEPAAS_ADMIN_USER, password: process.env.HIVEPAAS_ADMIN_PASSWORD } },
+                  lot: 'ADMIN',
+                  adminAccessToken: process.env.SERVER_ADMIN_ACCESS_TOKEN,
+                },
+              },
+            }),
+          });
+          const result = (await res.json())?.data?.registerUser;
+          if (result?.__typename === 'StringIdObject') {
+            console.log('hivepaas: administrator ' + process.env.HIVEPAAS_ADMIN_USER + ' created');
+          } else if (result?.error === 'IDENTIFIER_ALREADY_EXISTS') {
+            console.log('hivepaas: administrator ' + process.env.HIVEPAAS_ADMIN_USER + ' exists');
+          } else {
+            console.log('hivepaas: creating the administrator failed: ' + JSON.stringify(result));
+          }
+        swarmRef:
+          file: {name: /hivepaas/create-admin.mjs, mode: 444}
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
