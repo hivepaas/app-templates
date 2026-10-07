@@ -4911,6 +4911,51 @@
       }
     },
     {
+      "name": "gogs",
+      "file": {
+        "path": "templates/gogs.yaml",
+        "sha256": "35e8048d759150bfb4f08a47c5ba34c4f6a65e7822efd370320867863381d986"
+      },
+      "icon": {
+        "path": "icons/gogs.png",
+        "sha256": "051cb1af61baf06caaa90d691e38bbf2e104bd7479301afaefa88b102e52ae04"
+      },
+      "title": "Gogs",
+      "tagline": "A painless self-hosted Git service - small, fast, one binary",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "git",
+        "open-source"
+      ],
+      "aliases": [
+        "gogs",
+        "git server",
+        "git hosting",
+        "github alternative",
+        "repositories"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.14",
+          "release": "0.14.3",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "gotenberg",
       "file": {
         "path": "templates/gotenberg.yaml",

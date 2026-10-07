@@ -1,0 +1,215 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: gogs
+  title: Gogs
+  tagline: A painless self-hosted Git service - small, fast, one binary
+  description: |
+    Gogs is the original lightweight Git server: repositories with a web interface,
+    issues, pull requests, wikis, webhooks, organizations and teams, in one small Go
+    binary that runs comfortably on very little memory. Gitea and Forgejo, also in this
+    store, grew out of it and do more; Gogs stays small.
+
+    **This template creates two apps**
+
+    - **Gogs**, with the repositories and its configuration on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    The database and the volume together are the backup.
+
+    **Set up from the start**
+
+    Gogs's install page is open to whoever reaches it first. Here the first start writes
+    the configuration it would have written, with the install locked, and makes the
+    administrator below. The password is under this app's Secrets. The configuration is on
+    the volume, at `gogs/conf/app.ini`; later changes to the values below do not reach it.
+
+    **Accounts**
+
+    With sign-up closed, the administrator adds users in the site administration.
+
+    **Cloning**
+
+    Clone over HTTPS at the app's domain; SSH is turned off.
+  categories: [webapps/dev-tools]
+  tags: [git, open-source]
+  aliases: [gogs, git server, git hosting, github alternative, repositories]
+  icon: icons/gogs.png
+  links:
+    website: https://gogs.io
+    documentation: https://gogs.io/docs
+    source: https://github.com/gogs/gogs
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Gogs answers at, which its links and clone URLs use. Leave it empty only
+      to set it later, in the app's routing settings and in `app.ini`.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    description: Not "admin", which Gogs reserves.
+    type: string
+    default: gogs-admin
+    pattern: '^[A-Za-z0-9._-]{2,35}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: closeSignup
+    title: Close sign-up
+    description: On, only the administrator adds accounts. Off, anyone who reaches the address can make one.
+    type: bool
+    default: true
+  - name: secretKey
+    title: Secret key
+    description: Signs cookies and tokens. Leave empty to generate one.
+    type: secret
+    minLength: 20
+    generate: {length: 40}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the repositories and the configuration are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: gogs
+      username: gogs
+
+versions:
+  - name: "0.14"
+    release: "0.14.3"
+    default: true
+    # The "next" image: it runs as the git user, with no s6 supervisor and no SSH server.
+    image: gogs/gogs:next-0.14.3@sha256:35ce526c55c9a5cb9cb9335e48cd287ac88951dcdddf3e4552e47e60f13d181c
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Run by the image's entrypoint, in place of `gogs web` alone; see the file.
+      command: /hivepaas/start.sh
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:3000/healthcheck
+        interval: 30s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: gogs
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - k: GOGS_DB_HOST
+          v: "${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}"
+        - {k: GOGS_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: GOGS_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: GOGS_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: GOGS_SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: GOGS_DISABLE_REGISTRATION, v: "${{ params.closeSignup }}"}
+        - {k: GOGS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: GOGS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: GOGS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      start.sh:
+        content: |
+          #!/bin/sh
+          # Gogs's install page is open to whoever reaches it first. Here the first start writes
+          # the configuration it would have written - with the install locked - and makes the
+          # administrator, so that page never opens.
+          set -e
+          conf=/data/gogs/conf/app.ini
+          if [ ! -s "$conf" ]; then
+            mkdir -p /data/gogs/conf /data/git/gogs-repositories
+            url=https://$HIVEPAAS_DOMAIN/
+            [ -n "$HIVEPAAS_DOMAIN" ] || url=http://localhost:3000/
+            cat > "$conf" <<INI
+          BRAND_NAME = Gogs
+          RUN_USER = git
+          RUN_MODE = prod
+
+          [database]
+          TYPE = postgres
+          HOST = $GOGS_DB_HOST
+          NAME = $GOGS_DB_NAME
+          USER = $GOGS_DB_USER
+          PASSWORD = $GOGS_DB_PASSWORD
+          SSL_MODE = disable
+
+          [repository]
+          ROOT = /data/git/gogs-repositories
+
+          [server]
+          DOMAIN = $HIVEPAAS_DOMAIN
+          EXTERNAL_URL = $url
+          HTTP_PORT = 3000
+          DISABLE_SSH = true
+
+          [security]
+          INSTALL_LOCK = true
+          SECRET_KEY = $GOGS_SECRET_KEY
+
+          [auth]
+          DISABLE_REGISTRATION = $GOGS_DISABLE_REGISTRATION
+
+          [log]
+          MODE = console
+          LEVEL = Info
+          INI
+            echo "hivepaas: configuration written"
+          fi
+          (
+            until curl -fs -o /dev/null http://127.0.0.1:3000/healthcheck; do sleep 2; done
+            if /app/gogs/gogs admin create-user --config "$conf" --admin --name "$GOGS_ADMIN_USER" \
+                --password "$GOGS_ADMIN_PASSWORD" --email "$GOGS_ADMIN_EMAIL" >/dev/null 2>&1; then
+              echo "hivepaas: administrator $GOGS_ADMIN_USER created"
+            fi
+          ) &
+          exec /app/gogs/gogs web
+        swarmRef:
+          file: {name: /hivepaas/start.sh, mode: 555}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
