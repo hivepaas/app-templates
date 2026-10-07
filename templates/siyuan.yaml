@@ -1,0 +1,127 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: siyuan
+  title: SiYuan
+  tagline: A personal knowledge base of blocks, references and databases, in your browser
+  description: |
+    SiYuan is a note-taking and knowledge-management app built from blocks: every paragraph,
+    heading and list item can be referenced, embedded and queried elsewhere. Documents link
+    both ways, databases turn blocks into tables and boards, and flashcards, daily notes,
+    templates and SQL queries over your own notes are built in.
+
+    **What this template creates**
+
+    One app, with its workspace - notebooks, assets, settings and history - on a volume.
+    The volume is the backup.
+
+    **The access code**
+
+    SiYuan asks for its access code before it opens; leave it empty below to generate one.
+    It is under this app's Secrets as `ACCESS_AUTH_CODE`, and changing it there takes effect
+    on the next restart.
+
+    **One person's workspace**
+
+    SiYuan is a personal app: one workspace, one access code, no user accounts. Run one app
+    per person rather than sharing it.
+
+    **What the server version leaves out**
+
+    The desktop and mobile apps cannot open this server's workspace - they sync through
+    SiYuan's own cloud, S3 or WebDAV instead - and export to PDF and Word is not available.
+    Everything else works in the browser.
+  categories: [webapps/knowledge]
+  tags: [notes, wiki, open-source, privacy]
+  aliases: [siyuan, notes, knowledge base, pkm, obsidian alternative, notion alternative, logseq alternative, second brain]
+  icon: icons/siyuan.svg
+  links:
+    website: https://b3log.org/siyuan/en/
+    documentation: https://github.com/siyuan-note/siyuan#-docker-hosting
+    source: https://github.com/siyuan-note/siyuan
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address SiYuan answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: accessAuthCode
+    title: Access code
+    description: Asked before the workspace opens. Leave empty to generate one; it is kept under the app's Secrets.
+    type: secret
+    minLength: 6
+    generate: {length: 20}
+  - name: timezone
+    title: Timezone
+    description: The zone daily notes and timestamps are written in, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    description: A few hundred megabytes for a modest workspace; more for large ones with many assets.
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Workspace volume
+    description: The volume the workspace - notebooks, assets and settings - is kept on.
+    type: volume
+
+versions:
+  - name: "3.8"
+    release: "3.8.6"
+    default: true
+    image: b3log/siyuan:v3.8.6
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entrypoint takes these: it makes the user, gives it the workspace, and
+      # starts the kernel. The access code is read from SIYUAN_ACCESS_AUTH_CODE rather than
+      # passed here, where it would be stored in plain text on the app.
+      command: serve --workspace=/siyuan/workspace/ --port=6806
+    storage:
+      mounts:
+        /siyuan/workspace: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The version needs no access code: it says the kernel has booted.
+        command: wget -q -O /dev/null http://127.0.0.1:6806/api/system/version
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: siyuan
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: SIYUAN_ACCESS_AUTH_CODE, v: "${secrets.ACCESS_AUTH_CODE}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+    secrets:
+      ACCESS_AUTH_CODE:
+        value: "${{ params.accessAuthCode }}"
+    routing:
+      port: 6806
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

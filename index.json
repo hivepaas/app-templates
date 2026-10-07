@@ -12700,6 +12700,49 @@
       }
     },
     {
+      "name": "siyuan",
+      "file": {
+        "path": "templates/siyuan.yaml",
+        "sha256": "accfeb1d9e02886b8e6659c7eaab26e5d3ff3a62fc2ce8cb029eec8261160faa"
+      },
+      "icon": {
+        "path": "icons/siyuan.svg",
+        "sha256": "9272bb4a8629b99cc3e9e2053c7d21fe11328c4198d7df60a21bb1a3e2a64389"
+      },
+      "title": "SiYuan",
+      "tagline": "A personal knowledge base of blocks, references and databases, in your browser",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "notes",
+        "wiki",
+        "open-source",
+        "privacy"
+      ],
+      "aliases": [
+        "siyuan",
+        "notes",
+        "knowledge base",
+        "pkm",
+        "obsidian alternative",
+        "notion alternative",
+        "logseq alternative",
+        "second brain"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.8",
+          "release": "3.8.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "snipe-it",
       "file": {
         "path": "templates/snipe-it.yaml",
