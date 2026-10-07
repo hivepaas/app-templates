@@ -66,9 +66,9 @@ parameters:
 
 versions:
   - name: "2.40"
-    release: "2.40.2"
+    release: "2.40.7"
     default: true
-    image: n8nio/n8n:2.40.2
+    image: n8nio/n8n:2.40.7
 
 app:
   deployment:

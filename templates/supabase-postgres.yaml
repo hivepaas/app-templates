@@ -53,9 +53,9 @@ parameters:
 
 versions:
   - name: "17"
-    release: "17.6.1.136"
+    release: "17.11.0.004"
     default: true
-    image: supabase/postgres:17.6.1.136
+    image: supabase/postgres:17.11.0.004
 
 app:
   deployment:

@@ -77,12 +77,12 @@ dependencies:
 
 versions:
   - name: "32"
-    release: "32.0.2"
+    release: "32.0.15"
     default: true
-    image: nextcloud:32.0.2-apache
+    image: nextcloud:32.0.15-apache
   - name: "31"
-    release: "31.0.10"
-    image: nextcloud:31.0.10-apache
+    release: "31.0.14"
+    image: nextcloud:31.0.14-apache
 
 app:
   deployment:

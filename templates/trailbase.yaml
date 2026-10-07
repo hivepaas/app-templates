@@ -75,9 +75,9 @@ parameters:
 
 versions:
   - name: "0.34"
-    release: "0.34.1"
+    release: "0.34.4"
     default: true
-    image: trailbase/trailbase:0.34.1
+    image: trailbase/trailbase:0.34.4
 
 app:
   deployment:

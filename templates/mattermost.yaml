@@ -78,9 +78,9 @@ dependencies:
 
 versions:
   - name: "11.11"
-    release: "11.11.0"
+    release: "11.11.1"
     default: true
-    image: mattermost/mattermost-team-edition:11.11.0
+    image: mattermost/mattermost-team-edition:11.11.1
 
 app:
   deployment:

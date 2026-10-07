@@ -98,9 +98,9 @@ dependencies:
 
 versions:
   - name: "0.107"
-    release: "v0.107.2"
+    release: "v0.107.4"
     default: true
-    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.107.2
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.107.4
 
 app:
   deployment:

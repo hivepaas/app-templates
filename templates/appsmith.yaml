@@ -72,9 +72,9 @@ parameters:
 
 versions:
   - name: "2.4"
-    release: "v2.4.1"
+    release: "v2.4.3"
     default: true
-    image: appsmith/appsmith-ce:v2.4.1
+    image: appsmith/appsmith-ce:v2.4.3
 
 app:
   deployment:

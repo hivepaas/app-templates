@@ -83,9 +83,9 @@ parameters:
 
 versions:
   - name: "1.4"
-    release: "1.4.0"
+    release: "1.4.6"
     default: true
-    image: ghcr.io/gethomepage/homepage:v1.4.0
+    image: ghcr.io/gethomepage/homepage:v1.4.6
 
 app:
   deployment:

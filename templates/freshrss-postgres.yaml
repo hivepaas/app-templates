@@ -86,9 +86,9 @@ dependencies:
 
 versions:
   - name: "1.30"
-    release: "1.30.0"
+    release: "1.30.1"
     default: true
-    image: freshrss/freshrss:1.30.0-alpine
+    image: freshrss/freshrss:1.30.1-alpine
 
 app:
   deployment:

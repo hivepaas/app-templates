@@ -73,9 +73,9 @@ parameters:
 
 versions:
   - name: "12.1"
-    release: "12.1"
+    release: "12.1.20260915"
     default: true
-    image: jellyfin/jellyfin:12.1
+    image: jellyfin/jellyfin:12.1.20260915-010956
 
 app:
   deployment:

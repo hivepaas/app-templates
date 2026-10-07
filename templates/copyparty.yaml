@@ -106,11 +106,11 @@ parameters:
 
 versions:
   - name: "1.20"
-    release: "1.20.24"
+    release: "1.20.25"
     default: true
     # The "ac" image: copyparty with the optional dependencies for thumbnails, media
     # tags and fast hashing.
-    image: copyparty/ac:1.20.24
+    image: copyparty/ac:1.20.25
 
 app:
   deployment:

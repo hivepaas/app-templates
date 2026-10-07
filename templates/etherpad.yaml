@@ -90,9 +90,9 @@ dependencies:
 
 versions:
   - name: "3.3"
-    release: "3.3.6"
+    release: "3.3.7"
     default: true
-    image: etherpad/etherpad:3.3.6
+    image: etherpad/etherpad:3.3.7
 
 app:
   deployment:

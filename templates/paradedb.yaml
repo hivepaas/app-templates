@@ -83,10 +83,10 @@ parameters:
 
 versions:
   - name: "0.25"
-    release: "0.25.9"
+    release: "0.25.11"
     default: true
     # Built on the PostgreSQL 18 image.
-    image: paradedb/paradedb:0.25.9-pg18
+    image: paradedb/paradedb:0.25.11-pg18
 
 app:
   deployment:

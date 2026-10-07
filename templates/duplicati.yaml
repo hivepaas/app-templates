@@ -83,9 +83,9 @@ parameters:
 
 versions:
   - name: "2.4"
-    release: "2.4.0.0"
+    release: "2.4.0.1"
     default: true
-    image: duplicati/duplicati:2.4.0.0
+    image: duplicati/duplicati:2.4.0.1
 
 app:
   deployment:

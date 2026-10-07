@@ -89,9 +89,9 @@ parameters:
 
 versions:
   - name: "1.5"
-    release: "1.5.735"
+    release: "1.5.915"
     default: true
-    image: mumblevoip/mumble-server:v1.5.735
+    image: mumblevoip/mumble-server:v1.5.915-2
 
 app:
   deployment:

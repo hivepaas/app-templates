@@ -74,9 +74,9 @@ parameters:
 
 versions:
   - name: "2.8"
-    release: "2.8.1"
+    release: "2.8.4"
     default: true
-    image: grafana/tempo:2.8.1
+    image: grafana/tempo:2.8.4
 
 app:
   deployment:

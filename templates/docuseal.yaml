@@ -73,9 +73,9 @@ parameters:
 
 versions:
   - name: "2.3"
-    release: "2.3.6"
+    release: "2.3.7"
     default: true
-    image: docuseal/docuseal:2.3.6
+    image: docuseal/docuseal:2.3.7
 
 app:
   deployment:

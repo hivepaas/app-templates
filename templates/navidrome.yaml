@@ -68,9 +68,9 @@ parameters:
 
 versions:
   - name: "0.64"
-    release: "0.64.0"
+    release: "0.64.2"
     default: true
-    image: deluan/navidrome:0.64.0
+    image: deluan/navidrome:0.64.2
 
 app:
   deployment:

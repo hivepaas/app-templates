@@ -90,9 +90,9 @@ dependencies:
 
 versions:
   - name: "2026.9"
-    release: "2026.9.0"
+    release: "2026.9.1"
     default: true
-    image: misskey/misskey:2026.9.0
+    image: misskey/misskey:2026.9.1
 
 app:
   deployment:

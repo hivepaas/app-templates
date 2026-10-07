@@ -4,395 +4,396 @@
 # is not on GitHub.
 apiVersion: hivepaas.com/v1
 kind: TemplateStats
+counted: "2026-10-07"
 templates:
-  activepieces: {added: "2026-09-20"}
-  actual: {added: "2026-09-19"}
-  adguard-home: {added: "2026-09-21"}
-  adminer: {added: "2026-09-19"}
-  affine: {added: "2026-09-28"}
-  akaunting: {added: "2026-09-30"}
-  alertmanager: {added: "2026-09-20"}
-  anythingllm: {added: "2026-09-18"}
-  apache-answer: {added: "2026-10-07"}
-  apprise: {added: "2026-09-21"}
-  appsmith: {added: "2026-09-20"}
-  appwrite: {added: "2026-09-26"}
+  activepieces: {added: "2026-09-20", stars: 24931}
+  actual: {added: "2026-09-19", stars: 29349}
+  adguard-home: {added: "2026-09-21", stars: 37277}
+  adminer: {added: "2026-09-19", stars: 750}
+  affine: {added: "2026-09-28", stars: 73289}
+  akaunting: {added: "2026-09-30", stars: 10167}
+  alertmanager: {added: "2026-09-20", stars: 8636}
+  anythingllm: {added: "2026-09-18", stars: 66792}
+  apache-answer: {added: "2026-10-07", stars: 15688}
+  apprise: {added: "2026-09-21", stars: 1318}
+  appsmith: {added: "2026-09-20", stars: 41028}
+  appwrite: {added: "2026-09-26", stars: 57590}
   appwrite-postgres: {added: "2026-09-26"}
-  archivebox: {added: "2026-10-07"}
-  atuin: {added: "2026-10-07"}
-  audiobookshelf: {added: "2026-09-20"}
-  authelia: {added: "2026-09-20"}
-  authentik: {added: "2026-09-20"}
-  autobase: {added: "2026-09-24"}
-  backrest: {added: "2026-09-21"}
-  baserow: {added: "2026-09-20"}
-  bazarr: {added: "2026-09-21"}
-  bentopdf: {added: "2026-09-20"}
-  beszel: {added: "2026-09-20"}
-  bookstack: {added: "2026-09-21"}
-  borgwarehouse: {added: "2026-09-22"}
-  budibase: {added: "2026-10-07"}
-  bugsink: {added: "2026-09-21"}
-  bytebase: {added: "2026-09-23"}
-  bytestash: {added: "2026-10-07"}
-  cal-com: {added: "2026-09-30"}
-  calibre-web: {added: "2026-09-21"}
-  cap: {added: "2026-10-07"}
-  changedetection: {added: "2026-09-20"}
-  chatwoot: {added: "2026-09-30"}
-  chroma: {added: "2026-09-21"}
-  clickhouse: {added: "2026-09-17"}
-  cloudbeaver: {added: "2026-09-23"}
-  cloudflare-ddns: {added: "2026-09-20"}
-  cloudflared: {added: "2026-09-20"}
-  code-server: {added: "2026-09-18"}
-  collabora: {added: "2026-09-21"}
-  convertx: {added: "2026-09-28"}
-  copyparty: {added: "2026-09-22"}
-  couchdb: {added: "2026-09-17"}
-  cratedb: {added: "2026-09-22"}
-  cyberchef: {added: "2026-09-19"}
-  dashy: {added: "2026-10-07"}
-  databend: {added: "2026-09-21"}
-  dbgate: {added: "2026-10-07"}
-  dependency-track: {added: "2026-09-22"}
-  dify: {added: "2026-09-30"}
-  directus: {added: "2026-09-18"}
-  docmost: {added: "2026-09-18"}
-  documenso: {added: "2026-09-30"}
-  docuseal: {added: "2026-09-20"}
-  dokuwiki: {added: "2026-10-07"}
-  dolibarr: {added: "2026-09-22"}
-  dolt: {added: "2026-09-17"}
-  dragonfly: {added: "2026-09-17"}
-  drawdb: {added: "2026-10-07"}
-  drawio: {added: "2026-09-21"}
+  archivebox: {added: "2026-10-07", stars: 28701}
+  atuin: {added: "2026-10-07", stars: 31928}
+  audiobookshelf: {added: "2026-09-20", stars: 14572}
+  authelia: {added: "2026-09-20", stars: 29197}
+  authentik: {added: "2026-09-20", stars: 25875}
+  autobase: {added: "2026-09-24", stars: 4410}
+  backrest: {added: "2026-09-21", stars: 7478}
+  baserow: {added: "2026-09-20", stars: 6094}
+  bazarr: {added: "2026-09-21", stars: 4351}
+  bentopdf: {added: "2026-09-20", stars: 15856}
+  beszel: {added: "2026-09-20", stars: 26018}
+  bookstack: {added: "2026-09-21", stars: 19073}
+  borgwarehouse: {added: "2026-09-22", stars: 675}
+  budibase: {added: "2026-10-07", stars: 28329}
+  bugsink: {added: "2026-09-21", stars: 2117}
+  bytebase: {added: "2026-09-23", stars: 14537}
+  bytestash: {added: "2026-10-07", stars: 2548}
+  cal-com: {added: "2026-09-30", stars: 48909}
+  calibre-web: {added: "2026-09-21", stars: 18343}
+  cap: {added: "2026-10-07", stars: 7948}
+  changedetection: {added: "2026-09-20", stars: 34823}
+  chatwoot: {added: "2026-09-30", stars: 37605}
+  chroma: {added: "2026-09-21", stars: 29460}
+  clickhouse: {added: "2026-09-17", stars: 50285}
+  cloudbeaver: {added: "2026-09-23", stars: 5183}
+  cloudflare-ddns: {added: "2026-09-20", stars: 2923}
+  cloudflared: {added: "2026-09-20", stars: 16054}
+  code-server: {added: "2026-09-18", stars: 79556}
+  collabora: {added: "2026-09-21", stars: 3366}
+  convertx: {added: "2026-09-28", stars: 19112}
+  copyparty: {added: "2026-09-22", stars: 46922}
+  couchdb: {added: "2026-09-17", stars: 6970}
+  cratedb: {added: "2026-09-22", stars: 4444}
+  cyberchef: {added: "2026-09-19", stars: 36041}
+  dashy: {added: "2026-10-07", stars: 26641}
+  databend: {added: "2026-09-21", stars: 9455}
+  dbgate: {added: "2026-10-07", stars: 7334}
+  dependency-track: {added: "2026-09-22", stars: 4265}
+  dify: {added: "2026-09-30", stars: 158024}
+  directus: {added: "2026-09-18", stars: 38205}
+  docmost: {added: "2026-09-18", stars: 21892}
+  documenso: {added: "2026-09-30", stars: 15353}
+  docuseal: {added: "2026-09-20", stars: 18667}
+  dokuwiki: {added: "2026-10-07", stars: 4726}
+  dolibarr: {added: "2026-09-22", stars: 7699}
+  dolt: {added: "2026-09-17", stars: 24588}
+  dragonfly: {added: "2026-09-17", stars: 31755}
+  drawdb: {added: "2026-10-07", stars: 39842}
+  drawio: {added: "2026-09-21", stars: 2271}
   drupal: {added: "2026-09-21"}
-  duplicati: {added: "2026-09-18"}
-  easyappointments: {added: "2026-09-21"}
-  element-web: {added: "2026-09-21"}
-  erpnext: {added: "2026-09-30"}
-  esphome: {added: "2026-09-28"}
-  espocrm: {added: "2026-09-20"}
-  etcd: {added: "2026-09-20"}
-  etherpad: {added: "2026-09-30"}
-  evershop: {added: "2026-09-22"}
-  excalidraw: {added: "2026-09-21"}
-  factorio: {added: "2026-09-22"}
-  ferretdb: {added: "2026-09-21"}
-  fider: {added: "2026-09-30"}
-  filebrowser: {added: "2026-09-21"}
-  filestash: {added: "2026-10-07"}
-  firefly-iii: {added: "2026-09-18"}
-  firefox: {added: "2026-09-22"}
-  fizzy: {added: "2026-09-22"}
-  flaresolverr: {added: "2026-10-07"}
-  flarum: {added: "2026-09-21"}
-  flipt: {added: "2026-09-30"}
-  flowise: {added: "2026-09-18"}
-  flowise-postgres: {added: "2026-09-18"}
+  duplicati: {added: "2026-09-18", stars: 15064}
+  easyappointments: {added: "2026-09-21", stars: 4417}
+  element-web: {added: "2026-09-21", stars: 13545}
+  erpnext: {added: "2026-09-30", stars: 39870}
+  esphome: {added: "2026-09-28", stars: 11789}
+  espocrm: {added: "2026-09-20", stars: 3448}
+  etcd: {added: "2026-09-20", stars: 52338}
+  etherpad: {added: "2026-09-30", stars: 18572}
+  evershop: {added: "2026-09-22", stars: 10500}
+  excalidraw: {added: "2026-09-21", stars: 133644}
+  factorio: {added: "2026-09-22", stars: 1440}
+  ferretdb: {added: "2026-09-21", stars: 11091}
+  fider: {added: "2026-09-30", stars: 4564}
+  filebrowser: {added: "2026-09-21", stars: 35922}
+  filestash: {added: "2026-10-07", stars: 14765}
+  firefly-iii: {added: "2026-09-18", stars: 24842}
+  firefox: {added: "2026-09-22", stars: 2568}
+  fizzy: {added: "2026-09-22", stars: 8244}
+  flaresolverr: {added: "2026-10-07", stars: 15788}
+  flarum: {added: "2026-09-21", stars: 16411}
+  flipt: {added: "2026-09-30", stars: 4914}
+  flowise: {added: "2026-09-18", stars: 55489}
+  flowise-postgres: {added: "2026-09-18", stars: 55489}
   forgejo: {added: "2026-09-18"}
-  formbricks: {added: "2026-09-21"}
-  freescout: {added: "2026-09-21"}
-  freshrss: {added: "2026-09-19"}
-  freshrss-postgres: {added: "2026-09-19"}
-  friendica: {added: "2026-09-22"}
-  frp: {added: "2026-09-30"}
+  formbricks: {added: "2026-09-21", stars: 13069}
+  freescout: {added: "2026-09-21", stars: 4589}
+  freshrss: {added: "2026-09-19", stars: 16249}
+  freshrss-postgres: {added: "2026-09-19", stars: 16249}
+  friendica: {added: "2026-09-22", stars: 1690}
+  frp: {added: "2026-09-30", stars: 109766}
   garage: {added: "2026-09-21"}
-  garnet: {added: "2026-09-21"}
-  gatus: {added: "2026-09-20"}
-  ghost: {added: "2026-09-18"}
-  ghostfolio: {added: "2026-09-19"}
-  gitea: {added: "2026-09-18"}
+  garnet: {added: "2026-09-21", stars: 12045}
+  gatus: {added: "2026-09-20", stars: 12260}
+  ghost: {added: "2026-09-18", stars: 55494}
+  ghostfolio: {added: "2026-09-19", stars: 9415}
+  gitea: {added: "2026-09-18", stars: 58349}
   gitea-runner: {added: "2026-09-24"}
-  gitea-sqlite: {added: "2026-09-20"}
+  gitea-sqlite: {added: "2026-09-20", stars: 58349}
   gitlab: {added: "2026-09-20"}
-  glance: {added: "2026-09-19"}
+  glance: {added: "2026-09-19", stars: 37374}
   glitchtip: {added: "2026-09-22"}
-  goatcounter: {added: "2026-09-21"}
-  gogs: {added: "2026-10-07"}
-  gotenberg: {added: "2026-09-19"}
-  gotify: {added: "2026-09-18"}
-  gotify-postgres: {added: "2026-09-18"}
+  goatcounter: {added: "2026-09-21", stars: 6041}
+  gogs: {added: "2026-10-07", stars: 47859}
+  gotenberg: {added: "2026-09-19", stars: 13243}
+  gotify: {added: "2026-09-18", stars: 16038}
+  gotify-postgres: {added: "2026-09-18", stars: 16038}
   gotosocial: {added: "2026-09-21"}
-  gowa: {added: "2026-09-22"}
-  grafana: {added: "2026-09-18"}
-  grafana-postgres: {added: "2026-09-18"}
-  gramps-web: {added: "2026-09-28"}
-  grav: {added: "2026-09-21"}
-  greptimedb: {added: "2026-09-22"}
-  grist: {added: "2026-09-20"}
-  grocy: {added: "2026-09-21"}
-  growthbook: {added: "2026-09-30"}
-  hatchet: {added: "2026-09-30"}
-  headscale: {added: "2026-09-20"}
-  healthchecks: {added: "2026-09-18"}
-  hedgedoc: {added: "2026-09-21"}
-  heimdall: {added: "2026-10-07"}
-  heyform: {added: "2026-09-22"}
-  hi-events: {added: "2026-09-22"}
-  homarr: {added: "2026-09-22"}
-  home-assistant: {added: "2026-09-22"}
-  homebox: {added: "2026-09-21"}
-  homepage: {added: "2026-09-20"}
-  homer: {added: "2026-10-07"}
-  hoppscotch: {added: "2026-09-30"}
-  huginn: {added: "2026-10-07"}
-  imgcompress: {added: "2026-09-28"}
-  immich: {added: "2026-09-19"}
-  immich-machine-learning: {added: "2026-09-19"}
-  infisical: {added: "2026-09-21"}
-  influxdb: {added: "2026-09-17"}
-  inngest: {added: "2026-09-30"}
-  inventree: {added: "2026-10-07"}
-  invoice-ninja: {added: "2026-09-30"}
-  it-tools: {added: "2026-09-20"}
-  jackett: {added: "2026-10-07"}
-  jaeger: {added: "2026-09-18"}
-  jellyfin: {added: "2026-09-20"}
+  gowa: {added: "2026-09-22", stars: 4898}
+  grafana: {added: "2026-09-18", stars: 77122}
+  grafana-postgres: {added: "2026-09-18", stars: 77122}
+  gramps-web: {added: "2026-09-28", stars: 1718}
+  grav: {added: "2026-09-21", stars: 15683}
+  greptimedb: {added: "2026-09-22", stars: 6724}
+  grist: {added: "2026-09-20", stars: 11912}
+  grocy: {added: "2026-09-21", stars: 9558}
+  growthbook: {added: "2026-09-30", stars: 8481}
+  hatchet: {added: "2026-09-30", stars: 8079}
+  headscale: {added: "2026-09-20", stars: 44403}
+  healthchecks: {added: "2026-09-18", stars: 10386}
+  hedgedoc: {added: "2026-09-21", stars: 7463}
+  heimdall: {added: "2026-10-07", stars: 9342}
+  heyform: {added: "2026-09-22", stars: 9000}
+  hi-events: {added: "2026-09-22", stars: 4051}
+  homarr: {added: "2026-09-22", stars: 5026}
+  home-assistant: {added: "2026-09-22", stars: 91301}
+  homebox: {added: "2026-09-21", stars: 7460}
+  homepage: {added: "2026-09-20", stars: 32999}
+  homer: {added: "2026-10-07", stars: 11643}
+  hoppscotch: {added: "2026-09-30", stars: 80582}
+  huginn: {added: "2026-10-07", stars: 50027}
+  imgcompress: {added: "2026-09-28", stars: 342}
+  immich: {added: "2026-09-19", stars: 115730}
+  immich-machine-learning: {added: "2026-09-19", stars: 115730}
+  infisical: {added: "2026-09-21", stars: 29647}
+  influxdb: {added: "2026-09-17", stars: 31759}
+  inngest: {added: "2026-09-30", stars: 5923}
+  inventree: {added: "2026-10-07", stars: 7675}
+  invoice-ninja: {added: "2026-09-30", stars: 10239}
+  it-tools: {added: "2026-09-20", stars: 40781}
+  jackett: {added: "2026-10-07", stars: 16164}
+  jaeger: {added: "2026-09-18", stars: 23268}
+  jellyfin: {added: "2026-09-20", stars: 57870}
   jellyseerr: {added: "2026-09-21"}
-  jellystat: {added: "2026-10-07"}
-  jenkins: {added: "2026-09-20"}
-  joomla: {added: "2026-09-21"}
-  joplin-server: {added: "2026-09-22"}
-  jupyter: {added: "2026-09-21"}
-  kafka: {added: "2026-09-21"}
-  kafka-ui: {added: "2026-09-21"}
-  kanboard: {added: "2026-09-21"}
-  karakeep: {added: "2026-09-21"}
-  kavita: {added: "2026-09-19"}
-  kener: {added: "2026-10-07"}
-  kestra: {added: "2026-10-07"}
-  keycloak: {added: "2026-09-18"}
-  kimai: {added: "2026-09-18"}
-  kiwix: {added: "2026-09-22"}
-  koel: {added: "2026-10-07"}
-  komga: {added: "2026-09-20"}
-  kopia: {added: "2026-09-20"}
-  kutt: {added: "2026-09-21"}
-  kuzzle: {added: "2026-09-30"}
-  label-studio: {added: "2026-09-30"}
-  langflow: {added: "2026-09-21"}
-  langfuse: {added: "2026-09-22"}
-  langfuse-worker: {added: "2026-09-22"}
-  leantime: {added: "2026-09-21"}
-  librechat: {added: "2026-09-21"}
-  libreoffice: {added: "2026-09-28"}
-  librespeed: {added: "2026-10-07"}
-  libretranslate: {added: "2026-10-07"}
-  lidarr: {added: "2026-09-21"}
-  linkding: {added: "2026-09-19"}
-  linkding-postgres: {added: "2026-09-20"}
-  linkstack: {added: "2026-10-07"}
-  linkwarden: {added: "2026-09-20"}
-  listmonk: {added: "2026-09-20"}
-  litellm: {added: "2026-09-18"}
-  lldap: {added: "2026-09-20"}
-  localai: {added: "2026-10-07"}
-  logto: {added: "2026-09-30"}
-  loki: {added: "2026-09-18"}
-  luanti: {added: "2026-09-21"}
-  mage-ai: {added: "2026-09-22"}
-  mailpit: {added: "2026-09-18"}
-  manticore: {added: "2026-09-21"}
-  mariadb: {added: "2026-09-17"}
-  mariadb-replica: {added: "2026-09-20"}
-  marimo: {added: "2026-09-30"}
-  martin: {added: "2026-09-30"}
-  mastodon: {added: "2026-09-30"}
-  mathesar: {added: "2026-10-07"}
-  matomo: {added: "2026-09-20"}
-  mattermost: {added: "2026-09-18"}
-  mealie: {added: "2026-09-21"}
+  jellystat: {added: "2026-10-07", stars: 2490}
+  jenkins: {added: "2026-09-20", stars: 26627}
+  joomla: {added: "2026-09-21", stars: 5143}
+  joplin-server: {added: "2026-09-22", stars: 56631}
+  jupyter: {added: "2026-09-21", stars: 8469}
+  kafka: {added: "2026-09-21", stars: 33917}
+  kafka-ui: {added: "2026-09-21", stars: 2756}
+  kanboard: {added: "2026-09-21", stars: 9898}
+  karakeep: {added: "2026-09-21", stars: 29504}
+  kavita: {added: "2026-09-19", stars: 11813}
+  kener: {added: "2026-10-07", stars: 5192}
+  kestra: {added: "2026-10-07", stars: 29351}
+  keycloak: {added: "2026-09-18", stars: 37178}
+  kimai: {added: "2026-09-18", stars: 5058}
+  kiwix: {added: "2026-09-22", stars: 961}
+  koel: {added: "2026-10-07", stars: 17270}
+  komga: {added: "2026-09-20", stars: 6717}
+  kopia: {added: "2026-09-20", stars: 14276}
+  kutt: {added: "2026-09-21", stars: 11141}
+  kuzzle: {added: "2026-09-30", stars: 1667}
+  label-studio: {added: "2026-09-30", stars: 28414}
+  langflow: {added: "2026-09-21", stars: 155562}
+  langfuse: {added: "2026-09-22", stars: 35487}
+  langfuse-worker: {added: "2026-09-22", stars: 35487}
+  leantime: {added: "2026-09-21", stars: 11757}
+  librechat: {added: "2026-09-21", stars: 45371}
+  libreoffice: {added: "2026-09-28", stars: 147}
+  librespeed: {added: "2026-10-07", stars: 15215}
+  libretranslate: {added: "2026-10-07", stars: 17000}
+  lidarr: {added: "2026-09-21", stars: 5720}
+  linkding: {added: "2026-09-19", stars: 11278}
+  linkding-postgres: {added: "2026-09-20", stars: 11278}
+  linkstack: {added: "2026-10-07", stars: 3891}
+  linkwarden: {added: "2026-09-20", stars: 19952}
+  listmonk: {added: "2026-09-20", stars: 23712}
+  litellm: {added: "2026-09-18", stars: 60291}
+  lldap: {added: "2026-09-20", stars: 6550}
+  localai: {added: "2026-10-07", stars: 49420}
+  logto: {added: "2026-09-30", stars: 14656}
+  loki: {added: "2026-09-18", stars: 28994}
+  luanti: {added: "2026-09-21", stars: 13693}
+  mage-ai: {added: "2026-09-22", stars: 8829}
+  mailpit: {added: "2026-09-18", stars: 10563}
+  manticore: {added: "2026-09-21", stars: 12044}
+  mariadb: {added: "2026-09-17", stars: 8332}
+  mariadb-replica: {added: "2026-09-20", stars: 8332}
+  marimo: {added: "2026-09-30", stars: 23046}
+  martin: {added: "2026-09-30", stars: 3976}
+  mastodon: {added: "2026-09-30", stars: 50354}
+  mathesar: {added: "2026-10-07", stars: 5149}
+  matomo: {added: "2026-09-20", stars: 21932}
+  mattermost: {added: "2026-09-18", stars: 39287}
+  mealie: {added: "2026-09-21", stars: 13469}
   mediawiki: {added: "2026-09-22"}
-  meilisearch: {added: "2026-09-17"}
-  memcached: {added: "2026-09-17"}
-  memos: {added: "2026-09-19"}
-  memos-postgres: {added: "2026-09-19"}
-  metabase: {added: "2026-09-18"}
-  metamcp: {added: "2026-09-18"}
-  metube: {added: "2026-09-30"}
-  milvus: {added: "2026-09-22"}
-  mimir: {added: "2026-09-21"}
-  minecraft: {added: "2026-09-21"}
-  minecraft-bedrock: {added: "2026-09-22"}
-  miniflux: {added: "2026-09-18"}
-  misskey: {added: "2026-09-21"}
-  mongodb: {added: "2026-09-17"}
-  monica: {added: "2026-10-07"}
-  moodle: {added: "2026-09-30"}
-  mosquitto: {added: "2026-09-20"}
-  mumble: {added: "2026-09-20"}
-  myspeed: {added: "2026-10-07"}
-  mysql: {added: "2026-09-17"}
-  mysql-replica: {added: "2026-09-20"}
-  n8n: {added: "2026-09-18"}
-  n8n-queue: {added: "2026-09-22"}
-  n8n-sqlite: {added: "2026-09-18"}
-  n8n-worker: {added: "2026-09-22"}
-  nats: {added: "2026-09-18"}
-  navidrome: {added: "2026-09-20"}
-  neo4j: {added: "2026-09-17"}
-  netbox: {added: "2026-10-07"}
-  nextcloud: {added: "2026-09-18"}
-  nextcloud-mariadb: {added: "2026-09-18"}
-  nexterm: {added: "2026-10-07"}
-  nocobase: {added: "2026-09-22"}
-  nocodb: {added: "2026-09-18"}
-  node-red: {added: "2026-09-19"}
-  ntfy: {added: "2026-09-18"}
-  obsidian-livesync: {added: "2026-10-07"}
-  odoo: {added: "2026-09-20"}
-  ollama: {added: "2026-09-18"}
-  omni-tools: {added: "2026-10-07"}
-  onedev: {added: "2026-10-07"}
-  onetimesecret: {added: "2026-09-21"}
-  onlyoffice: {added: "2026-09-21"}
-  open-webui: {added: "2026-09-18"}
-  openbao: {added: "2026-09-21"}
-  openclaw: {added: "2026-09-22"}
-  opencloud: {added: "2026-09-21"}
-  openhands: {added: "2026-09-24"}
-  openobserve: {added: "2026-09-30"}
-  openproject: {added: "2026-09-21"}
-  opensearch: {added: "2026-09-20"}
-  osticket: {added: "2026-09-30"}
-  otel-collector: {added: "2026-09-20"}
-  outline: {added: "2026-09-21"}
-  overleaf: {added: "2026-10-07"}
-  owncast: {added: "2026-09-21"}
-  pairdrop: {added: "2026-09-30"}
-  paperless-ngx: {added: "2026-09-19"}
-  papra: {added: "2026-10-07"}
-  paradedb: {added: "2026-09-22"}
-  passbolt: {added: "2026-09-30"}
-  peertube: {added: "2026-10-07"}
-  penpot: {added: "2026-09-30"}
-  pgadmin: {added: "2026-09-21"}
-  pgbouncer: {added: "2026-09-20"}
-  pgvector: {added: "2026-09-17"}
-  photoprism: {added: "2026-09-20"}
-  phpmyadmin: {added: "2026-09-21"}
-  picoshare: {added: "2026-09-19"}
-  pihole: {added: "2026-09-21"}
-  plane: {added: "2026-09-30"}
-  planka: {added: "2026-09-18"}
-  plausible: {added: "2026-09-18"}
-  plone: {added: "2026-09-21"}
-  pocket-id: {added: "2026-09-21"}
-  pocketbase: {added: "2026-09-21"}
-  postgis: {added: "2026-09-17"}
-  postgres: {added: "2026-09-17"}
-  postgres-documentdb: {added: "2026-09-21"}
-  postgres-replica: {added: "2026-09-20"}
-  postgres-vectorchord: {added: "2026-09-19"}
-  postiz: {added: "2026-10-07"}
-  prestashop: {added: "2026-09-21"}
-  privatebin: {added: "2026-09-19"}
-  prometheus: {added: "2026-09-18"}
-  prowlarr: {added: "2026-09-21"}
-  qbittorrent: {added: "2026-09-21"}
-  qdrant: {added: "2026-09-17"}
-  questdb: {added: "2026-09-17"}
-  quickwit: {added: "2026-09-21"}
-  rabbitmq: {added: "2026-09-17"}
-  radarr: {added: "2026-09-21"}
-  radicale: {added: "2026-09-19"}
-  rallly: {added: "2026-09-22"}
-  rathole: {added: "2026-09-30"}
-  reactive-resume: {added: "2026-10-07"}
+  meilisearch: {added: "2026-09-17", stars: 59507}
+  memcached: {added: "2026-09-17", stars: 14291}
+  memos: {added: "2026-09-19", stars: 63594}
+  memos-postgres: {added: "2026-09-19", stars: 63594}
+  metabase: {added: "2026-09-18", stars: 49563}
+  metamcp: {added: "2026-09-18", stars: 2697}
+  metube: {added: "2026-09-30", stars: 14932}
+  milvus: {added: "2026-09-22", stars: 46331}
+  mimir: {added: "2026-09-21", stars: 5249}
+  minecraft: {added: "2026-09-21", stars: 14389}
+  minecraft-bedrock: {added: "2026-09-22", stars: 1871}
+  miniflux: {added: "2026-09-18", stars: 9775}
+  misskey: {added: "2026-09-21", stars: 11335}
+  mongodb: {added: "2026-09-17", stars: 28620}
+  monica: {added: "2026-10-07", stars: 25451}
+  moodle: {added: "2026-09-30", stars: 7469}
+  mosquitto: {added: "2026-09-20", stars: 11255}
+  mumble: {added: "2026-09-20", stars: 8324}
+  myspeed: {added: "2026-10-07", stars: 3031}
+  mysql: {added: "2026-09-17", stars: 12442}
+  mysql-replica: {added: "2026-09-20", stars: 12442}
+  n8n: {added: "2026-09-18", stars: 206813}
+  n8n-queue: {added: "2026-09-22", stars: 206813}
+  n8n-sqlite: {added: "2026-09-18", stars: 206813}
+  n8n-worker: {added: "2026-09-22", stars: 206813}
+  nats: {added: "2026-09-18", stars: 20850}
+  navidrome: {added: "2026-09-20", stars: 24017}
+  neo4j: {added: "2026-09-17", stars: 17281}
+  netbox: {added: "2026-10-07", stars: 21662}
+  nextcloud: {added: "2026-09-18", stars: 37025}
+  nextcloud-mariadb: {added: "2026-09-18", stars: 37025}
+  nexterm: {added: "2026-10-07", stars: 5059}
+  nocobase: {added: "2026-09-22", stars: 24488}
+  nocodb: {added: "2026-09-18", stars: 65214}
+  node-red: {added: "2026-09-19", stars: 23719}
+  ntfy: {added: "2026-09-18", stars: 34666}
+  obsidian-livesync: {added: "2026-10-07", stars: 12665}
+  odoo: {added: "2026-09-20", stars: 54878}
+  ollama: {added: "2026-09-18", stars: 182471}
+  omni-tools: {added: "2026-10-07", stars: 10293}
+  onedev: {added: "2026-10-07", stars: 15285}
+  onetimesecret: {added: "2026-09-21", stars: 2953}
+  onlyoffice: {added: "2026-09-21", stars: 6973}
+  open-webui: {added: "2026-09-18", stars: 154140}
+  openbao: {added: "2026-09-21", stars: 8337}
+  openclaw: {added: "2026-09-22", stars: 391579}
+  opencloud: {added: "2026-09-21", stars: 6107}
+  openhands: {added: "2026-09-24", stars: 90176}
+  openobserve: {added: "2026-09-30", stars: 22285}
+  openproject: {added: "2026-09-21", stars: 16339}
+  opensearch: {added: "2026-09-20", stars: 13816}
+  osticket: {added: "2026-09-30", stars: 3978}
+  otel-collector: {added: "2026-09-20", stars: 4979}
+  outline: {added: "2026-09-21", stars: 40836}
+  overleaf: {added: "2026-10-07", stars: 18213}
+  owncast: {added: "2026-09-21", stars: 11576}
+  pairdrop: {added: "2026-09-30", stars: 11535}
+  paperless-ngx: {added: "2026-09-19", stars: 46342}
+  papra: {added: "2026-10-07", stars: 5543}
+  paradedb: {added: "2026-09-22", stars: 9368}
+  passbolt: {added: "2026-09-30", stars: 6147}
+  peertube: {added: "2026-10-07", stars: 15344}
+  penpot: {added: "2026-09-30", stars: 60787}
+  pgadmin: {added: "2026-09-21", stars: 3869}
+  pgbouncer: {added: "2026-09-20", stars: 4396}
+  pgvector: {added: "2026-09-17", stars: 23265}
+  photoprism: {added: "2026-09-20", stars: 40271}
+  phpmyadmin: {added: "2026-09-21", stars: 7949}
+  picoshare: {added: "2026-09-19", stars: 3048}
+  pihole: {added: "2026-09-21", stars: 11653}
+  plane: {added: "2026-09-30", stars: 60484}
+  planka: {added: "2026-09-18", stars: 12606}
+  plausible: {added: "2026-09-18", stars: 29336}
+  plone: {added: "2026-09-21", stars: 5}
+  pocket-id: {added: "2026-09-21", stars: 9446}
+  pocketbase: {added: "2026-09-21", stars: 61309}
+  postgis: {added: "2026-09-17", stars: 1600}
+  postgres: {added: "2026-09-17", stars: 22307}
+  postgres-documentdb: {added: "2026-09-21", stars: 26}
+  postgres-replica: {added: "2026-09-20", stars: 22307}
+  postgres-vectorchord: {added: "2026-09-19", stars: 1810}
+  postiz: {added: "2026-10-07", stars: 36841}
+  prestashop: {added: "2026-09-21", stars: 9225}
+  privatebin: {added: "2026-09-19", stars: 8656}
+  prometheus: {added: "2026-09-18", stars: 66411}
+  prowlarr: {added: "2026-09-21", stars: 7338}
+  qbittorrent: {added: "2026-09-21", stars: 40639}
+  qdrant: {added: "2026-09-17", stars: 34965}
+  questdb: {added: "2026-09-17", stars: 17426}
+  quickwit: {added: "2026-09-21", stars: 11700}
+  rabbitmq: {added: "2026-09-17", stars: 13909}
+  radarr: {added: "2026-09-21", stars: 14516}
+  radicale: {added: "2026-09-19", stars: 5091}
+  rallly: {added: "2026-09-22", stars: 5292}
+  rathole: {added: "2026-09-30", stars: 14308}
+  reactive-resume: {added: "2026-10-07", stars: 43952}
   readeck: {added: "2026-09-21"}
-  redis: {added: "2026-09-17"}
-  redisinsight: {added: "2026-09-20"}
-  redmine: {added: "2026-09-21"}
-  redpanda: {added: "2026-09-20"}
-  registry: {added: "2026-09-21"}
-  registry-ui: {added: "2026-09-21"}
-  restic-rest-server: {added: "2026-09-17"}
-  rocket-chat: {added: "2026-09-30"}
-  romm: {added: "2026-10-07"}
-  roundcube: {added: "2026-09-20"}
-  rss-bridge: {added: "2026-10-07"}
-  rsshub: {added: "2026-10-07"}
-  rustdesk: {added: "2026-09-21"}
-  rustfs: {added: "2026-09-22"}
-  ryot: {added: "2026-10-07"}
-  s3proxy: {added: "2026-09-19"}
-  scylladb: {added: "2026-09-21"}
-  seafile: {added: "2026-09-30"}
-  searxng: {added: "2026-09-18"}
-  seaweedfs: {added: "2026-09-17"}
-  seerr: {added: "2026-10-07"}
-  semaphore: {added: "2026-09-22"}
-  sequin: {added: "2026-09-30"}
-  sftpgo: {added: "2026-09-20"}
-  shlink: {added: "2026-09-19"}
-  shlink-postgres: {added: "2026-09-19"}
-  shynet: {added: "2026-09-21"}
-  silo: {added: "2026-10-07"}
-  silverbullet: {added: "2026-10-07"}
-  siyuan: {added: "2026-10-07"}
-  snipe-it: {added: "2026-09-21"}
-  sonarqube: {added: "2026-09-21"}
-  sonarr: {added: "2026-09-21"}
-  speakr: {added: "2026-10-07"}
-  stalwart: {added: "2026-09-20"}
-  step-ca: {added: "2026-09-22"}
-  stirling-pdf: {added: "2026-09-21"}
-  supabase: {added: "2026-09-22"}
+  redis: {added: "2026-09-17", stars: 76641}
+  redisinsight: {added: "2026-09-20", stars: 8881}
+  redmine: {added: "2026-09-21", stars: 6043}
+  redpanda: {added: "2026-09-20", stars: 12602}
+  registry: {added: "2026-09-21", stars: 10644}
+  registry-ui: {added: "2026-09-21", stars: 3539}
+  restic-rest-server: {added: "2026-09-17", stars: 1512}
+  rocket-chat: {added: "2026-09-30", stars: 46223}
+  romm: {added: "2026-10-07", stars: 13273}
+  roundcube: {added: "2026-09-20", stars: 7206}
+  rss-bridge: {added: "2026-10-07", stars: 9268}
+  rsshub: {added: "2026-10-07", stars: 46437}
+  rustdesk: {added: "2026-09-21", stars: 10516}
+  rustfs: {added: "2026-09-22", stars: 34510}
+  ryot: {added: "2026-10-07", stars: 3625}
+  s3proxy: {added: "2026-09-19", stars: 2399}
+  scylladb: {added: "2026-09-21", stars: 15783}
+  seafile: {added: "2026-09-30", stars: 546}
+  searxng: {added: "2026-09-18", stars: 38070}
+  seaweedfs: {added: "2026-09-17", stars: 35290}
+  seerr: {added: "2026-10-07", stars: 12829}
+  semaphore: {added: "2026-09-22", stars: 14236}
+  sequin: {added: "2026-09-30", stars: 2212}
+  sftpgo: {added: "2026-09-20", stars: 12626}
+  shlink: {added: "2026-09-19", stars: 5323}
+  shlink-postgres: {added: "2026-09-19", stars: 5323}
+  shynet: {added: "2026-09-21", stars: 3156}
+  silo: {added: "2026-10-07", stars: 3917}
+  silverbullet: {added: "2026-10-07", stars: 6245}
+  siyuan: {added: "2026-10-07", stars: 46664}
+  snipe-it: {added: "2026-09-21", stars: 15012}
+  sonarqube: {added: "2026-09-21", stars: 11048}
+  sonarr: {added: "2026-09-21", stars: 16861}
+  speakr: {added: "2026-10-07", stars: 4066}
+  stalwart: {added: "2026-09-20", stars: 14981}
+  step-ca: {added: "2026-09-22", stars: 8936}
+  stirling-pdf: {added: "2026-09-21", stars: 93727}
+  supabase: {added: "2026-09-22", stars: 111202}
   supabase-postgres: {added: "2026-09-22"}
-  superset: {added: "2026-09-21"}
-  surrealdb: {added: "2026-09-18"}
-  swetrix: {added: "2026-09-30"}
-  synapse: {added: "2026-09-21"}
-  syncthing: {added: "2026-09-21"}
-  tandoor: {added: "2026-09-20"}
-  tdengine: {added: "2026-09-21"}
-  teable: {added: "2026-09-30"}
-  technitium-dns: {added: "2026-09-20"}
-  tempo: {added: "2026-09-20"}
-  temporal: {added: "2026-09-30"}
-  termix: {added: "2026-09-30"}
-  terraria: {added: "2026-09-21"}
-  tika: {added: "2026-09-19"}
-  timescaledb: {added: "2026-09-17"}
-  tooljet: {added: "2026-10-07"}
-  traccar: {added: "2026-09-30"}
-  trailbase: {added: "2026-09-30"}
-  trilium: {added: "2026-09-21"}
-  trino: {added: "2026-09-22"}
-  twenty: {added: "2026-09-30"}
-  typebot: {added: "2026-09-30"}
-  typesense: {added: "2026-09-18"}
-  umami: {added: "2026-09-18"}
-  unleash: {added: "2026-09-21"}
-  unmanic: {added: "2026-09-21"}
-  uptime-kuma: {added: "2026-09-18"}
-  uptime-kuma-mariadb: {added: "2026-09-20"}
-  valkey: {added: "2026-09-17"}
-  varnish: {added: "2026-09-22"}
-  vault: {added: "2026-09-21"}
-  vaultwarden: {added: "2026-09-18"}
-  vaultwarden-postgres: {added: "2026-09-18"}
-  verdaccio: {added: "2026-09-18"}
-  vert: {added: "2026-09-30"}
-  victorialogs: {added: "2026-09-21"}
-  victoriametrics: {added: "2026-09-20"}
+  superset: {added: "2026-09-21", stars: 75062}
+  surrealdb: {added: "2026-09-18", stars: 33110}
+  swetrix: {added: "2026-09-30", stars: 1205}
+  synapse: {added: "2026-09-21", stars: 4681}
+  syncthing: {added: "2026-09-21", stars: 89198}
+  tandoor: {added: "2026-09-20", stars: 8657}
+  tdengine: {added: "2026-09-21", stars: 25151}
+  teable: {added: "2026-09-30", stars: 21864}
+  technitium-dns: {added: "2026-09-20", stars: 10073}
+  tempo: {added: "2026-09-20", stars: 5511}
+  temporal: {added: "2026-09-30", stars: 23517}
+  termix: {added: "2026-09-30", stars: 15355}
+  terraria: {added: "2026-09-21", stars: 398}
+  tika: {added: "2026-09-19", stars: 4088}
+  timescaledb: {added: "2026-09-17", stars: 23653}
+  tooljet: {added: "2026-10-07", stars: 41045}
+  traccar: {added: "2026-09-30", stars: 7844}
+  trailbase: {added: "2026-09-30", stars: 5649}
+  trilium: {added: "2026-09-21", stars: 38245}
+  trino: {added: "2026-09-22", stars: 13306}
+  twenty: {added: "2026-09-30", stars: 58031}
+  typebot: {added: "2026-09-30", stars: 10506}
+  typesense: {added: "2026-09-18", stars: 26638}
+  umami: {added: "2026-09-18", stars: 39223}
+  unleash: {added: "2026-09-21", stars: 13861}
+  unmanic: {added: "2026-09-21", stars: 2519}
+  uptime-kuma: {added: "2026-09-18", stars: 92185}
+  uptime-kuma-mariadb: {added: "2026-09-20", stars: 92185}
+  valkey: {added: "2026-09-17", stars: 27390}
+  varnish: {added: "2026-09-22", stars: 4045}
+  vault: {added: "2026-09-21", stars: 36350}
+  vaultwarden: {added: "2026-09-18", stars: 68655}
+  vaultwarden-postgres: {added: "2026-09-18", stars: 68655}
+  verdaccio: {added: "2026-09-18", stars: 17912}
+  vert: {added: "2026-09-30", stars: 15686}
+  victorialogs: {added: "2026-09-21", stars: 2348}
+  victoriametrics: {added: "2026-09-20", stars: 17832}
   vikunja: {added: "2026-09-18"}
-  wallabag: {added: "2026-09-21"}
-  wallos: {added: "2026-10-07"}
-  wanderer: {added: "2026-10-07"}
-  weaviate: {added: "2026-09-18"}
-  web-check: {added: "2026-10-07"}
-  wekan: {added: "2026-09-21"}
-  wg-easy: {added: "2026-09-20"}
-  wikijs: {added: "2026-09-18"}
-  windmill: {added: "2026-09-21"}
-  woodpecker: {added: "2026-09-30"}
-  wordpress: {added: "2026-09-18"}
-  yamtrack: {added: "2026-09-28"}
-  yamtrack-postgres: {added: "2026-09-28"}
-  zipline: {added: "2026-09-21"}
-  zitadel: {added: "2026-09-30"}
-  zot: {added: "2026-09-21"}
-  zulip: {added: "2026-09-30"}
+  wallabag: {added: "2026-09-21", stars: 12998}
+  wallos: {added: "2026-10-07", stars: 8642}
+  wanderer: {added: "2026-10-07", stars: 3956}
+  weaviate: {added: "2026-09-18", stars: 16872}
+  web-check: {added: "2026-10-07", stars: 35042}
+  wekan: {added: "2026-09-21", stars: 21111}
+  wg-easy: {added: "2026-09-20", stars: 27076}
+  wikijs: {added: "2026-09-18", stars: 29014}
+  windmill: {added: "2026-09-21", stars: 18124}
+  woodpecker: {added: "2026-09-30", stars: 7962}
+  wordpress: {added: "2026-09-18", stars: 21455}
+  yamtrack: {added: "2026-09-28", stars: 3680}
+  yamtrack-postgres: {added: "2026-09-28", stars: 3680}
+  zipline: {added: "2026-09-21", stars: 3443}
+  zitadel: {added: "2026-09-30", stars: 15240}
+  zot: {added: "2026-09-21", stars: 2845}
+  zulip: {added: "2026-09-30", stars: 26007}

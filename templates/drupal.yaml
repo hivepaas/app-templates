@@ -95,9 +95,9 @@ parameters:
 
 versions:
   - name: "11"
-    release: "11.2.3"
+    release: "11.2.14"
     default: true
-    image: drupal:11.2.3-apache
+    image: drupal:11.2.14-apache
 
 app:
   deployment:

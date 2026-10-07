@@ -109,9 +109,9 @@ parameters:
 
 versions:
   - name: "2.1"
-    release: "2.1.19"
+    release: "2.1.21"
     default: true
-    image: factoriotools/factorio:2.1.19
+    image: factoriotools/factorio:2.1.21
 
 app:
   deployment:

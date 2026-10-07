@@ -74,9 +74,9 @@ parameters:
 
 versions:
   - name: "26.04"
-    release: "26.04.4.1.1"
+    release: "26.04.4.2.1"
     default: true
-    image: collabora/code:26.04.4.1.1
+    image: collabora/code:26.04.4.2.1
 
 app:
   deployment:

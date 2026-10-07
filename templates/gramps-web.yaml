@@ -64,9 +64,9 @@ dependencies:
 
 versions:
   - name: "25.7"
-    release: "25.7.0"
+    release: "25.7.3"
     default: true
-    image: ghcr.io/gramps-project/grampsweb:25.7.0
+    image: ghcr.io/gramps-project/grampsweb:25.7.3
 
 app:
   deployment:

@@ -88,12 +88,12 @@ variants:
 
 versions:
   - name: "0.8"
-    release: "0.8.6"
+    release: "0.8.7"
     default: true
     images:
-      pg18: pgvector/pgvector:0.8.6-pg18-trixie
-      pg17: pgvector/pgvector:0.8.6-pg17-trixie
-      pg16: pgvector/pgvector:0.8.6-pg16-trixie
+      pg18: pgvector/pgvector:0.8.7-pg18-trixie
+      pg17: pgvector/pgvector:0.8.7-pg17-trixie
+      pg16: pgvector/pgvector:0.8.7-pg16-trixie
 
 app:
   deployment:

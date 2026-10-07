@@ -97,9 +97,9 @@ dependencies:
 
 versions:
   - name: "0.165"
-    release: "0.165.14"
+    release: "0.165.17"
     default: true
-    image: infisical/infisical:v0.165.14
+    image: infisical/infisical:v0.165.17
 
 app:
   deployment:

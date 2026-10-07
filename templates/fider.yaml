@@ -108,9 +108,9 @@ dependencies:
 
 versions:
   - name: "0.38"
-    release: "0.38.0"
+    release: "0.38.2"
     default: true
-    image: getfider/fider:v0.38.0
+    image: getfider/fider:v0.38.2
 
 app:
   deployment:

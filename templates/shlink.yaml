@@ -88,9 +88,9 @@ parameters:
 
 versions:
   - name: "5.1"
-    release: "5.1.6"
+    release: "5.1.7"
     default: true
-    image: shlinkio/shlink:5.1.6
+    image: shlinkio/shlink:5.1.7
 
 app:
   deployment:

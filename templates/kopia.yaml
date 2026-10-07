@@ -102,8 +102,8 @@ versions:
     default: true
     image: kopia/kopia:0.23.1
   - name: "0.22"
-    release: "0.22.1"
-    image: kopia/kopia:0.22.1
+    release: "0.22.3"
+    image: kopia/kopia:0.22.3
 
 app:
   deployment:

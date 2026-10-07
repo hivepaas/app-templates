@@ -82,9 +82,9 @@ parameters:
 
 versions:
   - name: "1.16"
-    release: "1.16.1"
+    release: "1.16.2"
     default: true
-    image: mintplexlabs/anythingllm:1.16.1
+    image: mintplexlabs/anythingllm:1.16.2
 
 app:
   deployment:

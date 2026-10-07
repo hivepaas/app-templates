@@ -87,9 +87,9 @@ dependencies:
 
 versions:
   - name: "1.12"
-    release: "1.12.2"
+    release: "1.12.5"
     default: true
-    image: langflowai/langflow:1.12.2
+    image: langflowai/langflow:1.12.5
 
 app:
   deployment:

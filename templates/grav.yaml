@@ -65,9 +65,9 @@ parameters:
 
 versions:
   - name: "2.1"
-    release: "2.1.8"
+    release: "2.1.12"
     default: true
-    image: lscr.io/linuxserver/grav:2.1.8-ls278
+    image: lscr.io/linuxserver/grav:2.1.12-ls279
 
 app:
   deployment:

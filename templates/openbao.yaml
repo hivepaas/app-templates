@@ -75,12 +75,12 @@ parameters:
 
 versions:
   - name: "2.7"
-    release: "2.7.0"
+    release: "2.7.1"
     default: true
-    image: openbao/openbao:2.7.0
+    image: openbao/openbao:2.7.1
   - name: "2.6"
-    release: "2.6.2"
-    image: openbao/openbao:2.6.2
+    release: "2.6.4"
+    image: openbao/openbao:2.6.4
 
 app:
   deployment:
