@@ -1,0 +1,197 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: linkstack
+  title: LinkStack
+  tagline: Your own link-in-bio page, a Linktree you host - for one person or many
+  description: |
+    LinkStack gives each user a page of links at `/@name`: buttons for over a hundred
+    sites and apps, a picture and a short bio, themes, and click counts for each link.
+    One person can run it for themselves, or open sign-up and host pages for a team or
+    a community.
+
+    **This template sets up**
+
+    - LinkStack, its application, database and uploads on a volume - the backup
+    - the administrator, from the values below, whose page is `/@` and the handle
+    - a memory limit you choose
+
+    **Set up from the start**
+
+    LinkStack's setup page is open to whoever reaches a new one first. Here the first
+    start does what that page would and closes it. The password is under this app's
+    Secrets. After that the settings are LinkStack's, changed in its admin panel.
+
+    **Updating**
+
+    LinkStack keeps its whole application on the volume, so a new image does not update
+    an existing one: update from the admin panel, which LinkStack provides for that.
+  categories: [webapps/social]
+  tags: [open-source]
+  aliases: [linkstack, link in bio, linktree, littlelink, links page, profile page, landing page]
+  icon: icons/linkstack.svg
+  links:
+    website: https://linkstack.org
+    documentation: https://docs.linkstack.org
+    source: https://github.com/LinkStackOrg/LinkStack
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address LinkStack answers at; the pages are under it. Leave it empty to add one
+      later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: siteName
+    title: Site name
+    type: string
+    default: LinkStack
+    pattern: '^[^"\\]{1,64}$'
+  - name: adminName
+    title: Administrator's name
+    type: string
+    default: Administrator
+    pattern: '^.{1,64}$'
+  - name: adminHandle
+    title: Administrator's handle
+    description: The address of the administrator's page, after /@.
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9_-]{2,32}$'
+  - name: adminEmail
+    title: Administrator's email
+    description: What the administrator signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator's password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: openSignup
+    title: Open sign-up
+    description: On, anyone who reaches the site can make a page of their own.
+    type: bool
+    default: false
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the application, its database and uploads are kept on.
+    type: volume
+
+versions:
+  - name: "4.8"
+    release: "4.8.6"
+    default: true
+    # LinkStack publishes only latest; this is latest as it was at the release above,
+    # pinned by its digest.
+    image: linkstackorg/linkstack:latest@sha256:1c8b05399ee459ac601bac3eede7fbe765d1b6b7be725663b57f3220610958bf
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The setup, then the image's own start. See the file.
+      command: sh -c 'php /hivepaas/setup.php; exec docker-entrypoint.sh'
+    storage:
+      mounts:
+        # A new volume is given the application from the image on the first start.
+        /htdocs: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1/
+        interval: 30s
+        timeout: 10s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: linkstack
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_APP_NAME, v: "${{ params.siteName }}"}
+        - {k: HIVEPAAS_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: HIVEPAAS_ADMIN_HANDLE, v: "${{ params.adminHandle }}"}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        - {k: HIVEPAAS_ALLOW_REGISTRATION, v: "${{ params.openSignup }}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      setup.php:
+        content: |
+          <?php
+          // LinkStack's setup page is open to whoever reaches a new one first. On the first
+          // start this does what that page would - the administrator, the settings it asks for -
+          // and closes it. After that the settings are LinkStack's own, changed in its admin panel.
+          if (!file_exists('/htdocs/INSTALLING')) {
+              echo "hivepaas: LinkStack is set up\n";
+              exit;
+          }
+          require '/htdocs/vendor/autoload.php';
+          $app = require '/htdocs/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+          use App\Models\User;
+          use GeoSot\EnvEditor\Facades\EnvEditor;
+          use Illuminate\Support\Facades\DB;
+          use Illuminate\Support\Facades\Hash;
+
+          $set = function ($key, $value) {
+              EnvEditor::keyExists($key) ? EnvEditor::editKey($key, $value) : EnvEditor::addKey($key, $value);
+          };
+
+          if (DB::table('users')->count() == 0) {
+              User::create([
+                  'name' => getenv('HIVEPAAS_ADMIN_NAME'),
+                  'email' => getenv('HIVEPAAS_ADMIN_EMAIL'),
+                  'email_verified_at' => '0001-01-01 00:00:00',
+                  'password' => Hash::make(getenv('HIVEPAAS_ADMIN_PASSWORD')),
+                  'littlelink_name' => getenv('HIVEPAAS_ADMIN_HANDLE'),
+                  'littlelink_description' => 'admin page',
+                  'block' => 'no',
+              ]);
+              User::where('id', '1')->update(['role' => 'admin']);
+          }
+          $set('ADMIN_EMAIL', getenv('HIVEPAAS_ADMIN_EMAIL'));
+          $set('ALLOW_REGISTRATION', getenv('HIVEPAAS_ALLOW_REGISTRATION') === 'true' ? 'true' : 'false');
+          $set('REGISTER_AUTH', 'auth');
+          $set('APP_NAME', '"' . str_replace('"', '', getenv('HIVEPAAS_APP_NAME')) . '"');
+          // Behind HivePaaS' proxy, which takes the HTTPS connection; links have to say https.
+          $set('FORCE_HTTPS', 'true');
+          unlink('/htdocs/INSTALLING');
+          echo "hivepaas: LinkStack set up with administrator " . getenv('HIVEPAAS_ADMIN_EMAIL') . "\n";
+        swarmRef:
+          file: {name: /hivepaas/setup.php, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

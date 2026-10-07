@@ -8266,6 +8266,45 @@
       }
     },
     {
+      "name": "linkstack",
+      "file": {
+        "path": "templates/linkstack.yaml",
+        "sha256": "c5bea57af51dc6803a628a8d39e1114b18bd298a63136af435095bc518601512"
+      },
+      "icon": {
+        "path": "icons/linkstack.svg",
+        "sha256": "32687199302a57ddca1450c8582506d58841afa1aa44352c2849e474d4a5f951"
+      },
+      "title": "LinkStack",
+      "tagline": "Your own link-in-bio page, a Linktree you host - for one person or many",
+      "categories": [
+        "webapps/social"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "linkstack",
+        "link in bio",
+        "linktree",
+        "littlelink",
+        "links page",
+        "profile page",
+        "landing page"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "4.8",
+          "release": "4.8.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "linkwarden",
       "file": {
         "path": "templates/linkwarden.yaml",
