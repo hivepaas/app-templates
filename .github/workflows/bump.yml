@@ -35,9 +35,11 @@ jobs:
         run: go run ./tools/apptemplate bump ../app-templates
 
       # The stars the store orders by, and those of the last four weeks. The job's
-      # own token reads the stars; who starred when - what Trending counts - may
-      # need a token of a person or a GitHub App, as the STATS_GITHUB_TOKEN secret
-      # (read-only, public repositories only). Without one, Trending stays empty.
+      # own token reads the stars; who starred when - what Trending counts - is
+      # refused to it, to GitHub Apps and to fine-grained tokens, the stargazers
+      # being users. It takes a classic personal access token with no scope at
+      # all, which reads public data only, as the STATS_GITHUB_TOKEN secret.
+      # Without one, Trending stays empty.
       # A count that fails costs the stars, not the week's image bumps.
       - name: Count stars
         working-directory: hivepaas

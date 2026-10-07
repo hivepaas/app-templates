@@ -148,6 +148,10 @@ refreshes with `apptemplate stats`; the index carries them. They are not in the
 template files, so refreshing them never changes a file an installation reads
 strictly.
 
+Trending needs the `STATS_GITHUB_TOKEN` secret to be a classic personal access
+token with no scopes: GitHub refuses who starred when to the job's own token and
+to fine-grained ones.
+
 Stars are counted for the repository the template's `links.source` points at on
 GitHub. For a project hosted elsewhere with a GitHub mirror, name the mirror by
 hand - `myapp: {added: "2026-09-20", repo: owner/name}` - and leave the rest of
