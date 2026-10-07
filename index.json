@@ -1736,6 +1736,46 @@
       }
     },
     {
+      "name": "bytestash",
+      "file": {
+        "path": "templates/bytestash.yaml",
+        "sha256": "9b348b3d89d49413a3d2948c10197b44497d5a752fda120af5569a725f90071e"
+      },
+      "icon": {
+        "path": "icons/bytestash.svg",
+        "sha256": "01ee4ad67ba146459867d1dfd027c97523b9decf3f48f6479b5948b11ead734d"
+      },
+      "title": "ByteStash",
+      "tagline": "A place for your code snippets - organized, searchable and shareable",
+      "categories": [
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "notes",
+        "open-source"
+      ],
+      "aliases": [
+        "bytestash",
+        "code snippets",
+        "snippets",
+        "gist",
+        "pastebin",
+        "code library",
+        "opengist alternative"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.14",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "cal-com",
       "file": {
         "path": "templates/cal-com.yaml",

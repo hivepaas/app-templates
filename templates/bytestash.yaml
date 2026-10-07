@@ -1,0 +1,158 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: bytestash
+  title: ByteStash
+  tagline: A place for your code snippets - organized, searchable and shareable
+  description: |
+    ByteStash keeps the code snippets you reuse: each with a title, a description,
+    categories and any number of code fragments, highlighted for its language. Search and
+    filter them, share one by a link - public, protected or expiring - and reach them from
+    scripts and editors through its API.
+
+    **This template sets up**
+
+    - ByteStash, with its snippets in a SQLite database on a volume - the backup
+    - its first account, made from the values below, as the administrator
+    - a memory limit you choose
+
+    **The first account**
+
+    ByteStash lets the first account be made even with sign-up closed, so whoever reached
+    a new one first would own it. Here the first start makes it from the values below; the
+    password is under this app's Secrets. Change it later in ByteStash.
+
+    **Sign-up**
+
+    Closed by default: only that account exists. Turn it on to let others make accounts;
+    each keeps their own snippets.
+  categories: [webapps/dev-tools]
+  tags: [notes, open-source]
+  aliases: [bytestash, code snippets, snippets, gist, pastebin, code library, opengist alternative]
+  icon: icons/bytestash.svg
+  links:
+    website: https://github.com/jordan-dalby/ByteStash
+    documentation: https://github.com/jordan-dalby/ByteStash/wiki
+    source: https://github.com/jordan-dalby/ByteStash
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address ByteStash answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: User name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{3,32}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: openSignup
+    title: Open sign-up
+    description: On, anyone who reaches the address can make an account.
+    type: bool
+    default: false
+  - name: jwtSecret
+    title: Session key
+    description: Signs sign-in sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the snippets database is kept on.
+    type: volume
+
+versions:
+  - name: "1.5"
+    release: "1.5.14"
+    default: true
+    image: ghcr.io/jordan-dalby/bytestash:1.5.14@sha256:b684e4df3214594035f45c8f202cf9602ac80e4d2dc5c938a73cfcc0a0bb5d3f
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's start, with the script that makes the first account beside it.
+      command: sh -c 'node /hivepaas/create-user.js & exec node src/app.js'
+    storage:
+      mounts:
+        /data/snippets: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: wget -q -O /dev/null http://127.0.0.1:5000/api/auth/config
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: bytestash
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: ALLOW_NEW_ACCOUNTS, v: "${{ params.openSignup }}"}
+        - {k: ADMIN_USERNAMES, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      create-user.js:
+        content: |
+          // ByteStash lets the first account be made even with sign-up closed, so whoever reaches
+          // a new one first would own it. Once it answers, that first account is made from the
+          // values above - it is refused once there is one, which is what makes this safe to run
+          // on every start.
+          const base = 'http://127.0.0.1:5000/api/auth';
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+          (async () => {
+            for (;;) {
+              try {
+                if ((await fetch(base + '/config')).ok) break;
+              } catch {}
+              await sleep(2000);
+            }
+            const res = await fetch(base + '/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: process.env.HIVEPAAS_ADMIN_USER, password: process.env.HIVEPAAS_ADMIN_PASSWORD }),
+            });
+            console.log(res.ok ? 'hivepaas: account ' + process.env.HIVEPAAS_ADMIN_USER + ' created'
+                               : 'hivepaas: ByteStash has its first account');
+          })();
+        swarmRef:
+          file: {name: /hivepaas/create-user.js, mode: 444}
+    routing:
+      port: 5000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
