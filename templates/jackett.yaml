@@ -1,0 +1,160 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jackett
+  title: Jackett
+  tagline: One Torznab API for hundreds of torrent trackers
+  description: |
+    Jackett translates searches from Sonarr, Radarr, Lidarr and other apps into queries
+    to hundreds of torrent trackers - public and private - and their results back into
+    one Torznab feed each app understands. It also searches all of them at once from its
+    own page.
+
+    **This template sets up**
+
+    - Jackett, on a volume for its settings and the trackers you add
+    - an admin password and an API key, both generated unless you give them
+    - a memory limit you choose
+
+    **Signed in from the start**
+
+    Jackett itself starts with no password, and its dashboard shows the API key to whoever
+    opens it. Here the password below is set before its first start. It is under this
+    app's Secrets, and every start sets it again: change it there and deploy.
+
+    **Using it**
+
+    Add trackers in the dashboard; each gets a Torznab URL to copy into Sonarr, Radarr or
+    Lidarr, with the API key, at `http://<this app's key>:9117`. Trackers behind
+    Cloudflare's challenge need FlareSolverr, also in this store: set its address in
+    Jackett's settings.
+
+    Prowlarr, also in this store, does the same job and also pushes the indexers into the
+    other apps by itself.
+  categories: [webapps/media]
+  tags: [open-source]
+  aliases: [jackett, torznab, indexers, trackers, torrent search, servarr, arr]
+  icon: icons/jackett.svg
+  links:
+    website: https://github.com/Jackett/Jackett
+    documentation: https://github.com/Jackett/Jackett/wiki
+    source: https://github.com/Jackett/Jackett
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address this app answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: adminPassword
+    title: Admin password
+    description: For the dashboard. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: apiKey
+    title: API key
+    description: >-
+      What Sonarr, Radarr and the others send with their searches. Leave empty to generate
+      one; it is set on the first start only.
+    type: secret
+    minLength: 16
+    generate: {length: 32}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: dataVolume
+    title: Settings volume
+    description: The volume Jackett's settings and trackers are kept on.
+    type: volume
+
+versions:
+  - name: "0.24"
+    release: "0.24.2800"
+    default: true
+    image: lscr.io/linuxserver/jackett:v0.24.2800-ls51
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /config: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      # The image is built on s6-overlay, whose init has to be process 1 itself:
+      # behind the one an app is created with it exits saying "can only run as
+      # pid 1", over and over, and the app never starts.
+      init: false
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # /health answers without signing in.
+        command: curl -fsS -o /dev/null http://127.0.0.1:9117/health
+        interval: 20s
+        timeout: 5s
+        startPeriod: 60s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jackett
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PUID, v: "1000"}
+        - {k: PGID, v: "1000"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_API_KEY, v: "${secrets.API_KEY}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      API_KEY:
+        value: "${{ params.apiKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      set-admin-password:
+        content: |
+          #!/bin/bash
+          # Jackett starts with no password, and its dashboard shows the API key to whoever
+          # opens it. Before it starts, the password from this app's Secrets goes into its
+          # settings, hashed the way Jackett hashes it: SHA-512 of the password and the API
+          # key, as UTF-16.
+          set -e
+          conf=/config/Jackett/ServerConfig.json
+          mkdir -p /config/Jackett
+          if [ ! -s "$conf" ]; then
+            jq -n --arg key "$HIVEPAAS_API_KEY" '{APIKey: $key, AllowExternal: true}' > "$conf"
+          fi
+          key=$(jq -r .APIKey "$conf")
+          hash=$(printf '%s' "$HIVEPAAS_ADMIN_PASSWORD$key" | iconv -f UTF-8 -t UTF-16LE | sha512sum | cut -d' ' -f1)
+          jq --arg hash "$hash" '.AdminPassword = $hash' "$conf" > "$conf.new"
+          mv "$conf.new" "$conf"
+          chown -R abc:abc /config/Jackett
+          echo "hivepaas: Jackett's admin password set"
+        swarmRef:
+          # Run by the image's init, as root, before Jackett starts.
+          file: {name: /custom-cont-init.d/set-admin-password, mode: 555}
+    routing:
+      port: 9117
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -6410,6 +6410,45 @@
       }
     },
     {
+      "name": "jackett",
+      "file": {
+        "path": "templates/jackett.yaml",
+        "sha256": "93c0e5b3b93e43748e66cd4d06e3e5e90357bb3a8805fe1a433be33dc86d6a29"
+      },
+      "icon": {
+        "path": "icons/jackett.svg",
+        "sha256": "bdabf03aa4bbf31c097f8af654e899934ecf0cacc741625b7b636863e6bec0d2"
+      },
+      "title": "Jackett",
+      "tagline": "One Torznab API for hundreds of torrent trackers",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "jackett",
+        "torznab",
+        "indexers",
+        "trackers",
+        "torrent search",
+        "servarr",
+        "arr"
+      ],
+      "license": "GPL-2.0-only",
+      "versions": [
+        {
+          "name": "0.24",
+          "release": "0.24.2800",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "jaeger",
       "file": {
         "path": "templates/jaeger.yaml",
