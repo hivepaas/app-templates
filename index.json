@@ -6618,6 +6618,56 @@
       }
     },
     {
+      "name": "kestra",
+      "file": {
+        "path": "templates/kestra.yaml",
+        "sha256": "0709ea7ce6710107d0b950082e645ef106644559a6998c234a549e8ccccb191f"
+      },
+      "icon": {
+        "path": "icons/kestra.svg",
+        "sha256": "21e4f9da9dbd7645a991ae1dd6759a4ad91cc9b777b8d3f4711c8f06cf4d111c"
+      },
+      "title": "Kestra",
+      "tagline": "Workflow orchestration in YAML - data pipelines, automations, scheduled jobs",
+      "categories": [
+        "webapps/automation",
+        "webapps/dev-tools"
+      ],
+      "tags": [
+        "automation",
+        "tasks",
+        "open-source"
+      ],
+      "aliases": [
+        "kestra",
+        "workflow",
+        "orchestration",
+        "scheduler",
+        "etl",
+        "data pipelines",
+        "airflow alternative",
+        "n8n alternative"
+      ],
+      "license": "Apache-2.0",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2.0",
+          "release": "2.0.5",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "keycloak",
       "file": {
         "path": "templates/keycloak.yaml",

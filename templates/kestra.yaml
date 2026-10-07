@@ -1,0 +1,176 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: kestra
+  title: Kestra
+  tagline: Workflow orchestration in YAML - data pipelines, automations, scheduled jobs
+  description: |
+    Kestra runs workflows declared in YAML: tasks that query databases, call APIs, move
+    files, run Python, shell or SQL scripts, branch, loop and retry, started on a schedule,
+    by a webhook, a file arriving or another flow finishing. Its UI edits flows with a live
+    topology, and shows every execution with its logs, outputs and metrics. Hundreds of
+    plugins come in the image.
+
+    **This template creates two apps**
+
+    - **Kestra**, every server role in one, with its stored files - task outputs, namespace
+      files, plugins - on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added, holding the flows,
+      executions and logs
+
+    The database and the volume together are the backup.
+
+    **Signing in**
+
+    Kestra asks for the email and password below. Change them in the app's environment
+    variables and Secrets, not in Kestra: they are applied again at every start.
+
+    **Script tasks run inside Kestra**
+
+    Python, shell and other script tasks run their code in a Docker container by default,
+    which this app cannot start. Give each of them the process runner, and they run inside
+    the Kestra container, where Python 3.12 and uv are installed:
+
+    ```yaml
+    - id: hello
+      type: io.kestra.plugin.scripts.python.Script
+      taskRunner:
+        type: io.kestra.plugin.core.runner.Process
+      script: print("hello")
+    ```
+  categories: [webapps/automation, webapps/dev-tools]
+  tags: [automation, tasks, open-source]
+  aliases: [kestra, workflow, orchestration, scheduler, etl, data pipelines, airflow alternative, n8n alternative]
+  icon: icons/kestra.svg
+  links:
+    website: https://kestra.io
+    documentation: https://kestra.io/docs
+    source: https://github.com/kestra-io/kestra
+  license: Apache-2.0
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Kestra answers at; links in its notifications use it. Leave it empty to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Sign-in email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Sign-in password
+    description: >-
+      8 characters or more, with a lowercase letter, an uppercase letter and a digit -
+      Kestra refuses any other, and the app will not start.
+    type: secret
+    minLength: 8
+  - name: memoryLimit
+    title: Memory limit
+    description: About 1.3GB once it has started; script tasks run within it too.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Storage volume
+    description: The volume task outputs, namespace files and plugins are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: kestra
+      username: kestra
+
+versions:
+  - name: "2.0"
+    release: "2.0.5"
+    default: true
+    image: kestra/kestra:v2.0.5
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Checks the password and the URL first. See the file.
+      entrypoint: /usr/local/bin/kestra-start
+    storage:
+      mounts:
+        # Kestra's home: a path that exists in the image and belongs to its user, so the new
+        # volume does too. The files go in storage/ below it.
+        /home/kestra: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The management port, which the domain does not lead to.
+        command: curl -fs -o /dev/null http://127.0.0.1:8081/health
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema.
+        startPeriod: 180s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: kestra
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # Kestra's configuration file, as YAML on one line.
+        - k: KESTRA_CONFIGURATION
+          v: >-
+            {datasources: {postgres: {driverClassName: org.postgresql.Driver}},
+            kestra: {repository: {type: postgres}, queue: {type: postgres},
+            storage: {type: local, local: {base-path: /home/kestra/storage}},
+            tasks: {tmp-dir: {path: /tmp/kestra-wd/tmp}}, anonymous-usage-report: {enabled: false}}}
+        # The rest of the configuration, as the variables Kestra maps onto it.
+        - k: DATASOURCES_POSTGRES_URL
+          v: >-
+            jdbc:postgresql://${{ deps.db.ref.HIVEPAAS_HOST }}:${{ deps.db.ref.HIVEPAAS_PORT }}/${{
+            deps.db.ref.HIVEPAAS_DATABASE_NAME }}
+        - {k: DATASOURCES_POSTGRES_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DATASOURCES_POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: KESTRA_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: KESTRA_SERVER_BASIC_AUTH_USERNAME, v: "${{ params.adminEmail }}"}
+        - {k: KESTRA_SERVER_BASIC_AUTH_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      kestra-start:
+        content: |
+          #!/bin/sh
+          # Kestra ignores a password that breaks its rules, and then lets whoever opens it
+          # first choose the credentials. Refuse to start instead. It refuses an empty URL:
+          # the app has none while it has no domain.
+          p="$KESTRA_SERVER_BASIC_AUTH_PASSWORD"
+          if ! { printf '%s' "$p" | grep -Eq '.{8}' && printf '%s' "$p" | grep -q '[a-z]' &&
+            printf '%s' "$p" | grep -q '[A-Z]' && printf '%s' "$p" | grep -q '[0-9]'; }; then
+            echo "hivepaas: the password needs 8 characters or more, with a lowercase letter, an uppercase letter and a digit" >&2
+            exit 1
+          fi
+          if [ -z "$KESTRA_URL" ]; then
+            unset KESTRA_URL
+          fi
+          exec /app/kestra server standalone
+        swarmRef:
+          file: {name: /usr/local/bin/kestra-start, mode: 555}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
