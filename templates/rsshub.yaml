@@ -1,0 +1,144 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rsshub
+  title: RSSHub
+  tagline: RSS feeds for the sites that stopped offering them
+  description: |
+    RSSHub turns thousands of pages into RSS: a YouTube channel, a GitHub repository's
+    releases, a Telegram channel, a subreddit, a government notice board, a shop's new
+    arrivals. Each source is a route - `/github/release/owner/repo` - and the feed is that
+    route on your server, to read in FreshRSS, Miniflux or any other reader.
+
+    **This template creates two apps**
+
+    - **RSSHub** itself, which keeps no state of its own
+    - **a Valkey cache**, named with `-redis`, holding what RSSHub fetched so a reader polling
+      every few minutes does not hit the source each time
+
+    **The browser variant**
+
+    Some routes need a real browser to read a page. The **With Chromium** variant bundles
+    one: a larger image, and about a gigabyte more memory while it works. The standard
+    variant answers every other route.
+
+    **Keeping it to yourself**
+
+    Without an access key anybody who finds the address can use your server to fetch feeds,
+    and the sources may rate-limit it. With one, every request needs it:
+    `https://rss.example.com/github/release/owner/repo?key=YOUR_KEY`. The key is under this
+    app's Secrets.
+
+    **Routes that need an account**
+
+    Routes for sites behind a login - Twitter/X, Instagram, Pixiv and others - read cookies
+    or tokens from environment variables, listed with each route in RSSHub's documentation.
+    Add them to this app's environment variables.
+  categories: [webapps/knowledge]
+  tags: [automation, documents, open-source]
+  aliases: [rss, atom, feeds, feed generator, rsshub, rss bridge]
+  icon: icons/rsshub.svg
+  links:
+    website: https://rsshub.app
+    documentation: https://docs.rsshub.app
+    source: https://github.com/DIYgod/RSSHub
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the feeds are read from. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: accessKey
+    title: Access key
+    description: >-
+      Asked of every request, as `?key=` in the feed's address. Leave it empty for open feeds -
+      only for an RSSHub no one else can reach.
+    type: secret
+    optional: true
+    minLength: 8
+  - name: cacheSeconds
+    title: Cache duration (seconds)
+    description: How long a route's result is served from the cache before the source is read again.
+    type: int
+    default: 300
+    min: 60
+    max: 86400
+  - name: memoryLimit
+    title: Memory limit
+    description: The standard variant needs about 512MB; the browser variant 1.5GB or more.
+    type: size
+    default: 1GB
+    min: 256MB
+
+dependencies:
+  - name: redis
+    title: Cache
+    template: valkey
+    version: "9.1"
+    params:
+      evictionPolicy: allkeys-lru
+      persistence: none
+
+variants:
+  - name: standard
+    title: Standard
+    description: Every route that reads a page without a browser.
+    default: true
+  - name: chromium
+    title: With Chromium
+    description: A browser bundled, for the routes that need one. A larger image and more memory.
+
+versions:
+  - name: "2026.10"
+    release: "2026-10-06"
+    default: true
+    images:
+      standard: diygod/rsshub:2026-10-06@sha256:9702431d8d8cb8e3bf08a0fa3275ec05343c0ec65b8d15c5c772f7ba541fae74
+      chromium: diygod/rsshub:chromium-bundled-2026-10-06@sha256:e02c92bf3cd83a8cd1c543a9b6a905e5d8edb020e1170eff5c27a2e218dbcbf7
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # With an access key set, /healthz asks for it too.
+        command: curl -fs -o /dev/null "http://127.0.0.1:1200/healthz?key=$ACCESS_KEY"
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: rsshub
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: NODE_ENV, v: production}
+        - {k: PORT, v: "1200"}
+        - {k: CACHE_TYPE, v: redis}
+        - {k: REDIS_URL, v: "redis://default:${{ deps.redis.ref.HIVEPAAS_PASSWORD }}@${{ deps.redis.ref.HIVEPAAS_HOST }}:${{ deps.redis.ref.HIVEPAAS_PORT }}/"}
+        - {k: CACHE_EXPIRE, v: "${{ params.cacheSeconds }}"}
+        - {k: ACCESS_KEY, v: "${secrets.ACCESS_KEY}"}
+    secrets:
+      ACCESS_KEY:
+        value: "${{ params.accessKey }}"
+    routing:
+      port: 1200
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

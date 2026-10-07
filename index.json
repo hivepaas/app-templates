@@ -12089,6 +12089,66 @@
       }
     },
     {
+      "name": "rsshub",
+      "file": {
+        "path": "templates/rsshub.yaml",
+        "sha256": "6ba14aef45493a152b90a746d507fba588519c160b45b42146a136ddfaac80de"
+      },
+      "icon": {
+        "path": "icons/rsshub.svg",
+        "sha256": "564776f6c7b5f79a856945f33798491c019b180790383713228f205ff37345b9"
+      },
+      "title": "RSSHub",
+      "tagline": "RSS feeds for the sites that stopped offering them",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "automation",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "rss",
+        "atom",
+        "feeds",
+        "feed generator",
+        "rsshub",
+        "rss bridge"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "redis",
+          "title": "Cache",
+          "template": "valkey"
+        }
+      ],
+      "variants": [
+        {
+          "name": "standard",
+          "default": true
+        },
+        {
+          "name": "chromium"
+        }
+      ],
+      "versions": [
+        {
+          "name": "2026.10",
+          "release": "2026-10-06",
+          "default": true,
+          "variants": [
+            "standard",
+            "chromium"
+          ]
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "rustdesk",
       "file": {
         "path": "templates/rustdesk.yaml",
