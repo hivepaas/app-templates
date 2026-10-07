@@ -1505,6 +1505,48 @@
       }
     },
     {
+      "name": "budibase",
+      "file": {
+        "path": "templates/budibase.yaml",
+        "sha256": "88db864fd1290f4c64534b308736cb8c4b020aeb77987d901ac9667206077e04"
+      },
+      "icon": {
+        "path": "icons/budibase.svg",
+        "sha256": "95de8eda20a1f2de466d6f3e99dd6a77da533aa96c3bbf28f57438843ee076a1"
+      },
+      "title": "Budibase",
+      "tagline": "Internal apps, forms and approval flows, built on your data",
+      "categories": [
+        "webapps/low-code"
+      ],
+      "tags": [
+        "low-code",
+        "automation",
+        "dashboards",
+        "open-source"
+      ],
+      "aliases": [
+        "budibase",
+        "internal tools",
+        "admin panel",
+        "forms",
+        "retool alternative",
+        "appsmith alternative",
+        "workflow"
+      ],
+      "license": "GPL-3.0-only",
+      "versions": [
+        {
+          "name": "3.48",
+          "release": "3.48.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "bugsink",
       "file": {
         "path": "templates/bugsink.yaml",

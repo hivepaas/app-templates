@@ -1,0 +1,122 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: budibase
+  title: Budibase
+  tagline: Internal apps, forms and approval flows, built on your data
+  description: |
+    Budibase builds the tools a team runs on: admin panels, request forms, approval queues,
+    portals for clients. Point it at PostgreSQL, MySQL, a REST API or a Google Sheet, or
+    keep the data in its own tables, then lay out screens from tables, forms and charts and
+    wire them up with automations that run on a schedule, a webhook or a row changing.
+
+    **It brings its own databases**
+
+    This image runs everything inside one container - CouchDB, MinIO, Redis and a small
+    PostgreSQL - so the app is one app, and the volume is all of it: the apps you build,
+    their data, uploaded files, and the keys Budibase generates for itself on the first
+    start. Back that volume up and there is nothing else to keep.
+
+    **Signing in**
+
+    The administrator account below is created on the first start; sign in with that email
+    and password. The password is under this app's Secrets as `ADMIN_PASSWORD`, read only
+    that once, so change it later in Budibase itself. Invite the rest of the team from
+    *Users*; invitation and password-reset emails need SMTP, set under *Settings > Email*.
+
+    **It is not small**
+
+    Its databases, two Node.js services and the AI gateway take close to three gigabytes
+    once it has started. Its AI features need a key from an AI provider, added in its
+    settings.
+  categories: [webapps/low-code]
+  tags: [low-code, automation, dashboards, open-source]
+  aliases: [budibase, internal tools, admin panel, forms, retool alternative, appsmith alternative, workflow]
+  icon: icons/budibase.svg
+  links:
+    website: https://budibase.com
+    documentation: https://docs.budibase.com
+    source: https://github.com/Budibase/budibase
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Budibase answers at. Invitation and password-reset links use it, kept from
+      the first start: a domain added later, in the app's routing settings, has to be entered
+      as the Platform URL in Budibase's settings too.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: The account created on the first start, and what it signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: What that account signs in with the first time. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: About 3GB is in use once it has started; leave room for the apps you build.
+    type: size
+    default: 4GB
+    min: 3GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume its databases, uploaded files and generated keys are kept on.
+    type: volume
+
+versions:
+  - name: "3.48"
+    release: "3.48.0"
+    default: true
+    image: budibase/budibase:v3.48.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        /data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image's own check: the proxy, the app and worker services, CouchDB and Redis.
+        command: /healthcheck.sh
+        interval: 30s
+        timeout: 15s
+        # The first start sets up every database.
+        startPeriod: 300s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: budibase
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PLATFORM_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: BB_ADMIN_USER_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: BB_ADMIN_USER_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
