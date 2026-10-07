@@ -1,0 +1,298 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: inventree
+  title: InvenTree
+  tagline: Inventory management for parts, stock, suppliers and builds
+  description: |
+    InvenTree keeps track of parts and where they are: stock in locations and bins, with
+    batches and serial numbers, the suppliers and prices to buy them from, bills of
+    materials, and build orders that consume parts to make assemblies. Purchase and sales
+    orders, labels and reports, barcodes, and a REST API with plugins round it out.
+
+    **This template creates three apps**
+
+    - **InvenTree**, as three components sharing a volume for uploaded files, the
+      generated secret key and the configuration:
+      - **proxy**, the address the domain points at, which serves static and uploaded
+        files and passes the rest on
+      - **server**, the interface and the API
+      - **worker**, which runs background tasks
+    - **a PostgreSQL database**, named after the app with `-db` added
+    - **a Valkey**, named after the app with `-redis` added, as the cache
+
+    The database and the volume together are the backup.
+
+    **Signing in**
+
+    The administrator below is created on the first start; its password is under the
+    server component's Secrets as `ADMIN_PASSWORD`, read only then. Add other people under
+    *Admin center > Users*.
+
+    **Starting takes a while**
+
+    Every start of the server collects its static files first, and the first one creates
+    the schema: allow a few minutes before it answers.
+  categories: [webapps/business]
+  tags: [ecommerce, open-source]
+  aliases: [inventree, inventory, stock, parts, bom, bill of materials, warehouse, electronics]
+  icon: icons/inventree.svg
+  links:
+    website: https://inventree.org
+    documentation: https://docs.inventree.org
+    source: https://github.com/inventree/InvenTree
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address InvenTree answers at; signing in only works on it. Leave it empty only to
+      add one later, in the routing settings of the proxy component.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@.+_-]{1,150}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: What the administrator signs in with the first time. Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: memoryLimit
+    title: Memory limit
+    description: >-
+      For the server and the worker each; the worker starts a process per CPU and can
+      reach 1.5GB.
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files, the secret key and the configuration are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: inventree
+      username: inventree
+  - name: redis
+    title: Cache
+    template: valkey
+    version: "9.1"
+    params:
+      evictionPolicy: allkeys-lru
+      persistence: none
+
+versions:
+  - name: "1.5"
+    release: "1.5.6"
+    default: true
+    components:
+      proxy: {image: "caddy:2.11.7-alpine"}
+      server: {image: "inventree/inventree:1.5.6"}
+      worker: {image: "inventree/inventree:1.5.6"}
+
+components:
+  # ── Proxy ──────────────────────────────────────────────────────────────
+  - name: proxy
+    title: Proxy
+    primary: true
+    needs: [server, worker]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+        storage:
+          mounts:
+            /var/www/static:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              readOnly: true
+              volumeOptions: {subpath: static}
+            /var/www/media:
+              type: volume
+              source: "${{ params.dataVolume }}"
+              readOnly: true
+              volumeOptions: {subpath: media}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            # Caddy's own port, below: whether the server is up is the server's check.
+            command: wget -q -O /dev/null http://127.0.0.1:8081/
+            interval: 30s
+            timeout: 5s
+            startPeriod: 10s
+            retries: 3
+        resources:
+          limits: {memory: 128MB}
+      settings:
+        kind: {category: webapp, engine: inventree, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: INVENTREE_SERVER, v: "http://${{ comp.server.key }}:8000"}
+        configFiles:
+          Caddyfile:
+            content: |
+              {
+              	admin off
+              	auto_https off
+              	# The X-Forwarded headers come from HivePaaS's proxy: pass them on, so the
+              	# server sees the HTTPS address it was set up with.
+              	servers {
+              		trusted_proxies static private_ranges
+              	}
+              }
+
+              # For the health check.
+              :8081 {
+              	respond 200
+              }
+
+              :80 {
+              	encode gzip
+              	request_body {
+              		max_size 100MB
+              	}
+              	handle_path /static/* {
+              		root * /var/www/static
+              		file_server
+              	}
+              	# Uploaded files: the server says whether the visitor may have them.
+              	handle_path /media/* {
+              		forward_auth {$INVENTREE_SERVER} {
+              			uri /auth/
+              		}
+              		root * /var/www/media
+              		file_server
+              		header Content-Disposition attachment
+              	}
+              	handle {
+              		reverse_proxy {$INVENTREE_SERVER}
+              	}
+              }
+            swarmRef:
+              file: {name: /etc/caddy/Caddyfile, mode: 444}
+        routing:
+          port: 80
+          exposePublicly: true
+          domains:
+            - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
+
+  # ── Server ─────────────────────────────────────────────────────────────
+  - name: server
+    title: Server
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          # InvenTree will not start without a site URL, which the app lacks while it has no
+          # domain. The static files go where the proxy serves them from, then the image's
+          # own server runs; the migrations run as it starts.
+          command: >-
+            sh -c '[ -n "$INVENTREE_SITE_URL" ] || export INVENTREE_SITE_URL=http://localhost;
+            invoke static && exec gunicorn -c ./gunicorn.conf.py InvenTree.wsgi
+            -b $INVENTREE_WEB_ADDR:$INVENTREE_WEB_PORT --chdir $INVENTREE_BACKEND_DIR/InvenTree'
+        storage:
+          mounts:
+            /home/inventree/data: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: curl -fs -o /dev/null http://127.0.0.1:8000/api/system/health/
+            interval: 30s
+            timeout: 10s
+            startPeriod: 600s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: inventree, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: INVENTREE_SITE_URL, v: "${${{ comp.proxy.key }}.HIVEPAAS_APP_URL}"}
+            - {k: INVENTREE_USE_X_FORWARDED_HOST, v: "True"}
+            - {k: INVENTREE_USE_X_FORWARDED_PORT, v: "True"}
+            - {k: INVENTREE_USE_X_FORWARDED_PROTO, v: "True"}
+            - {k: INVENTREE_AUTO_UPDATE, v: "True"}
+            - {k: INVENTREE_PLUGINS_ENABLED, v: "True"}
+            - {k: INVENTREE_LOG_LEVEL, v: WARNING}
+            - {k: INVENTREE_DB_ENGINE, v: postgresql}
+            - {k: INVENTREE_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: INVENTREE_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: INVENTREE_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: INVENTREE_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: INVENTREE_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: INVENTREE_CACHE_ENABLED, v: "True"}
+            - {k: INVENTREE_CACHE_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: INVENTREE_CACHE_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: INVENTREE_CACHE_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: INVENTREE_ADMIN_USER, v: "${{ params.adminUser }}"}
+            - {k: INVENTREE_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+            - {k: INVENTREE_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+        secrets:
+          ADMIN_PASSWORD:
+            value: "${{ params.adminPassword }}"
+
+  # ── Worker ─────────────────────────────────────────────────────────────
+  - name: worker
+    title: Worker
+    needs: [server]
+    app:
+      deployment:
+        source:
+          activeMethod: image
+          imageSource: {image: "${{ image }}"}
+          command: >-
+            sh -c '[ -n "$INVENTREE_SITE_URL" ] || export INVENTREE_SITE_URL=http://localhost;
+            exec invoke worker'
+        storage:
+          mounts:
+            /home/inventree/data: {type: volume, source: "${{ params.dataVolume }}"}
+        container:
+          healthcheck:
+            enabled: true
+            mode: CMD-SHELL
+            command: invoke worker-health
+            interval: 60s
+            timeout: 30s
+            startPeriod: 600s
+            retries: 3
+        resources:
+          limits: {memory: "${{ params.memoryLimit }}"}
+      settings:
+        kind: {category: webapp, engine: inventree, version: "${{ version.name }}", webapp: {}}
+        envVars:
+          data:
+            - {k: INVENTREE_SITE_URL, v: "${${{ comp.proxy.key }}.HIVEPAAS_APP_URL}"}
+            - {k: INVENTREE_PLUGINS_ENABLED, v: "True"}
+            - {k: INVENTREE_LOG_LEVEL, v: WARNING}
+            - {k: INVENTREE_DB_ENGINE, v: postgresql}
+            - {k: INVENTREE_DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+            - {k: INVENTREE_DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+            - {k: INVENTREE_DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+            - {k: INVENTREE_DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+            - {k: INVENTREE_DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+            - {k: INVENTREE_CACHE_ENABLED, v: "True"}
+            - {k: INVENTREE_CACHE_HOST, v: "${{ deps.redis.ref.HIVEPAAS_HOST }}"}
+            - {k: INVENTREE_CACHE_PORT, v: "${{ deps.redis.ref.HIVEPAAS_PORT }}"}
+            - {k: INVENTREE_CACHE_PASSWORD, v: "${{ deps.redis.ref.HIVEPAAS_PASSWORD }}"}

@@ -6029,6 +6029,74 @@
       }
     },
     {
+      "name": "inventree",
+      "file": {
+        "path": "templates/inventree.yaml",
+        "sha256": "47df5f55b9625f21b6122da219792b03bdf9034f27b0e20ef1f127b3e6b2f37b"
+      },
+      "icon": {
+        "path": "icons/inventree.svg",
+        "sha256": "98e6ff72feced958174cc206803c44d904ce343a6add1266639c892241581df7"
+      },
+      "title": "InvenTree",
+      "tagline": "Inventory management for parts, stock, suppliers and builds",
+      "categories": [
+        "webapps/business"
+      ],
+      "tags": [
+        "ecommerce",
+        "open-source"
+      ],
+      "aliases": [
+        "inventree",
+        "inventory",
+        "stock",
+        "parts",
+        "bom",
+        "bill of materials",
+        "warehouse",
+        "electronics"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        },
+        {
+          "name": "redis",
+          "title": "Cache",
+          "template": "valkey"
+        }
+      ],
+      "components": [
+        {
+          "name": "proxy",
+          "title": "Proxy",
+          "primary": true
+        },
+        {
+          "name": "server",
+          "title": "Server"
+        },
+        {
+          "name": "worker",
+          "title": "Worker"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.5",
+          "release": "1.5.6",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "invoice-ninja",
       "file": {
         "path": "templates/invoice-ninja.yaml",
