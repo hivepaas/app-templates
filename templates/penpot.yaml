@@ -140,7 +140,6 @@ components:
   - name: frontend
     title: Frontend
     primary: true
-    needs: [backend, exporter]
     app:
       deployment:
         source:
@@ -190,6 +189,7 @@ components:
   # ── Backend ────────────────────────────────────────────────────────────
   - name: backend
     title: Backend
+    needs: [frontend]
     app:
       deployment:
         source:
@@ -274,6 +274,7 @@ components:
   # ── Exporter ───────────────────────────────────────────────────────────
   - name: exporter
     title: Exporter
+    needs: [frontend]
     app:
       deployment:
         source:

@@ -118,7 +118,6 @@ components:
   - name: frontend
     title: Frontend
     primary: true
-    needs: [backend, websocket]
     app:
       deployment:
         source:
@@ -166,6 +165,7 @@ components:
   # ── Backend ────────────────────────────────────────────────────────────
   - name: backend
     title: Backend
+    needs: [frontend]
     app:
       deployment:
         source:

@@ -3367,7 +3367,7 @@
       "name": "erpnext",
       "file": {
         "path": "templates/erpnext.yaml",
-        "sha256": "09c65e196636d2708bb46277ba6b2b618222d85ba378baffece80bea75af5f6f"
+        "sha256": "7921e0428f886c17a4e1db466bab2a0246ca7b65dc8ea04485de63a052df53ff"
       },
       "icon": {
         "path": "icons/erpnext.svg",
@@ -5716,7 +5716,7 @@
       "name": "headscale",
       "file": {
         "path": "templates/headscale.yaml",
-        "sha256": "f48bcd963a44067104a8607fbf2c9bcdb42762648d4217101d98394beaad081c"
+        "sha256": "e7df4a89fbaa9b2d82483c8740dbca10b548a499b3426516952b37e35e05c5ee"
       },
       "icon": {
         "path": "icons/headscale.svg",
@@ -6581,7 +6581,7 @@
       "name": "inventree",
       "file": {
         "path": "templates/inventree.yaml",
-        "sha256": "47df5f55b9625f21b6122da219792b03bdf9034f27b0e20ef1f127b3e6b2f37b"
+        "sha256": "789b73a8586aeeca7cca38de8bfe5c96a5e87b3aa0463481484a7b6538d54aa1"
       },
       "icon": {
         "path": "icons/inventree.svg",
@@ -12027,7 +12027,7 @@
       "name": "penpot",
       "file": {
         "path": "templates/penpot.yaml",
-        "sha256": "2c7a1ae03d393beaba4247a651d47ef4eb73783cda247f69047128609af31ffe"
+        "sha256": "abd044867e121b38d5d638a2dd0f3e29b44195caa932fe8bc31b5f4827ee1818"
       },
       "icon": {
         "path": "icons/penpot.svg",

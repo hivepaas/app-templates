@@ -151,7 +151,6 @@ components:
   - name: proxy
     title: Proxy
     primary: true
-    needs: [server, ui]
     app:
       deployment:
         source:
@@ -213,6 +212,7 @@ components:
   # ── Server ─────────────────────────────────────────────────────────────
   - name: server
     title: Server
+    needs: [proxy]
     app:
       deployment:
         source:
