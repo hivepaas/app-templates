@@ -1,0 +1,185 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mathesar
+  title: Mathesar
+  tagline: A spreadsheet-like interface to PostgreSQL, for people who don't write SQL
+  description: |
+    Mathesar puts a spreadsheet in front of PostgreSQL: browse, edit, filter, sort and group
+    the rows of real tables, design schemas and relationships, build queries across joins
+    without writing SQL, and share forms that add records. Access follows the database's own
+    roles, so what someone can see in Mathesar is what Postgres lets them see.
+
+    **This template creates two apps**
+
+    - **Mathesar**, with uploaded files on a volume
+    - **a PostgreSQL database**, named after the app with `-db` added, holding Mathesar's
+      own data - and, if you like, the databases you create from it
+
+    The database and the volume together are the backup.
+
+    **Connecting your data**
+
+    Mathesar can create new databases on its own server, or connect to an existing
+    PostgreSQL - another app in the project, by its key as the host. Connecting asks for a
+    Postgres user and password, kept encrypted.
+
+    **Signing in**
+
+    The administrator below is created on the first start, before Mathesar answers anyone;
+    its password is under this app's Secrets as `ADMIN_PASSWORD`, read only then. Add other
+    people under *Administration > Users*.
+  categories: [databases/sql, webapps/low-code]
+  tags: [sql, relational, spreadsheet, low-code, open-source]
+  aliases: [mathesar, postgres gui, spreadsheet, airtable alternative, database ui, data entry, query builder]
+  icon: icons/mathesar.svg
+  links:
+    website: https://mathesar.org
+    documentation: https://docs.mathesar.org
+    source: https://github.com/mathesar-foundation/mathesar
+  license: GPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Mathesar answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@.+_-]{1,150}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Secret key
+    description: >-
+      Signs sessions and encrypts the database passwords Mathesar keeps. Leave empty to
+      generate one, and keep it with the backups.
+    type: secret
+    minLength: 50
+    generate: {length: 64}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded files are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: mathesar_django
+      username: mathesar
+
+versions:
+  - name: "0.12"
+    release: "0.12.0"
+    default: true
+    image: mathesar/mathesar:0.12.0
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Set the database up, make the administrator while there is none, then serve - the
+      # image's own start, less the database it would run itself without one.
+      command: >-
+        sh -c 'python -m mathesar.install && python /hivepaas/create-admin.py &&
+        exec ./bin/mathesar run -ne'
+    storage:
+      mounts:
+        /code/.media: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8000/healthz/ready/
+        interval: 30s
+        timeout: 5s
+        # The first start creates the schema.
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: mathesar
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: DJANGO_SETTINGS_MODULE, v: config.settings.production}
+        # The proxy has checked the host already.
+        - {k: ALLOWED_HOSTS, v: "*"}
+        - {k: SECRET_KEY, v: "${secrets.SECRET_KEY}"}
+        - {k: POSTGRES_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: POSTGRES_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      create-admin.py:
+        content: |
+          # The first administrator, from the values above, before Mathesar answers anyone:
+          # until there is one, its installation page lets whoever opens it first make it.
+          import os
+          import sys
+
+          import django
+
+          # Run from the image's working directory, where its settings are.
+          sys.path.insert(0, os.getcwd())
+
+          os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
+          django.setup()
+
+          from django.contrib.auth import get_user_model  # noqa: E402
+
+          User = get_user_model()
+          username = os.environ["HIVEPAAS_ADMIN_USER"]
+          if User.objects.filter(is_superuser=True).exists():
+              print("hivepaas: no administrator created: there is one already")
+          else:
+              User.objects.create_superuser(
+                  username, os.environ.get("HIVEPAAS_ADMIN_EMAIL", ""), os.environ["HIVEPAAS_ADMIN_PASSWORD"]
+              )
+              print(f"hivepaas: administrator {username} created")
+        swarmRef:
+          file: {name: /hivepaas/create-admin.py, mode: 444}
+    routing:
+      port: 8000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

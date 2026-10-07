@@ -8269,6 +8269,57 @@
       }
     },
     {
+      "name": "mathesar",
+      "file": {
+        "path": "templates/mathesar.yaml",
+        "sha256": "af5bb681f526492fdcf638530942ec6d14460fdf26167a97b124dfd589038812"
+      },
+      "icon": {
+        "path": "icons/mathesar.svg",
+        "sha256": "63bf46c668e90f9c0784507d258ca2a31965699ec1b3a07bfeccee4eb45e36d6"
+      },
+      "title": "Mathesar",
+      "tagline": "A spreadsheet-like interface to PostgreSQL, for people who don't write SQL",
+      "categories": [
+        "databases/sql",
+        "webapps/low-code"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "spreadsheet",
+        "low-code",
+        "open-source"
+      ],
+      "aliases": [
+        "mathesar",
+        "postgres gui",
+        "spreadsheet",
+        "airtable alternative",
+        "database ui",
+        "data entry",
+        "query builder"
+      ],
+      "license": "GPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "0.12",
+          "release": "0.12.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "matomo",
       "file": {
         "path": "templates/matomo.yaml",
