@@ -10761,6 +10761,48 @@
       }
     },
     {
+      "name": "papra",
+      "file": {
+        "path": "templates/papra.yaml",
+        "sha256": "31820f7b998daec58e4e55943f11c5255daa394491fd5ba604301f4bb8fd4b4c"
+      },
+      "icon": {
+        "path": "icons/papra.svg",
+        "sha256": "6119be4fd41339c57161e9fe4f4db1ca457044325a2166b2c16a10050dcb61f1"
+      },
+      "title": "Papra",
+      "tagline": "A simple archive for receipts, contracts and bills, found again in seconds",
+      "categories": [
+        "webapps/documents"
+      ],
+      "tags": [
+        "documents",
+        "search",
+        "privacy",
+        "open-source"
+      ],
+      "aliases": [
+        "papra",
+        "documents",
+        "document management",
+        "paperless alternative",
+        "receipts",
+        "archive",
+        "ocr"
+      ],
+      "license": "AGPL-3.0-only",
+      "versions": [
+        {
+          "name": "26.7",
+          "release": "26.7.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "paradedb",
       "file": {
         "path": "templates/paradedb.yaml",

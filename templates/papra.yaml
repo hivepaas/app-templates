@@ -1,0 +1,248 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: papra
+  title: Papra
+  tagline: A simple archive for receipts, contracts and bills, found again in seconds
+  description: |
+    Papra keeps the documents you need to find again: upload them, or forward them by email
+    or drop them in a folder, and it extracts their text - scans and photos included - so a
+    search finds them. Tags and rules that tag automatically keep them in order, and
+    organizations share them with family or colleagues; a link shares one document with
+    anyone, with a password and an expiry date if you like.
+
+    **What this template creates**
+
+    One app, with its SQLite database and the documents on a volume. The volume is the
+    backup.
+
+    **Signing in**
+
+    The administrator below is created on the first start, before Papra answers anyone; its
+    password is under this app's Secrets as `ADMIN_PASSWORD`, read only then. Sign-up is
+    closed unless you open it below: others then make their own accounts, and join an
+    organization by invitation.
+
+    **Email**
+
+    Invitations and password resets go out by SMTP when a host is set below; without one,
+    they are only written to the app's log.
+  categories: [webapps/documents]
+  tags: [documents, search, privacy, open-source]
+  aliases: [papra, documents, document management, paperless alternative, receipts, archive, ocr]
+  icon: icons/papra.svg
+  links:
+    website: https://papra.app
+    documentation: https://docs.papra.app
+    source: https://github.com/papra-hq/papra
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Papra answers at; signing in and share links use it. Leave it empty only to
+      add one later, in the app's routing settings.
+    type: domain
+    optional: true
+  - name: adminName
+    title: Administrator name
+    type: string
+    default: Admin
+    maxLength: 100
+  - name: adminEmail
+    title: Administrator email
+    description: What the administrator signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: openSignup
+    title: Open sign-up
+    description: On, anyone who reaches the address can make an account.
+    type: bool
+    default: false
+  - name: authSecret
+    title: Session secret
+    description: Signs sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: smtpHost
+    title: SMTP host
+    description: For invitations and password resets. Leave empty to send no email.
+    type: string
+    optional: true
+  - name: smtpPort
+    title: SMTP port
+    type: int
+    default: 587
+    min: 1
+    max: 65535
+  - name: smtpSecure
+    title: TLS from the first byte
+    description: On for port 465; off for STARTTLS on 587.
+    type: bool
+    default: false
+  - name: smtpUser
+    title: SMTP username
+    type: string
+    optional: true
+  - name: smtpPassword
+    title: SMTP password
+    type: secret
+    optional: true
+  - name: mailFrom
+    title: Sender
+    type: string
+    default: Papra <papra@example.com>
+  - name: memoryLimit
+    title: Memory limit
+    description: About 250MB at rest; text extraction from scans takes more.
+    type: size
+    default: 1GB
+    min: 512MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database and the documents are kept on.
+    type: volume
+
+versions:
+  - name: "26.7"
+    release: "26.7.0"
+    default: true
+    image: ghcr.io/papra-hq/papra:26.7.0-rootless
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's own start, with the administrator made first. See the files.
+      command: sh /hivepaas/start.sh
+    storage:
+      mounts:
+        /app/app-data: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl or wget in the image.
+        command: >-
+          node -e "fetch('http://127.0.0.1:1221/api/health').then((r) => process.exit(r.ok ? 0 : 1),
+          () => process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: papra
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_BASE_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: AUTH_SECRET, v: "${secrets.AUTH_SECRET}"}
+        - {k: AUTH_IS_REGISTRATION_ENABLED, v: "${{ params.openSignup }}"}
+        - {k: SMTP_HOST, v: "${{ params.smtpHost }}"}
+        - {k: SMTP_PORT, v: "${{ params.smtpPort }}"}
+        - {k: SMTP_SECURE, v: "${{ params.smtpSecure }}"}
+        - {k: SMTP_USER, v: "${{ params.smtpUser }}"}
+        - {k: SMTP_PASSWORD, v: "${secrets.SMTP_PASSWORD}"}
+        - {k: EMAILS_FROM_ADDRESS, v: "${{ params.mailFrom }}"}
+        - {k: HIVEPAAS_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      AUTH_SECRET:
+        value: "${{ params.authSecret }}"
+      SMTP_PASSWORD:
+        value: "${{ params.smtpPassword }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      start.sh:
+        content: |
+          #!/bin/sh
+          # The image's own start - migrations, then the server - with the administrator made
+          # in between until there is one, and email sent by SMTP only when there is a host.
+          set -e
+          # An empty address is refused: the app has none while it has no domain.
+          if [ -z "$APP_BASE_URL" ]; then
+            unset APP_BASE_URL
+          fi
+          if [ -n "$SMTP_HOST" ]; then
+            export EMAILS_DRIVER=smtp
+          fi
+          pnpm migrate:up:prod
+          if [ ! -f ./app-data/.hivepaas-admin ]; then
+            node /hivepaas/create-admin.mjs
+          fi
+          exec pnpm start
+        swarmRef:
+          file: {name: /hivepaas/start.sh, mode: 444}
+      create-admin.mjs:
+        content: |
+          // The first account, made before Papra answers anyone: it becomes the administrator.
+          // A server of its own runs for it on the loopback, with sign-up on whatever the
+          // app's setting, and is stopped once the account exists. A file on the volume
+          // records that it does.
+          import { spawn } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+
+          const port = '1299';
+          const base = 'http://127.0.0.1:' + port;
+          const server = spawn('node', ['dist/index.js'], {
+            env: { ...process.env, PORT: port, SERVER_HOSTNAME: '127.0.0.1', AUTH_IS_REGISTRATION_ENABLED: 'true' },
+            stdio: 'ignore',
+          });
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          try {
+            for (let i = 0; ; i++) {
+              try {
+                if ((await fetch(base + '/api/health')).ok) break;
+              } catch {}
+              if (i > 120) throw new Error('the server did not start');
+              await sleep(1000);
+            }
+            const res = await fetch(base + '/api/auth/sign-up/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Origin: process.env.APP_BASE_URL || 'http://localhost:1221' },
+              body: JSON.stringify({
+                name: process.env.HIVEPAAS_ADMIN_NAME,
+                email: process.env.HIVEPAAS_ADMIN_EMAIL,
+                password: process.env.HIVEPAAS_ADMIN_PASSWORD,
+              }),
+            });
+            const body = await res.text();
+            if (res.ok || body.includes('USER_ALREADY_EXISTS')) {
+              // Done: later starts leave it alone, whatever the settings become.
+              writeFileSync('./app-data/.hivepaas-admin', process.env.HIVEPAAS_ADMIN_EMAIL + '\n');
+              console.log('hivepaas: administrator ' + process.env.HIVEPAAS_ADMIN_EMAIL + (res.ok ? ' created' : ' exists'));
+            } else {
+              console.log('hivepaas: creating the administrator failed, to be tried again at the next start: ' + res.status + ' ' + body);
+            }
+          } catch (err) {
+            console.log('hivepaas: creating the administrator failed: ' + err.message);
+          } finally {
+            server.kill('SIGTERM');
+          }
+        swarmRef:
+          file: {name: /hivepaas/create-admin.mjs, mode: 444}
+    routing:
+      port: 1221
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
