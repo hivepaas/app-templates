@@ -1,0 +1,127 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: rss-bridge
+  title: RSS-Bridge
+  tagline: RSS and Atom feeds for sites that do not offer one
+  description: |
+    RSS-Bridge makes feeds out of web pages: hundreds of bridges for sites and services -
+    YouTube channels, Reddit, Mastodon, Telegram channels, Twitch, shops, forums - and
+    generic ones that turn any page into a feed with a CSS selector or XPath. Pick a
+    bridge, fill in its form, and copy the feed URL into your reader.
+
+    **This template sets up**
+
+    - RSS-Bridge, with every bridge enabled
+    - a sign-in, on by default, with a password generated unless you give one
+    - a memory limit you choose
+
+    It keeps nothing but a cache, which is rebuilt when it is gone, so it needs no volume.
+
+    **Signing in**
+
+    With the sign-in on, the pages and the feeds ask for the user name and password -
+    HTTP basic authentication, which feed readers support: give them the feed URL with
+    `https://user:password@` in front of the domain, or the credentials in their own
+    fields. A reader in the same project, such as FreshRSS or Miniflux from this store, can
+    use `http://<this app's key>` instead. The password is under this app's Secrets.
+
+    Without a sign-in, anyone who reaches it can make it fetch pages for them.
+  categories: [webapps/knowledge]
+  tags: [automation, open-source]
+  aliases: [rss-bridge, rssbridge, rss, atom, feeds, feed generator, rsshub alternative, scraping]
+  icon: icons/rss-bridge.svg
+  links:
+    website: https://rss-bridge.org
+    documentation: https://rss-bridge.github.io/rss-bridge/
+    source: https://github.com/RSS-Bridge/rss-bridge
+  license: Unlicense
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address RSS-Bridge answers at. Leave it empty to keep it to the project's own
+      apps, or to add one later in the app's routing settings.
+    type: domain
+    optional: true
+  - name: requireLogin
+    title: Require sign-in
+    description: On, the pages and the feeds ask for the user name and password below.
+    type: bool
+    default: true
+  - name: username
+    title: User name
+    type: string
+    default: rss
+    pattern: '^[A-Za-z0-9@._-]{2,64}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam, for the dates in the feeds.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+
+versions:
+  - name: "2026.10"
+    release: "2026.10.07"
+    default: true
+    # The last tagged release is more than a year old; the project publishes main as
+    # latest and as sha-<commit>. This is the build of the date above, by its commit.
+    image: rssbridge/rss-bridge:sha-f37eaa2@sha256:11b6ed6d2c7d4e46ba901eb163db2e57152b4f59d8bc55b4641635ab379e0b8e
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # No curl or wget in the image. A 401 comes from RSS-Bridge itself, so it is up.
+        command: >-
+          php -r '$c = stream_context_create(["http" => ["ignore_errors" => true]]);
+          @file_get_contents("http://127.0.0.1/?action=health", false, $c);
+          exit(preg_match("/ (200|401) /", $http_response_header[0] ?? "") ? 0 : 1);'
+        interval: 30s
+        timeout: 10s
+        startPeriod: 20s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: rss-bridge
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        # RSSBRIDGE_<section>_<key> sets that key of config.ini.php.
+        - {k: RSSBRIDGE_authentication_enable, v: "${{ params.requireLogin }}"}
+        - {k: RSSBRIDGE_authentication_username, v: "${{ params.username }}"}
+        - {k: RSSBRIDGE_authentication_password, v: "${secrets.PASSWORD}"}
+        - {k: RSSBRIDGE_system_timezone, v: "${{ params.timezone }}"}
+    secrets:
+      PASSWORD:
+        value: "${{ params.password }}"
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

@@ -13641,6 +13641,47 @@
       }
     },
     {
+      "name": "rss-bridge",
+      "file": {
+        "path": "templates/rss-bridge.yaml",
+        "sha256": "bf89a6294ed425d11c74237ac66f736f8a520b24bb2f4f57df3d493272c16d19"
+      },
+      "icon": {
+        "path": "icons/rss-bridge.svg",
+        "sha256": "77c33d9263bcf8ef53de4e50c0c257c71aa797b93559719cc0696ae088396824"
+      },
+      "title": "RSS-Bridge",
+      "tagline": "RSS and Atom feeds for sites that do not offer one",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "automation",
+        "open-source"
+      ],
+      "aliases": [
+        "rss-bridge",
+        "rssbridge",
+        "rss",
+        "atom",
+        "feeds",
+        "feed generator",
+        "rsshub alternative",
+        "scraping"
+      ],
+      "license": "Unlicense",
+      "versions": [
+        {
+          "name": "2026.10",
+          "release": "2026.10.07",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "rsshub",
       "file": {
         "path": "templates/rsshub.yaml",
