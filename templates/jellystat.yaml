@@ -1,0 +1,200 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: jellystat
+  title: Jellystat
+  tagline: Watch statistics for Jellyfin - who watched what, when, and on which device
+  description: |
+    Jellystat keeps the history Jellyfin itself forgets: every playback by every user, on
+    which device and client, transcoded or played directly, and for how long. It turns that
+    into charts of the most watched titles and libraries, the busiest hours and the most
+    active users, and shows what is playing right now.
+
+    **This template creates two apps**
+
+    - **Jellystat**
+    - **a PostgreSQL database**, named after the app with `-db` added, which holds the
+      history and is the backup
+
+    **Before you create it**
+
+    The Jellyfin app has to exist, from this store, with an API key for Jellystat: in
+    Jellyfin open **Dashboard → API Keys**, add one, and give it below.
+
+    **Set up from the start**
+
+    Jellystat's own setup page is open to whoever reaches it first. Here the first start
+    connects it to Jellyfin and makes the user below, which closes that page; until
+    Jellyfin answers, it keeps trying. The password is under this app's Secrets.
+  categories: [webapps/media]
+  tags: [analytics, open-source]
+  aliases: [jellystat, jellyfin statistics, playback history, tautulli alternative, watch stats]
+  icon: icons/jellystat.png
+  links:
+    website: https://github.com/CyferShepard/Jellystat
+    documentation: https://github.com/CyferShepard/Jellystat#readme
+    source: https://github.com/CyferShepard/Jellystat
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Jellystat answers at. Leave it empty to add one later, in the app's
+      routing settings.
+    type: domain
+    optional: true
+  - name: jellyfinApp
+    title: Jellyfin app
+    description: The Jellyfin app whose playback it records.
+    type: app
+    engine: jellyfin
+  - name: jellyfinApiKey
+    title: Jellyfin API key
+    description: Made in Jellyfin under Dashboard, API Keys.
+    type: secret
+    minLength: 8
+  - name: adminUser
+    title: User name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9@._-]{2,64}$'
+  - name: adminPassword
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: jwtSecret
+    title: Session key
+    description: Signs sign-in sessions. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 48}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam; the charts use it.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: jellystat
+      username: jellystat
+
+versions:
+  - name: "1.1"
+    release: "1.1.12"
+    default: true
+    image: cyfershepard/jellystat:1.1.12@sha256:e61c759ec706da378bc8374e797da1dfd298ab30f804cefd82d192c301a888c7
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's start, with the script that sets it up beside it.
+      command: sh -c 'node /hivepaas/setup.cjs & exec /entry.sh'
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The image has neither curl nor wget.
+        command: >-
+          node -e "fetch('http://127.0.0.1:3000/auth/isConfigured').then((r) =>
+          process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+        interval: 30s
+        timeout: 10s
+        startPeriod: 60s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: jellystat
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: POSTGRES_IP, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: POSTGRES_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: POSTGRES_DB, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: POSTGRES_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: POSTGRES_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: JWT_SECRET, v: "${secrets.JWT_SECRET}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - k: HIVEPAAS_JELLYFIN_URL
+          v: "http://${${{ params.jellyfinApp }}.HIVEPAAS_HOST}:${${{ params.jellyfinApp }}.HIVEPAAS_PORT}"
+        - {k: HIVEPAAS_JELLYFIN_API_KEY, v: "${secrets.JELLYFIN_API_KEY}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      JWT_SECRET:
+        value: "${{ params.jwtSecret }}"
+      JELLYFIN_API_KEY:
+        value: "${{ params.jellyfinApiKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      setup.cjs:
+        content: |
+          // Jellystat's setup is open to whoever comes first: until it has both a user and a
+          // Jellyfin server, anyone can set either. Once it answers, both are set from the values
+          // above - the user, then Jellyfin straight after, which closes the setup. Jellyfin may not
+          // be reachable yet; each try sets the user again first, so it is ours that is kept.
+          const CryptoJS = require('/app/node_modules/crypto-js');
+          const base = 'http://127.0.0.1:3000';
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const post = (path, body) =>
+            fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+          (async () => {
+            let state;
+            for (;;) {
+              try {
+                const res = await fetch(base + '/auth/isConfigured');
+                if (res.ok) { state = (await res.json()).state; break; }
+              } catch {}
+              await sleep(2000);
+            }
+            if (state >= 2) {
+              console.log('hivepaas: Jellystat is set up');
+              return;
+            }
+            for (;;) {
+              // The browser sends the password hashed, and this is what it compares with.
+              await post('/auth/createuser', {
+                username: process.env.HIVEPAAS_ADMIN_USER,
+                password: CryptoJS.SHA3(process.env.HIVEPAAS_ADMIN_PASSWORD).toString(),
+              });
+              const res = await post('/auth/configSetup', {
+                JF_HOST: process.env.HIVEPAAS_JELLYFIN_URL,
+                JF_API_KEY: process.env.HIVEPAAS_JELLYFIN_API_KEY,
+              });
+              if (res.ok) break;
+              console.log('hivepaas: connecting to Jellyfin failed, retrying: ' + res.status + ' ' + (await res.text()).slice(0, 200));
+              await sleep(15000);
+            }
+            console.log('hivepaas: Jellystat set up with user ' + process.env.HIVEPAAS_ADMIN_USER);
+          })();
+        swarmRef:
+          file: {name: /hivepaas/setup.cjs, mode: 444}
+    routing:
+      port: 3000
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

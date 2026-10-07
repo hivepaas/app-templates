@@ -6603,6 +6603,51 @@
       }
     },
     {
+      "name": "jellystat",
+      "file": {
+        "path": "templates/jellystat.yaml",
+        "sha256": "a1bc275b6b34bcad20201a4f89b2b38211beca3e39fc0047d966739b1b4b7360"
+      },
+      "icon": {
+        "path": "icons/jellystat.png",
+        "sha256": "80da496f423f1ade5828695914474546e08830c1acd661258ab8aa3483c5b857"
+      },
+      "title": "Jellystat",
+      "tagline": "Watch statistics for Jellyfin - who watched what, when, and on which device",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "analytics",
+        "open-source"
+      ],
+      "aliases": [
+        "jellystat",
+        "jellyfin statistics",
+        "playback history",
+        "tautulli alternative",
+        "watch stats"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "1.1",
+          "release": "1.1.12",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "jenkins",
       "file": {
         "path": "templates/jenkins.yaml",
