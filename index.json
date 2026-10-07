@@ -2825,6 +2825,47 @@
       }
     },
     {
+      "name": "dokuwiki",
+      "file": {
+        "path": "templates/dokuwiki.yaml",
+        "sha256": "e3497d982dd81ca805072b3914180bb0fee0e27b751ccb13a2e1a579f6d46c17"
+      },
+      "icon": {
+        "path": "icons/dokuwiki.svg",
+        "sha256": "5ff452b83a697834bc8b6ef5cc4eeba076566fbc5f258b53f8527f684b6c5fc1"
+      },
+      "title": "DokuWiki",
+      "tagline": "A simple wiki that keeps its pages as plain text files - no database",
+      "categories": [
+        "webapps/knowledge"
+      ],
+      "tags": [
+        "wiki",
+        "documents",
+        "open-source"
+      ],
+      "aliases": [
+        "dokuwiki",
+        "wiki",
+        "documentation",
+        "knowledge base",
+        "notes",
+        "flat file",
+        "no database"
+      ],
+      "license": "GPL-2.0-only",
+      "versions": [
+        {
+          "name": "2026-07-14",
+          "release": "2026-07-14c",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "dolibarr",
       "file": {
         "path": "templates/dolibarr.yaml",

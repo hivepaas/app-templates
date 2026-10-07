@@ -1,0 +1,211 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: dokuwiki
+  title: DokuWiki
+  tagline: A simple wiki that keeps its pages as plain text files - no database
+  description: |
+    DokuWiki is a wiki for documentation, notes and team knowledge that stores every page
+    as a text file: no database to run, back up or upgrade. It has a clean syntax, full
+    revision history, access control by page and namespace, and over a thousand plugins
+    and templates.
+
+    **This template sets up**
+
+    - DokuWiki, its pages, media and settings on a volume - the backup
+    - a superuser, with a password generated unless you give one
+    - a memory limit you choose
+
+    **Set up from the start**
+
+    DokuWiki's installer is open to whoever reaches it first. Here the first start writes
+    what the installer would - the settings, the superuser and the access rules - so it
+    never opens. After that they are DokuWiki's to change, from its admin pages; the values
+    below are not applied again.
+
+    **Who can read**
+
+    By default anyone can read the wiki and only users can edit it; choose a closed wiki
+    to keep it to users. With sign-up closed, the superuser adds users in the User Manager.
+
+    **Email**
+
+    The image has no mail server; for password resets and notifications, install the SMTP
+    plugin from the Extension Manager.
+  categories: [webapps/knowledge]
+  tags: [wiki, documents, open-source]
+  aliases: [dokuwiki, wiki, documentation, knowledge base, notes, flat file, no database]
+  icon: icons/dokuwiki.svg
+  links:
+    website: https://www.dokuwiki.org
+    documentation: https://www.dokuwiki.org/manual
+    source: https://github.com/dokuwiki/dokuwiki
+  license: GPL-2.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address the wiki answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: title
+    title: Wiki title
+    type: string
+    default: My Wiki
+    pattern: '^.{1,64}$'
+  - name: aclPolicy
+    title: Who can read
+    type: select
+    default: read
+    options:
+      - {value: read, title: "Anyone reads, users edit"}
+      - {value: closed, title: "Only users read and edit"}
+  - name: allowRegistration
+    title: Open sign-up
+    description: On, anyone who reaches the wiki can make an account.
+    type: bool
+    default: false
+  - name: adminUser
+    title: Superuser name
+    type: string
+    default: admin
+    pattern: '^[a-z0-9._-]{2,64}$'
+  - name: adminName
+    title: Superuser's full name
+    type: string
+    default: Administrator
+    pattern: '^[^:]{1,64}$'
+  - name: adminEmail
+    title: Superuser's email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@:\s]+@[^@:\s]+\.[^@:\s]+$'
+  - name: adminPassword
+    title: Superuser password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: timezone
+    title: Time zone
+    description: An IANA name, such as Europe/Amsterdam.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 256MB
+    min: 128MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the pages, media, plugins and settings are kept on.
+    type: volume
+
+versions:
+  - name: "2026-07-14"
+    release: "2026-07-14c"
+    default: true
+    image: dokuwiki/dokuwiki:2026-07-14c@sha256:b5b66a0d54d39f1aa817ffd2da31d28afd927fceaab04c651e0c132b33a80640
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's entrypoint takes no command, so the first settings go in by a new one
+      # that hands over to it. See the files.
+      entrypoint: /usr/local/bin/dokuwiki-start
+    storage:
+      mounts:
+        /storage: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8080/health.php
+        interval: 30s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: dokuwiki
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: PHP_TIMEZONE, v: "${{ params.timezone }}"}
+        - {k: DW_TITLE, v: "${{ params.title }}"}
+        - {k: DW_ACL_POLICY, v: "${{ params.aclPolicy }}"}
+        - {k: DW_ALLOW_REGISTRATION, v: "${{ params.allowRegistration }}"}
+        - {k: DW_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: DW_ADMIN_NAME, v: "${{ params.adminName }}"}
+        - {k: DW_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: DW_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      dokuwiki-start:
+        content: |
+          #!/bin/sh
+          # Writes the first settings, then starts as the image does. See setup.php.
+          set -e
+          php /hivepaas/setup.php
+          exec /dokuwiki-entrypoint.sh
+        swarmRef:
+          file: {name: /usr/local/bin/dokuwiki-start, mode: 555}
+      setup.php:
+        content: |
+          <?php
+          // DokuWiki's installer is open to whoever reaches it first. On the first start this
+          // writes what the installer would - the settings, the superuser, the access rules - so it
+          // never opens. Once written, they are DokuWiki's to change, from its admin pages.
+          $conf = '/storage/conf';
+          if (is_file("$conf/local.php") && filesize("$conf/local.php")) {
+              echo "hivepaas: DokuWiki is set up\n";
+              exit;
+          }
+          @mkdir($conf, 0755, true);
+          $env = fn($name) => (string)getenv($name);
+          $q = fn($s) => "'" . addslashes($s) . "'";
+
+          $local = "<?php\n// Written by HivePaaS on the first start, as DokuWiki's installer would.\n"
+              . "\$conf['title'] = " . $q($env('DW_TITLE')) . ";\n"
+              . "\$conf['lang'] = 'en';\n"
+              . "\$conf['license'] = 'cc-by-sa';\n"
+              . "\$conf['useacl'] = 1;\n"
+              . "\$conf['superuser'] = '@admin';\n"
+              . ($env('DW_ALLOW_REGISTRATION') === 'true' ? '' : "\$conf['disableactions'] = 'register';\n");
+          file_put_contents("$conf/local.php", $local);
+
+          $user = implode(':', [$env('DW_ADMIN_USER'), password_hash($env('DW_ADMIN_PASSWORD'), PASSWORD_BCRYPT),
+              $env('DW_ADMIN_NAME'), $env('DW_ADMIN_EMAIL'), 'admin,user']);
+          file_put_contents("$conf/users.auth.php", "# users.auth.php\n# <?php exit()?>\n# Don't modify the lines above\n#\n"
+              . "# login:passwordhash:Real Name:email:groups,comma,separated\n\n$user\n");
+
+          // read: anyone may read, users may edit; closed: only users may read and edit.
+          $acl = $env('DW_ACL_POLICY') === 'closed'
+              ? "*               @ALL          0\n*               @user         8\n"
+              : "*               @ALL          1\n*               @user         8\n";
+          file_put_contents("$conf/acl.auth.php", "# acl.auth.php\n# <?php exit()?>\n# Don't modify the lines above\n\n$acl");
+
+          file_put_contents("$conf/plugins.local.php", "<?php\n\$plugins['authad']    = 0;\n\$plugins['authldap']  = 0;\n"
+              . "\$plugins['authmysql'] = 0;\n\$plugins['authpgsql'] = 0;\n");
+          echo "hivepaas: DokuWiki set up with superuser " . $env('DW_ADMIN_USER') . "\n";
+        swarmRef:
+          file: {name: /hivepaas/setup.php, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
