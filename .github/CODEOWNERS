@@ -1,0 +1,9 @@
+# Who must approve a change before it merges into main, when the branch's rules
+# require a code owner's review. A bot is never a code owner, so a workflow
+# approving a pull request is never enough on its own.
+*                   @tiendc
+
+# The workflows hold the job's write token and run the bump that opens pull
+# requests: named on their own, so that they keep an owner if the line above
+# is ever split up.
+/.github/           @tiendc
