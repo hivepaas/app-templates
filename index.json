@@ -7036,6 +7036,54 @@
       }
     },
     {
+      "name": "koel",
+      "file": {
+        "path": "templates/koel.yaml",
+        "sha256": "d4facfbc20a22ba89e992713d6dd8cc0f4bda205888f0a9b39e2ac80e75024de"
+      },
+      "icon": {
+        "path": "icons/koel.svg",
+        "sha256": "c1e84b1435a4608edb83e0761b42c2806863f055d96397339b82dd617a248c02"
+      },
+      "title": "Koel",
+      "tagline": "A personal music streaming server with a polished web player",
+      "categories": [
+        "webapps/media"
+      ],
+      "tags": [
+        "files",
+        "open-source"
+      ],
+      "aliases": [
+        "koel",
+        "music",
+        "music streaming",
+        "audio",
+        "mp3",
+        "flac",
+        "spotify alternative",
+        "player"
+      ],
+      "license": "MIT",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "postgres"
+        }
+      ],
+      "versions": [
+        {
+          "name": "9.15",
+          "release": "9.15.0",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "komga",
       "file": {
         "path": "templates/komga.yaml",

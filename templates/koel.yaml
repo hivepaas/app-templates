@@ -1,0 +1,207 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: koel
+  title: Koel
+  tagline: A personal music streaming server with a polished web player
+  description: |
+    Koel streams your music collection to a browser: a fast, good-looking player with
+    playlists and smart playlists, favorites, an equalizer, lyrics and artist information,
+    and a queue that follows you between devices. Several people can share one library,
+    each with their own playlists and stats.
+
+    **This template creates two apps**
+
+    - **Koel**, with two volumes: the **music** library, and the **data** - uploaded
+      artwork and avatars, and its search index
+    - **a PostgreSQL database**, named after the app with `-db` added
+
+    The database and the two volumes together are the backup.
+
+    **The administrator**
+
+    The first start creates the administrator with the email and password below, instead
+    of the ones Koel's documentation publishes. The password is under this app's Secrets.
+    More users are added from the administrator's account.
+
+    **Adding music**
+
+    Upload songs from Koel's own interface, or put files on the music volume in any folder
+    layout. The library is scanned every day; to scan at once after copying files, run
+    `php artisan koel:sync` from the app's terminal.
+
+    **The application key**
+
+    It encrypts what Koel stores encrypted; it is under this app's Secrets. Keep it with the
+    backup.
+  categories: [webapps/media]
+  tags: [files, open-source]
+  aliases: [koel, music, music streaming, audio, mp3, flac, spotify alternative, player]
+  icon: icons/koel.svg
+  links:
+    website: https://koel.dev
+    documentation: https://docs.koel.dev
+    source: https://github.com/koel/koel
+  license: MIT
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address Koel answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminEmail
+    title: Administrator email
+    description: What the administrator signs in with.
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: appKey
+    title: Application key
+    description: Encrypts what Koel stores encrypted, 32 characters. Leave empty to generate one, and keep it with the backups.
+    type: secret
+    minLength: 32
+    maxLength: 32
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 512MB
+    min: 256MB
+  - name: musicVolume
+    title: Music volume
+    description: The volume the music library is kept on.
+    type: volume
+  - name: dataVolume
+    title: Data volume
+    description: The volume uploaded artwork and the search index are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: postgres
+    version: "17"
+    params:
+      dbName: koel
+      username: koel
+
+versions:
+  - name: "9.15"
+    release: "9.15.0"
+    default: true
+    image: phanan/koel:9.15.0@sha256:e0d4d466d8be93970395943d9b708ef32a67eedecfb226a32a31320bf2d62641
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # Run by the image's entrypoint, in place of Apache alone; see the file.
+      command: /hivepaas/start.sh
+    storage:
+      mounts:
+        /music: {type: volume, source: "${{ params.musicVolume }}"}
+        /var/www/html/storage/app/public/images:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: images}
+        /var/www/html/storage/search-indexes:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: search-indexes}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1/sw.js
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema.
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: koel
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: APP_URL, v: "${HIVEPAAS_APP_URL}"}
+        - {k: APP_KEY, v: "${secrets.APP_KEY}"}
+        # Behind the proxy, which says the request came in over HTTPS.
+        - {k: FORCE_HTTPS, v: "true"}
+        - {k: DB_CONNECTION, v: pgsql}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_DATABASE, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USERNAME, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWORD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: MEDIA_PATH, v: /music}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      APP_KEY:
+        value: "${{ params.appKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+    configFiles:
+      start.sh:
+        content: |
+          #!/bin/sh
+          # Koel's init runs only with a .env file, which the image does not have; the
+          # settings come from the environment, so an empty one does. Then the
+          # administrator, cron and Apache.
+          set -e
+          cd /var/www/html
+          touch .env
+          # The volumes' directories, which a new volume gives to root.
+          chown www-data:www-data .env /music storage/app/public/images storage/search-indexes
+          su -s /bin/sh -c 'php artisan koel:init --no-assets --no-interaction' www-data
+          su -s /bin/sh -c 'php /hivepaas/set-admin.php' www-data
+          # The scheduler koel:init put in www-data's crontab: the daily scan of the library.
+          cron
+          exec apache2-foreground
+        swarmRef:
+          file: {name: /hivepaas/start.sh, mode: 555}
+      set-admin.php:
+        content: |
+          <?php
+          // koel:init makes the first administrator with an email and a password everyone
+          // can read in Koel's documentation. While it still has that password, it is given
+          // the ones set for this app.
+          require '/var/www/html/vendor/autoload.php';
+          $app = require '/var/www/html/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+          use App\Models\User;
+          use Illuminate\Support\Facades\Hash;
+
+          $admin = User::query()->where('email', User::FIRST_ADMIN_EMAIL)->first();
+          if ($admin && Hash::check(User::FIRST_ADMIN_PASSWORD, $admin->password)) {
+              $admin->email = getenv('HIVEPAAS_ADMIN_EMAIL');
+              $admin->password = Hash::make(getenv('HIVEPAAS_ADMIN_PASSWORD'));
+              $admin->save();
+              echo "hivepaas: administrator " . $admin->email . " set\n";
+          }
+        swarmRef:
+          file: {name: /hivepaas/set-admin.php, mode: 444}
+    routing:
+      port: 80
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}
