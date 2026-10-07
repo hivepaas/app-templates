@@ -1,0 +1,259 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: romm
+  title: RomM
+  tagline: Your retro game library in the browser - cover art, metadata, and play in place
+  description: |
+    RomM scans a folder of game ROMs, recognizes the platform and the game, and fetches
+    covers, screenshots and descriptions for them. Browse the library in a polished web
+    interface, keep saves and states, share with other users - and play many systems right
+    in the browser through its built-in emulators.
+
+    **This template creates two apps**
+
+    - **RomM**, with two volumes: the **library**, where the games go, and the **data** -
+      fetched artwork, uploaded saves and states, its configuration and cache
+    - **a MariaDB database**, named after the app with `-db` added
+
+    The database and the two volumes together are the backup.
+
+    **The administrator**
+
+    The first start creates the administrator from the values below, so the setup page
+    never opens to whoever reaches the address first. The password is under this app's
+    Secrets. More users are added from the administrator's account.
+
+    **Adding games**
+
+    Upload games from RomM's own interface, or put them on the library volume as
+    `roms/<platform>/<game file>` - `roms/snes/`, `roms/gba/` and so on - then run a scan.
+
+    **Metadata**
+
+    Hasheous and Libretro need no account and are on. For better matches and artwork, give
+    the keys of the providers you have accounts with below, or later under the app's
+    environment variables; IGDB is the most complete.
+  categories: [webapps/media, games/servers]
+  tags: [open-source]
+  aliases: [romm, rom manager, roms, retro games, emulation, emulator, game library, emulatorjs]
+  icon: icons/romm.svg
+  links:
+    website: https://romm.app
+    documentation: https://docs.romm.app
+    source: https://github.com/rommapp/romm
+  license: AGPL-3.0-only
+  requires:
+    versionCode: v000001
+
+parameters:
+  - name: domain
+    title: Domain
+    description: >-
+      The address RomM answers at. Leave it empty to add one later, in the app's routing
+      settings.
+    type: domain
+    optional: true
+  - name: adminUser
+    title: Administrator user name
+    type: string
+    default: admin
+    pattern: '^[A-Za-z0-9._-]{2,64}$'
+  - name: adminEmail
+    title: Administrator email
+    type: string
+    default: admin@example.com
+    pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  - name: adminPassword
+    title: Administrator password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 8
+    generate: {length: 24}
+  - name: secretKey
+    title: Session key
+    description: Signs sessions and tokens. Leave empty to generate one.
+    type: secret
+    minLength: 32
+    generate: {length: 64}
+  - name: igdbClientId
+    title: IGDB client ID
+    description: From a Twitch developer application; with its secret, IGDB is used for matches and artwork.
+    type: string
+    optional: true
+  - name: igdbClientSecret
+    title: IGDB client secret
+    type: secret
+    optional: true
+  - name: screenscraperUser
+    title: ScreenScraper user name
+    type: string
+    optional: true
+  - name: screenscraperPassword
+    title: ScreenScraper password
+    type: secret
+    optional: true
+  - name: steamgriddbKey
+    title: SteamGridDB API key
+    description: For more cover art.
+    type: secret
+    optional: true
+  - name: retroachievementsKey
+    title: RetroAchievements API key
+    description: For achievements on the games' pages.
+    type: secret
+    optional: true
+  - name: timezone
+    title: Timezone
+    description: The zone the scheduled tasks run in, such as America/New_York.
+    type: string
+    default: UTC
+    pattern: '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 2GB
+    min: 1GB
+  - name: libraryVolume
+    title: Library volume
+    description: The volume the games are kept on.
+    type: volume
+  - name: dataVolume
+    title: Data volume
+    description: The volume the artwork, saves and states, the configuration and the cache are kept on.
+    type: volume
+
+dependencies:
+  - name: db
+    title: Database
+    template: mariadb
+    version: "11.8"
+    params:
+      dbName: romm
+      username: romm
+
+versions:
+  - name: "5.3"
+    release: "5.3.1"
+    default: true
+    image: rommapp/romm:5.3.1@sha256:0d66b4ea152a237c7f24b95e87459f46d3c596a7c0b35a82f26bc971487278b3
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+      # The image's start, with the script that makes the administrator beside it. The
+      # entrypoint runs first and ends in exec "$@".
+      command: sh -c 'python3 /hivepaas/create-admin.py & exec /init'
+    storage:
+      mounts:
+        /romm/library: {type: volume, source: "${{ params.libraryVolume }}"}
+        /romm/resources:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: resources}
+        /romm/assets:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: assets}
+        /romm/config:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: config}
+        # The cache of the Valkey the image runs inside: sessions and fetched metadata.
+        /redis-data:
+          type: volume
+          source: "${{ params.dataVolume }}"
+          volumeOptions: {subpath: redis}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        command: curl -fs -o /dev/null http://127.0.0.1:8080/api/heartbeat
+        interval: 30s
+        timeout: 10s
+        # The first start creates the schema.
+        startPeriod: 120s
+        retries: 3
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: webapp
+      engine: romm
+      version: "${{ version.name }}"
+      webapp: {}
+    envVars:
+      data:
+        - {k: ROMM_DB_DRIVER, v: mariadb}
+        - {k: DB_HOST, v: "${{ deps.db.ref.HIVEPAAS_HOST }}"}
+        - {k: DB_PORT, v: "${{ deps.db.ref.HIVEPAAS_PORT }}"}
+        - {k: DB_NAME, v: "${{ deps.db.ref.HIVEPAAS_DATABASE_NAME }}"}
+        - {k: DB_USER, v: "${{ deps.db.ref.HIVEPAAS_USER }}"}
+        - {k: DB_PASSWD, v: "${{ deps.db.ref.HIVEPAAS_PASSWORD }}"}
+        - {k: ROMM_AUTH_SECRET_KEY, v: "${secrets.AUTH_SECRET_KEY}"}
+        - {k: HASHEOUS_API_ENABLED, v: "true"}
+        - {k: IGDB_CLIENT_ID, v: "${{ params.igdbClientId }}"}
+        - {k: IGDB_CLIENT_SECRET, v: "${secrets.IGDB_CLIENT_SECRET}"}
+        - {k: SCREENSCRAPER_USER, v: "${{ params.screenscraperUser }}"}
+        - {k: SCREENSCRAPER_PASSWORD, v: "${secrets.SCREENSCRAPER_PASSWORD}"}
+        - {k: STEAMGRIDDB_API_KEY, v: "${secrets.STEAMGRIDDB_API_KEY}"}
+        - {k: RETROACHIEVEMENTS_API_KEY, v: "${secrets.RETROACHIEVEMENTS_API_KEY}"}
+        - {k: TZ, v: "${{ params.timezone }}"}
+        - {k: HIVEPAAS_ADMIN_USER, v: "${{ params.adminUser }}"}
+        - {k: HIVEPAAS_ADMIN_EMAIL, v: "${{ params.adminEmail }}"}
+        - {k: HIVEPAAS_ADMIN_PASSWORD, v: "${secrets.ADMIN_PASSWORD}"}
+    secrets:
+      AUTH_SECRET_KEY:
+        value: "${{ params.secretKey }}"
+      ADMIN_PASSWORD:
+        value: "${{ params.adminPassword }}"
+      IGDB_CLIENT_SECRET:
+        value: "${{ params.igdbClientSecret }}"
+      SCREENSCRAPER_PASSWORD:
+        value: "${{ params.screenscraperPassword }}"
+      STEAMGRIDDB_API_KEY:
+        value: "${{ params.steamgriddbKey }}"
+      RETROACHIEVEMENTS_API_KEY:
+        value: "${{ params.retroachievementsKey }}"
+    configFiles:
+      create-admin.py:
+        content: |
+          # Once RomM answers, the administrator from the values above - while RomM has
+          # none, which is when it would show its setup page to whoever came first.
+          import http.cookiejar, json, os, time, urllib.error, urllib.request
+
+          api = 'http://127.0.0.1:8080/api'
+          jar = http.cookiejar.CookieJar()
+          web = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+          while True:
+              try:
+                  with web.open(api + '/heartbeat', timeout=10) as res:
+                      beat = json.load(res)
+                  break
+              except Exception:
+                  time.sleep(3)
+          user = os.environ['HIVEPAAS_ADMIN_USER']
+          if not beat['SYSTEM']['SHOW_SETUP_WIZARD']:
+              print('hivepaas: RomM has an administrator')
+              raise SystemExit
+          # The heartbeat set the CSRF cookie; RomM wants it back as a header.
+          token = next(c.value for c in jar if c.name == 'romm_csrftoken')
+          body = json.dumps({'username': user, 'email': os.environ['HIVEPAAS_ADMIN_EMAIL'],
+                             'password': os.environ['HIVEPAAS_ADMIN_PASSWORD'], 'role': 'admin'})
+          req = urllib.request.Request(api + '/users', data=body.encode(), method='POST',
+                                       headers={'Content-Type': 'application/json', 'x-csrftoken': token})
+          try:
+              web.open(req, timeout=30)
+              print('hivepaas: administrator ' + user + ' created')
+          except urllib.error.HTTPError as e:
+              print('hivepaas: creating the administrator failed: ' + str(e.code) + ' ' + e.read().decode()[:200])
+        swarmRef:
+          file: {name: /hivepaas/create-admin.py, mode: 444}
+    routing:
+      port: 8080
+      exposePublicly: true
+      domains:
+        - {domain: "${{ params.domain }}", enabled: true, forceHttps: true}

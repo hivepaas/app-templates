@@ -13116,6 +13116,54 @@
       }
     },
     {
+      "name": "romm",
+      "file": {
+        "path": "templates/romm.yaml",
+        "sha256": "883ed6f79cb37959dcef30a89be7b2da8a862693929cbdf7e40308ad204ca1d2"
+      },
+      "icon": {
+        "path": "icons/romm.svg",
+        "sha256": "8ac0aac68dfe78592a8022bd59e0710affa87e904811b1ae9522c21fa21244cd"
+      },
+      "title": "RomM",
+      "tagline": "Your retro game library in the browser - cover art, metadata, and play in place",
+      "categories": [
+        "webapps/media",
+        "games/servers"
+      ],
+      "tags": [
+        "open-source"
+      ],
+      "aliases": [
+        "romm",
+        "rom manager",
+        "roms",
+        "retro games",
+        "emulation",
+        "emulator",
+        "game library",
+        "emulatorjs"
+      ],
+      "license": "AGPL-3.0-only",
+      "dependencies": [
+        {
+          "name": "db",
+          "title": "Database",
+          "template": "mariadb"
+        }
+      ],
+      "versions": [
+        {
+          "name": "5.3",
+          "release": "5.3.1",
+          "default": true
+        }
+      ],
+      "requires": {
+        "versionCode": "v000001"
+      }
+    },
+    {
       "name": "roundcube",
       "file": {
         "path": "templates/roundcube.yaml",
