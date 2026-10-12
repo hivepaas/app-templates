@@ -100,9 +100,9 @@ dependencies:
 
 versions:
   - name: "2.0"
-    release: "2.0.2"
+    release: "2.0.3"
     default: true
-    image: apache/answer:2.0.2
+    image: apache/answer:2.0.3
 
 app:
   deployment:

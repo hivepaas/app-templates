@@ -73,9 +73,9 @@ parameters:
 
 versions:
   - name: "0.22"
-    release: "0.22.1"
+    release: "0.22.2"
     default: true
-    image: superseriousbusiness/gotosocial:0.22.1
+    image: superseriousbusiness/gotosocial:0.22.2
 
 app:
   deployment:

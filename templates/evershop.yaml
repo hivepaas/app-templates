@@ -91,9 +91,9 @@ dependencies:
 
 versions:
   - name: "2.2"
-    release: "2.2.1"
+    release: "2.2.2"
     default: true
-    image: evershop/evershop:2.2.1
+    image: evershop/evershop:2.2.2
 
 app:
   deployment:

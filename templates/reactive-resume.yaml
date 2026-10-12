@@ -123,9 +123,9 @@ dependencies:
 
 versions:
   - name: "6.0"
-    release: "6.0.0"
+    release: "6.0.2"
     default: true
-    image: ghcr.io/reactive-resume/reactive-resume:v6.0.0
+    image: ghcr.io/reactive-resume/reactive-resume:v6.0.2
 
 app:
   deployment:

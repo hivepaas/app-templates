@@ -85,9 +85,9 @@ parameters:
 
 versions:
   - name: "0.60"
-    release: "0.60.8"
+    release: "0.60.9"
     default: true
-    image: dgtlmoon/changedetection.io:0.60.8
+    image: dgtlmoon/changedetection.io:0.60.9
 
 app:
   deployment:
