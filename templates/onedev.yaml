@@ -90,9 +90,9 @@ dependencies:
 
 versions:
   - name: "16.8"
-    release: "16.8.5"
+    release: "16.8.8"
     default: true
-    image: 1dev/server:16.8.5@sha256:6f1b6650cbd7d48b8366467b069155440756d2a8f5444064d728ccf869330708
+    image: 1dev/server:16.8.8
 
 app:
   deployment:

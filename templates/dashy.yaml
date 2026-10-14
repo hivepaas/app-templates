@@ -75,9 +75,9 @@ parameters:
 
 versions:
   - name: "4.7"
-    release: "4.7.19"
+    release: "4.7.24"
     default: true
-    image: lissy93/dashy:4.7.19@sha256:0cad7b1dd9ca1712d12223bb0913723f922ff1ebf6f910bb5fcfbcb401e045e4
+    image: lissy93/dashy:4.7.24
 
 app:
   deployment:
