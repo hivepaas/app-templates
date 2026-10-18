@@ -18,6 +18,12 @@ sql() {
   psql -h "$pg_host" -U "$pg_user" -d postgres -XAtq -v ON_ERROR_STOP=1 -c "$1"
 }
 
+# promoted_marker: the file a promoted replica keeps beside its data, which
+# makes it start as the primary from then on.
+promoted_marker() {
+  echo "$(data_root)/hivepaas-promoted"
+}
+
 # rfc3339 EPOCH: that second, in UTC.
 rfc3339() {
   date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ

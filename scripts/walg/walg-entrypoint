@@ -9,7 +9,11 @@
 # from the archive's latest base backup, never from an empty directory, then
 # streaming as $replication_user, the archive its fallback. Its password is the
 # file HIVEPAAS_STANDBY_PASSWORD_FILE names, written for libpq to a passfile in
-# memory at each start; HIVEPAAS_STANDBY_NAME is what the primary knows it by.
+# memory at each start; HIVEPAAS_STANDBY_NAME is what the primary knows it by. A
+# replica walg-promote promoted starts as the primary, whatever these say.
+#   A database HIVEPAAS_FENCED is set on is a primary another was promoted over:
+# it idles and never starts its server, whoever starts its service, so that no
+# two primaries write to the cluster's archive.
 #   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
 #     starts or recovers, 1 when the recovery failed, having printed why.
 #   walg-entrypoint health: the container's health check, healthy while it
@@ -27,6 +31,7 @@ set_state() {
 }
 restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
 standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+fenced() { [ -n "${HIVEPAAS_FENCED:-}" ]; }
 # A passfile in memory: the password is never on the data volume.
 passfile=/dev/shm/hivepaas-standby.pgpass
 
@@ -49,6 +54,7 @@ status() {
 }
 
 health() {
+  if fenced; then exit 0; fi
   if restoring; then
     case $(state) in fetching | recovering | failed) exit 0 ;; esac
   fi
@@ -176,7 +182,16 @@ case ${1:-} in
   health) health ;;
 esac
 
+if fenced; then
+  echo "walg-entrypoint: fenced ($HIVEPAAS_FENCED): another member is the primary; this one idles and never" \
+    "starts its server" >&2
+  idle
+fi
 # A replica never starts from an empty directory: one it cannot seed idles.
+if standby && [ -e "$(promoted_marker)" ]; then
+  echo "walg-entrypoint: promoted before; starts as the primary"
+  serve "$@"
+fi
 if standby; then
   if ! standby_setup; then
     set_state standby-failed

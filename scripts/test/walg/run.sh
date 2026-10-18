@@ -465,6 +465,98 @@ test_standby() {
   psql_in src "delete from t where id >= 7000"
 }
 
+# follows NAME TABLE ID SECONDS: the row ID is on NAME in time.
+follows() {
+  for _ in $(seq "$4"); do
+    [ "$(psql_in "$1" "select count(*) from $2 where id = $3" 2>/dev/null)" = 1 ] && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# standby_db NAME PRIMARY: a replica of PRIMARY on the promote test's archive, its
+# volume kept across starts as a service's is.
+standby_db() {
+  start_db "$1" "walg/promote-$major" "$work/secrets-src" \
+    -v "$work/promote-password:/run/secrets/hivepaas-replication/password:ro" \
+    -e "HIVEPAAS_STANDBY_HOST=$run-$2" -e "HIVEPAAS_STANDBY_NAME=$1" \
+    -e HIVEPAAS_STANDBY_PASSWORD_FILE=/run/secrets/hivepaas-replication/password \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+}
+
+test_promote() {
+  say "promoting a replica over its fenced primary, and the other replica following it"
+  local password=PromotePass0123456789 code
+  rm -f "$work/promote-password"
+  printf '%s' "$password" > "$work/promote-password"
+  chmod 444 "$work/promote-password"
+  start_db pri "walg/promote-$major" "$work/secrets-src" --entrypoint /opt/hivepaas/bin/walg-entrypoint \
+    -- "${server_args[@]}"
+  if ! wait_ready pri; then
+    fail "the primary starts"
+    return
+  fi
+  psql_in pri "create table c (id int primary key)"
+  psql_in pri "insert into c select generate_series(1, 5)"
+  job_env=()
+  job pri walg-nightly backup >/dev/null || true
+  switch_and_wait pri || true
+  printf '%s\n' "$password" | docker exec -i "$run-pri" /opt/hivepaas/bin/walg-replication >/dev/null
+  standby_db ra pri
+  standby_db rb pri
+  wait_ready ra || true
+  wait_ready rb || true
+  psql_in pri "insert into c values (6)"
+  check "ra follows the primary" follows ra c 6 30
+  check "rb follows the primary" follows rb c 6 30
+
+  # The engine fences the old primary: its service stopped, and kept from starting.
+  docker stop "$run-pri" >/dev/null
+  check "walg-promote: promotes ra" docker exec "$run-ra" /opt/hivepaas/bin/walg-promote
+  check "ra is the primary" test "$(psql_in ra "select pg_is_in_recovery()")" = f
+  check "walg-promote: again, it is so already" docker exec "$run-ra" /opt/hivepaas/bin/walg-promote
+  # Its pg_hba.conf is the base backup's, which may predate the replicas' line: the
+  # engine lets them into the new primary as it did into the old.
+  check "walg-replication: lets the replicas into ra" bash -c \
+    "printf '%s\n' $password | docker exec -i $run-ra /opt/hivepaas/bin/walg-replication >/dev/null"
+  psql_in ra "insert into c values (7)"
+  check "ra archives, on its new timeline" switch_and_wait ra
+
+  # The other replica is restarted with ra as its primary.
+  docker rm -f "$run-rb" >/dev/null
+  standby_db rb ra
+  wait_ready rb || true
+  check "rb follows ra across the new timeline" follows rb c 7 60
+  check "rb streams from ra" test "$(psql_in ra \
+    "select state from pg_stat_replication where application_name = 'rb'")" = streaming
+  check "rb is still a standby" test "$(psql_in rb "select pg_is_in_recovery()")" = t
+
+  # ra restarted, its standby variables still set: the marker keeps it the primary.
+  docker restart "$run-ra" >/dev/null
+  wait_ready ra || true
+  check "restarted, ra is still the primary" test "$(psql_in ra "select pg_is_in_recovery()" 2>/dev/null)" = f
+  psql_in ra "insert into c values (8)"
+  check "and rb follows it again" follows rb c 8 60
+
+  # The old primary, fenced, never starts its server.
+  docker rm -f "$run-pri" >/dev/null
+  start_db pri "walg/promote-$major" "$work/secrets-src" -e "HIVEPAAS_FENCED=ra was promoted" \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+  for _ in $(seq 30); do
+    docker logs "$run-pri" 2>&1 | grep -q "fenced (ra was promoted)" && break
+    sleep 1
+  done
+  check "a fenced primary says so" bash -c "docker logs $run-pri 2>&1 | grep -q 'fenced (ra was promoted)'"
+  check "and starts no server" bash -c \
+    "! docker exec $run-pri pg_isready -h /var/run/postgresql -U app -d app >/dev/null 2>&1"
+  check "its health check passes, so that it is not restarted" \
+    docker exec "$run-pri" /opt/hivepaas/bin/walg-entrypoint health
+  code=0
+  docker exec "$run-pri" /opt/hivepaas/bin/walg-promote >/dev/null 2>&1 || code=$?
+  check "walg-promote on a server that does not answer promotes nothing (3)" test "$code" = 3
+  docker rm -fv "$run-pri" "$run-ra" "$run-rb" >/dev/null
+}
+
 test_removed_segment() {
   say "a WAL segment gone from the archive"
   local start segment
@@ -508,6 +600,7 @@ print(next(v['image'] for v in d['versions'] if v['name']==sys.argv[2]))" "$temp
     test_passthrough
     test_standby
     test_retention
+    test_promote
     test_removed_segment
   fi
   # What this major made goes, its volumes too: the next one starts from nothing.
