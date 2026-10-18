@@ -5,6 +5,11 @@
 # the source's archive, writes the recovery settings, and runs the server through
 # the recovery, its log kept, to tell a recovery that failed from a restart.
 # After one that failed, it idles, so that status can say why.
+#   A replica (§9) is a standby of the primary HIVEPAAS_STANDBY_HOST names: seeded
+# from the archive's latest base backup, never from an empty directory, then
+# streaming as $replication_user, the archive its fallback. Its password is the
+# file HIVEPAAS_STANDBY_PASSWORD_FILE names, written for libpq to a passfile in
+# memory at each start; HIVEPAAS_STANDBY_NAME is what the primary knows it by.
 #   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
 #     starts or recovers, 1 when the recovery failed, having printed why.
 #   walg-entrypoint health: the container's health check, healthy while it
@@ -21,6 +26,9 @@ set_state() {
   echo "$1" > "$state_dir/state.new" && mv "$state_dir/state.new" "$state_dir/state"
 }
 restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
+standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+# A passfile in memory: the password is never on the data volume.
+passfile=/dev/shm/hivepaas-standby.pgpass
 
 status() {
   case $(state) in
@@ -43,6 +51,9 @@ status() {
 health() {
   if restoring; then
     case $(state) in fetching | recovering | failed) exit 0 ;; esac
+  fi
+  if standby; then
+    case $(state) in standby-fetching | standby-failed) exit 0 ;; esac
   fi
   exec pg_isready -h "$pg_host" -U "$pg_user" -d "${POSTGRES_DB:-postgres}"
 }
@@ -102,6 +113,35 @@ recover() {
   idle
 }
 
+# standby_setup: the passfile, the data seeded from the archive when there is
+# none, and the standby's settings, written again at each start: the primary
+# named may have moved.
+standby_setup() {
+  local password
+  password=$(cat "${HIVEPAAS_STANDBY_PASSWORD_FILE:?a replica needs the replication password}") || return 1
+  (umask 077 && printf '%s:5432:*:%s:%s\n' "$HIVEPAAS_STANDBY_HOST" "$replication_user" "$password" > "$passfile")
+  chown postgres:postgres "$passfile"
+  if [ "$(state)" = standby-fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
+    set_state standby-fetching
+    mkdir -p "$PGDATA"
+    find "$PGDATA" -mindepth 1 -delete
+    chown postgres:postgres "$PGDATA"
+    chmod 700 "$PGDATA"
+    echo "Seeding the replica from the archive's latest base backup..."
+    gosu postgres "$bin/walg-run" backup-fetch "$PGDATA" LATEST || return 1
+  fi
+  clear_recovery "$PGDATA"
+  {
+    echo "primary_conninfo = 'host=$HIVEPAAS_STANDBY_HOST port=5432 user=$replication_user passfile=$passfile \
+application_name=${HIVEPAAS_STANDBY_NAME:-replica}'"
+    echo "restore_command = '$bin/walg-fetch %f %p'"
+    echo "recovery_target_timeline = 'latest'"
+  } >> "$PGDATA/postgresql.auto.conf"
+  touch "$PGDATA/standby.signal"
+  chown postgres:postgres "$PGDATA/postgresql.auto.conf" "$PGDATA/standby.signal"
+  set_state standby
+}
+
 # checkpoint_once: one CHECKPOINT, once the server is up. After a start PostgreSQL
 # forces no segment switch until its first checkpoint, checkpoint_timeout later, so
 # archive_timeout would only hold from then. It waits for the server itself, not
@@ -136,6 +176,15 @@ case ${1:-} in
   health) health ;;
 esac
 
+# A replica never starts from an empty directory: one it cannot seed idles.
+if standby; then
+  if ! standby_setup; then
+    set_state standby-failed
+    echo "The replica could not be seeded from the archive; it idles rather than start empty." >&2
+    idle
+  fi
+  serve "$@"
+fi
 if ! restoring; then serve "$@"; fi
 case $(state) in
   failed)
