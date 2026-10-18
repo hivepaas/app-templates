@@ -120,7 +120,8 @@ start_db() {
   shift
   mapfile -t env < <(archive_env "$prefix")
   docker volume create --label "$run" --label "$run-db" "$run-$name" >/dev/null
-  docker run -d --label "$run" --label "$run-db" --name "$run-$name" --network "$run" \
+  # --init as HivePaaS runs it: docker's init is PID 1, and reaps what is detached.
+  docker run -d --init --label "$run" --label "$run-db" --name "$run-$name" --network "$run" \
     -v "$run-$name:$data_mount" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$secrets:/run/secrets/walg:ro" \
     "${env[@]}" "${version_env[@]}" "${opts[@]}" "$image" "$@" >/dev/null
 }
@@ -152,6 +153,16 @@ job() { # job NAME SCRIPT ARGS...: a job's run, its log in $work/job.log, its ou
   return $code
 }
 output() { sed -n "s/^$1=//p" "$work/out" | tail -n 1; }
+
+archived_unasked() { # archived_unasked NAME SECONDS: what was just written is archived in time, no switch asked for
+  local segment
+  segment=$(psql_in "$1" "select pg_walfile_name(pg_current_wal_insert_lsn())")
+  for _ in $(seq "$2"); do
+    [ "$(psql_in "$1" "select coalesce(last_archived_wal, '') >= '$segment' from pg_stat_archiver")" = t ] && return 0
+    sleep 1
+  done
+  return 1
+}
 
 switch_and_wait() { # switch_and_wait NAME: until the current WAL is archived
   local segment
@@ -190,13 +201,18 @@ test_fetch_exit_codes() {
 
 test_archive() {
   say "archiving, health, base backups, retention and restore points"
-  start_db src "walg/src-$major" "$work/secrets-src" --tmpfs /tiny:size=1m -- "${server_args[@]}"
+  # Through walg-entrypoint, as HivePaaS starts every managed database.
+  start_db src "walg/src-$major" "$work/secrets-src" --tmpfs /tiny:size=1m \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
   if ! wait_ready src; then
     fail "the database starts"
     return 1
   fi
   psql_in src "create table t (id int primary key, at timestamptz not null default clock_timestamp())"
   psql_in src "insert into t (id) select generate_series(1, 10)"
+  # Without a checkpoint after the start, PostgreSQL forces no segment switch until
+  # its first one, checkpoint_timeout later: archive_timeout would not hold.
+  check "a write in its first minute is archived within archive_timeout + 30s, unasked" archived_unasked src 40
   check "its WAL is archived" switch_and_wait src
 
   job_env=()

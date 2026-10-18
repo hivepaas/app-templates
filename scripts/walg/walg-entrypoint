@@ -102,18 +102,47 @@ recover() {
   idle
 }
 
+# checkpoint_once: one CHECKPOINT, once the server is up. After a start PostgreSQL
+# forces no segment switch until its first checkpoint, checkpoint_timeout later, so
+# archive_timeout would only hold from then. It waits for the server itself, not
+# the one docker-entrypoint.sh runs on the socket alone while it initializes a new
+# data directory. It always exits 0: in a container without an init, the server
+# reaps it, and takes any other exit for a backend's crash.
+checkpoint_once() {
+  for _ in $(seq 600); do
+    if [ "$(sql "select current_setting('listen_addresses') <> ''" 2>/dev/null)" = t ]; then
+      if sql checkpoint >/dev/null 2>&1; then
+        echo "walg-entrypoint: checkpointed once the server was up, so archive_timeout holds from now"
+      else
+        echo "walg-entrypoint: the checkpoint after the start failed; archive_timeout holds from the first one" >&2
+      fi
+      exit 0
+    fi
+    sleep 1
+  done
+  exit 0
+}
+
+# serve ARGS...: the image's entrypoint, with one checkpoint once a server it
+# starts is up. The checkpoint runs detached twice, so that it is not the server's
+# child once this script has become the server.
+serve() {
+  if [ "${1:-}" = postgres ]; then ( checkpoint_once & ); fi
+  exec docker-entrypoint.sh "$@"
+}
+
 case ${1:-} in
   status) status ;;
   health) health ;;
 esac
 
-if ! restoring; then exec docker-entrypoint.sh "$@"; fi
+if ! restoring; then serve "$@"; fi
 case $(state) in
   failed)
     echo "The recovery failed before: see $log." >&2
     idle
     ;;
-  "done") exec docker-entrypoint.sh "$@" ;;
+  "done") serve "$@" ;;
 esac
 if [ "$(state)" = fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
   if ! fetch; then
