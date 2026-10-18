@@ -303,6 +303,8 @@ restore() {
       -e "HIVEPAAS_RESTORE_RECOVERY=recovery_target_lsn=$point_lsn recovery_target_inclusive=on") ;;
     backup) target=(-e "HIVEPAAS_RESTORE_TARGET_BACKUP=$backup_at_10"
       -e HIVEPAAS_RESTORE_RECOVERY=recovery_target=immediate) ;;
+    replica-backup) target=(-e "HIVEPAAS_RESTORE_TARGET_BACKUP=$replica_backup"
+      -e HIVEPAAS_RESTORE_RECOVERY=recovery_target=immediate) ;;
     future) target=(-e "HIVEPAAS_RESTORE_TARGET_BEFORE=$time_at_20"
       -e "HIVEPAAS_RESTORE_RECOVERY=recovery_target_time=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%S+00:00)") ;;
   esac
@@ -421,6 +423,23 @@ test_standby() {
   check "walg-health: healthy" job src walg-health
   check "walg-health: lists the replica, streaming" grep -qE '(^| )src-r1@streaming@[0-9]+@' <<<"$(output REPLICAS)"
   check "it archives nothing" test "$(psql_in replica "select archived_count from pg_stat_archiver")" = 0
+
+  # The nightly backup run on the replica, sparing the primary: a base backup of
+  # the standby, in the primary's archive, that a restore starts from.
+  local rows
+  psql_in src "insert into t (id) values (7002)"
+  replica_follows replica 7002 30 || true
+  rows=$(psql_in src "select count(*) from t")
+  check "walg-nightly backup: on the replica" job replica walg-nightly backup
+  replica_backup=$(output BACKUP_NAME)
+  check "walg-nightly backup: names it" grep -qE '^base_[0-9A-F]{24}$' <<<"$replica_backup"
+  check "walg-nightly backup: lists it among the primary's" grep -q "$replica_backup@" <<<"$(output BACKUPS)"
+  check "the replica still archives nothing" test \
+    "$(psql_in replica "select archived_count from pg_stat_archiver")" = 0
+  psql_in src "insert into t (id) values (7003)"
+  # The backup ends in WAL only the primary archives.
+  check "the primary archives past it" switch_and_wait src
+  restore restored-replica-backup replica-backup "$rows"
 
   docker restart "$run-replica" >/dev/null
   wait_ready replica || true
