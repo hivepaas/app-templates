@@ -168,3 +168,16 @@ To try a template in a local HivePaaS before publishing it, start the backend wi
    commit.
 3. The HivePaaS release owner puts that pin into `release.json`, signs it offline,
    and publishes it - to beta first, then stable.
+
+## License
+
+[PolyForm Shield 1.0.0](LICENSE): the templates may be read, changed and shared for
+any purpose except providing a product that competes with them or with HivePaaS -
+another PaaS or app store using them included. Commits up to `27d8b2d` were
+published under Apache-2.0 and stay so.
+
+App names and icons belong to their owners and are not licensed here; a template's
+`license` field is the upstream app's license, not the template's.
+
+A contribution is made on the terms in [CONTRIBUTING.md](CONTRIBUTING.md): you grant
+HivePaaS the right to use it under any license; nothing needs signing.
