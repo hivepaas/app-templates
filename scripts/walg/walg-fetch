@@ -1,0 +1,13 @@
+#!/bin/bash
+# walg-fetch FILE PATH: the restore_command. wal-g's 74, the file is not in the
+# archive, passes through: recovery has reached the end of it. Any other failure
+# is 255, which stops recovery, instead of letting it end early at an older point
+# and promote there.
+source=()
+if [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; then source=(--source); fi
+/opt/hivepaas/bin/walg-run "${source[@]}" wal-fetch "$1" "$2"
+code=$?
+case $code in
+  0 | 74) exit "$code" ;;
+  *) exit 255 ;;
+esac

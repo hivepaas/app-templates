@@ -1,0 +1,101 @@
+#!/bin/bash
+# walg-restore-test: proves the archive restores (HivePaaS's managed templates
+# design, §5). It marks a restore point on the live database, restores the latest
+# base backup before it into a scratch directory, recovers it to the point with a
+# second server - archiving off, so the copy never writes to the archive - and
+# checks what it reached. In a verifier, the live database is at
+# HIVEPAAS_RESTORE_SOURCE_HOST and the scratch directory is
+# HIVEPAAS_RESTORE_SCRATCH_DIR, on the verifier's own volume.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+recovery_timeout=${HIVEPAAS_RESTORE_TEST_TIMEOUT:-21600}
+if [ -n "${HIVEPAAS_RESTORE_SOURCE_HOST:-}" ]; then
+  pg_host=$HIVEPAAS_RESTORE_SOURCE_HOST
+  export PGPASSWORD=${POSTGRES_PASSWORD:-}
+fi
+scratch=${HIVEPAAS_RESTORE_SCRATCH_DIR:-$(data_root)}/hivepaas-restore-test
+socket=/tmp/hivepaas-restore-test
+log=$socket/server.log
+
+stop_copy() {
+  if [ -f "$scratch/postmaster.pid" ]; then gosu postgres pg_ctl -D "$scratch" -m immediate stop >/dev/null 2>&1 || true; fi
+  rm -rf "$scratch" "$socket"
+}
+trap stop_copy EXIT
+
+# 1. The point, on the live database, its WAL archived.
+point=hp-test-$(date -u +%Y%m%dT%H%M%SZ)
+point_at=$(date +%s)
+lsn=$(sql "select pg_create_restore_point('$point')")
+segment=$(sql "select pg_walfile_name(pg_switch_wal())")
+timeout=$(sql "select setting from pg_settings where name = 'archive_timeout'")
+if ! wait_archived "$segment" $((3 * (timeout > 0 ? timeout : 60))); then
+  echo "The restore point's WAL, $segment, was not archived: archiving is failing" >&2
+  exit 1
+fi
+echo "Marked $point at $lsn."
+
+# 2. Room for the copy, and room to replay into it.
+db_bytes=$(sql "select sum(pg_database_size(datname)) from pg_database")
+stop_copy
+mkdir -p "$scratch"
+free_bytes=$(df -B1 --output=avail "$scratch" | tail -n 1 | tr -d ' ')
+if [ "$free_bytes" -lt $((db_bytes * 12 / 10)) ]; then
+  echo "Not enough room to restore into: $free_bytes bytes free beside a database of $db_bytes" >&2
+  exit 1
+fi
+
+# 3. The latest base backup before the point.
+started=$(date +%s)
+backup=$(backup_before "$point_at")
+echo "Restoring $backup into $scratch..."
+chown postgres:postgres "$scratch"
+chmod 700 "$scratch"
+gosu postgres "$bin/walg-run" backup-fetch "$scratch" "$backup"
+
+# 4. Recovered to the point by a second server, which archives nothing.
+clear_recovery "$scratch"
+cat >> "$scratch/postgresql.auto.conf" <<CONF
+restore_command = '$bin/walg-fetch %f %p'
+recovery_target_name = '$point'
+recovery_target_action = 'promote'
+CONF
+touch "$scratch/recovery.signal"
+chown postgres:postgres "$scratch/postgresql.auto.conf" "$scratch/recovery.signal"
+mkdir -p "$socket"
+chown postgres:postgres "$socket"
+gosu postgres pg_ctl -D "$scratch" -l "$log" -W start -o \
+  "-c port=5433 -c listen_addresses='' -c unix_socket_directories=$socket -c archive_mode=off" >/dev/null
+started_copy=$(date +%s)
+deadline=$((started_copy + recovery_timeout))
+while :; do
+  # A server just started has no pid file for a moment: it is gone only when it
+  # says why, or stays gone.
+  if ! gosu postgres pg_ctl -D "$scratch" status >/dev/null 2>&1 &&
+    { grep -qE 'FATAL|PANIC' "$log" 2>/dev/null || [ $(($(date +%s) - started_copy)) -gt 30 ]; }; then
+    echo "The copy stopped before it reached $point:" >&2
+    tail -n 20 "$log" >&2
+    exit 1
+  fi
+  in_recovery=$(psql -h "$socket" -p 5433 -U "$pg_user" -d postgres -XAtqc "select pg_is_in_recovery()" 2>/dev/null || true)
+  if [ "$in_recovery" = f ]; then break; fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "The copy has not reached $point in ${recovery_timeout}s" >&2
+    exit 1
+  fi
+  sleep 2
+done
+duration=$(($(date +%s) - started))
+
+# 5. What it reached.
+copy() { psql -h "$socket" -p 5433 -U "$pg_user" -XAtq -v ON_ERROR_STOP=1 "$@"; }
+copy -d postgres -c "select count(*) from pg_database" >/dev/null
+if [ -n "${HIVEPAAS_RESTORE_CHECK_QUERY:-}" ]; then
+  echo "Checking: $HIVEPAAS_RESTORE_CHECK_QUERY"
+  copy -d "${POSTGRES_DB:-postgres}" -c "$HIVEPAAS_RESTORE_CHECK_QUERY"
+fi
+out RESTORED_TO "$point"
+out DURATION_SECONDS "$duration"
+echo "Restored to $point in ${duration}s."

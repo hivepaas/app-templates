@@ -1,0 +1,31 @@
+#!/bin/bash
+# walg-run [--source] ARGS...: wal-g ARGS, with the archive's keys exported for
+# it alone - they are files, never the container's environment. With --source,
+# the archive is the one a restored database is restored from: its settings are
+# the HIVEPAAS_RESTORE_-prefixed variables, its keys in HIVEPAAS_RESTORE_SECRETS_DIR.
+# It runs as the postgres user, which archive_command does already.
+set -euo pipefail
+dir=${HIVEPAAS_WALG_SECRETS_DIR:-/run/secrets/walg}
+if [ "${1:-}" = --source ]; then
+  shift
+  dir=${HIVEPAAS_RESTORE_SECRETS_DIR:?this database is not being restored}
+  unset WALG_S3_PREFIX WALG_FILE_PREFIX AWS_ENDPOINT AWS_REGION AWS_S3_FORCE_PATH_STYLE
+  for var in $(compgen -e); do
+    case $var in
+      HIVEPAAS_RESTORE_WALG_* | HIVEPAAS_RESTORE_AWS_*) export "${var#HIVEPAAS_RESTORE_}=${!var}" ;;
+    esac
+  done
+fi
+for file in "$dir"/*; do
+  [ -f "$file" ] || continue
+  name=$(basename "$file")
+  case $name in
+    WALG_AWS_*) name=${name#WALG_} ;;
+  esac
+  export "$name=$(cat "$file")"
+done
+export PGHOST=${PGHOST:-/var/run/postgresql} PGUSER=${PGUSER:-${POSTGRES_USER:-postgres}} PGDATABASE=${PGDATABASE:-postgres}
+if [ "$(id -u)" = 0 ]; then
+  exec gosu postgres /opt/hivepaas/bin/wal-g "$@"
+fi
+exec /opt/hivepaas/bin/wal-g "$@"

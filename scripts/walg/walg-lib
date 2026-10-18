@@ -1,0 +1,79 @@
+# What the walg-* scripts of engine API 1 share. Sourced, not run.
+# shellcheck shell=bash disable=SC2034 # what it sets is the scripts' that source it
+bin=/opt/hivepaas/bin
+pg_user=${POSTGRES_USER:-postgres}
+# pg_host is the server the scripts ask: the local one, or the live database
+# a verifier's restore test makes its restore point on.
+pg_host=/var/run/postgresql
+
+# out KEY VALUE: one of the run's outputs, the engine's to read.
+out() {
+  if [ -n "${HIVEPAAS_OUTPUT:-}" ]; then printf '%s=%s\n' "$1" "$2" >> "$HIVEPAAS_OUTPUT"; fi
+}
+
+# sql QUERY: what the server answers, one row a line, fields split by '|'.
+sql() {
+  psql -h "$pg_host" -U "$pg_user" -d postgres -XAtq -v ON_ERROR_STOP=1 -c "$1"
+}
+
+# rfc3339 EPOCH: that second, in UTC.
+rfc3339() {
+  date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
+}
+
+# data_root: the data volume's mount point, where what goes beside PGDATA goes.
+data_root() {
+  local dir=$PGDATA
+  while [ ! -d "$dir" ]; do dir=$(dirname "$dir"); done
+  stat -c %m "$dir"
+}
+
+# backups [--source]: every base backup, oldest first, a line each:
+# "name start-epoch compressed-bytes".
+backups() {
+  local json obj name start bytes
+  json=$("$bin/walg-run" "$@" backup-list --detail --json)
+  while IFS= read -r obj; do
+    name=$(sed -n 's/.*"backup_name":"\([^"]*\)".*/\1/p' <<<"$obj")
+    start=$(sed -n 's/.*"start_time":"\([^"]*\)".*/\1/p' <<<"$obj")
+    bytes=$(sed -n 's/.*"compressed_size":\([0-9]*\).*/\1/p' <<<"$obj")
+    if [ -n "$name" ] && [ -n "$start" ]; then echo "$name $(date -u -d "$start" +%s) ${bytes:-0}"; fi
+  done <<<"${json//'},{'/$'}\n{'}" | sort -k2,2n
+}
+
+# backup_before EPOCH [--source]: the latest base backup that starts before it.
+backup_before() {
+  local before=$1 name start bytes found=""
+  shift
+  while read -r name start bytes; do
+    if [ "$start" -le "$before" ]; then found=$name; fi
+  done < <(backups "$@")
+  if [ -z "$found" ]; then
+    echo "No base backup starts before $(rfc3339 "$before")" >&2
+    return 1
+  fi
+  echo "$found"
+}
+
+# wait_archived SEGMENT SECONDS: whether the archiver archives SEGMENT, or one
+# after it, within SECONDS.
+wait_archived() {
+  local segment=$1 deadline=$(($(date +%s) + $2)) last
+  while :; do
+    last=$(sql "select coalesce(last_archived_wal, '') from pg_stat_archiver")
+    last=${last:0:24}
+    if [[ $last =~ ^[0-9A-F]{24}$ ]] && [[ ! $last < $segment ]]; then return 0; fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then return 1; fi
+    sleep 1
+  done
+}
+
+# clear_recovery DIR: the recovery settings a data directory carries from where
+# it was restored before, which would clash with the ones written next.
+clear_recovery() {
+  local conf=$1/postgresql.auto.conf
+  if [ -f "$conf" ]; then
+    sed -i -E '/^[[:space:]]*(restore_command|recovery_target[a-z_]*|primary_conninfo)[[:space:]]*=/d' "$conf"
+  fi
+  rm -f "$1/standby.signal" "$1/recovery.signal"
+}

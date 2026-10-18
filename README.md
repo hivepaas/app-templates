@@ -132,6 +132,10 @@ artifacts:                  # binaries the engine mounts, downloaded by each nod
 - The scripts are `settings.configFiles` in `/opt/hivepaas/bin`, and lint refuses
   a template missing one its `engineApi` names. Its images are glibc ones, never
   Alpine: the artifacts are built against glibc.
+- `postgres-managed`'s scripts live in `scripts/walg`, one file each, beside
+  `template-head.yaml`, which is the template without them. Edit them there and run
+  `scripts/walg/generate.sh`, which writes the template. CI runs it with `-check` and
+  fails when the committed template is not what they make.
 - An artifact is pinned by its sha256 and size, which come from the project's own
   published `.sha256`, and are checked by downloading it. Raise its version as an
   image's: the new hashes, checked the same way.

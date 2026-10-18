@@ -1,0 +1,23 @@
+#!/bin/bash
+# walg-mark NAME SECONDS: a restore point named NAME. It switches to a new WAL
+# segment, so the point's is archived, and waits up to SECONDS for that: a point
+# is restorable only once it is. It prints LSN=, the point's, which is what a
+# restore targets; it exits 75 when the segment was not archived in time.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+name=${1:?usage: walg-mark NAME SECONDS}
+seconds=${2:-120}
+if [[ ! $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$ ]]; then
+  echo "Not a restore point's name: $name" >&2
+  exit 2
+fi
+lsn=$(sql "select pg_create_restore_point('$name')")
+segment=$(sql "select pg_walfile_name(pg_switch_wal())")
+if ! wait_archived "$segment" "$seconds"; then
+  echo "The point is made, but $segment, the WAL it is in, was not archived in ${seconds}s" >&2
+  exit 75
+fi
+echo "LSN=$lsn"
+echo "SEGMENT=$segment"

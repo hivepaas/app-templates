@@ -1,0 +1,125 @@
+#!/bin/bash
+# walg-entrypoint [ARGS...]: a managed database's entrypoint. It hands over to
+# the image's own, unless the database is a restore whose data is not there yet
+# (HivePaaS's managed templates design, §4). Then it fetches the base backup from
+# the source's archive, writes the recovery settings, and runs the server through
+# the recovery, its log kept, to tell a recovery that failed from a restart.
+# After one that failed, it idles, so that status can say why.
+#   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
+#     starts or recovers, 1 when the recovery failed, having printed why.
+#   walg-entrypoint health: the container's health check, healthy while it
+#     restores.
+set -uo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+state_dir=$(data_root)/hivepaas-restore
+log=$state_dir/recovery.log
+state() { cat "$state_dir/state" 2>/dev/null || true; }
+set_state() {
+  mkdir -p "$state_dir"
+  echo "$1" > "$state_dir/state.new" && mv "$state_dir/state.new" "$state_dir/state"
+}
+restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
+
+status() {
+  case $(state) in
+    failed)
+      echo "The recovery failed:"
+      grep -E 'FATAL|PANIC' "$log" | tail -n 5 || tail -n 20 "$log"
+      exit 1
+      ;;
+    fetching) exit 75 ;;
+  esac
+  case $(sql "select pg_is_in_recovery()" 2>/dev/null) in
+    f)
+      if [ "$(state)" = recovering ]; then set_state "done"; fi
+      exit 0
+      ;;
+    *) exit 75 ;;
+  esac
+}
+
+health() {
+  if restoring; then
+    case $(state) in fetching | recovering | failed) exit 0 ;; esac
+  fi
+  exec pg_isready -h "$pg_host" -U "$pg_user" -d "${POSTGRES_DB:-postgres}"
+}
+
+idle() {
+  trap 'exit 0' TERM INT
+  while :; do sleep 3600 & wait $!; done
+}
+
+fetch() {
+  local backup=${HIVEPAAS_RESTORE_TARGET_BACKUP:-}
+  set_state fetching
+  mkdir -p "$PGDATA"
+  find "$PGDATA" -mindepth 1 -delete
+  chown postgres:postgres "$PGDATA"
+  chmod 700 "$PGDATA"
+  if [ -z "$backup" ]; then
+    backup=$(backup_before "$(date -u -d "${HIVEPAAS_RESTORE_TARGET_BEFORE:?a restore needs its target}" +%s)" \
+      --source) || return 1
+  fi
+  echo "Fetching $backup from the source's archive..."
+  gosu postgres "$bin/walg-run" --source backup-fetch "$PGDATA" "$backup" || return 1
+  clear_recovery "$PGDATA"
+  {
+    echo "restore_command = '$bin/walg-fetch %f %p'"
+    for setting in ${HIVEPAAS_RESTORE_RECOVERY:-}; do echo "${setting%%=*} = '${setting#*=}'"; done
+    echo "recovery_target_action = 'promote'"
+  } >> "$PGDATA/postgresql.auto.conf"
+  touch "$PGDATA/recovery.signal"
+  chown postgres:postgres "$PGDATA/postgresql.auto.conf" "$PGDATA/recovery.signal"
+  set_state recovering
+}
+
+recover() {
+  local pid code stopping="" from
+  mkdir -p "$state_dir"
+  touch "$log"
+  from=$(($(wc -l < "$log") + 1))
+  docker-entrypoint.sh "$@" > >(tee -a "$log") 2>&1 &
+  pid=$!
+  trap 'stopping=1; kill -TERM "$pid" 2>/dev/null' TERM
+  trap 'stopping=1; kill -INT "$pid" 2>/dev/null' INT
+  while kill -0 "$pid" 2>/dev/null; do wait "$pid"; done
+  wait "$pid"
+  code=$?
+  # Promoted - in this run's log, or seen by status - the server stopped as any
+  # does, and the next start is an ordinary one. Stopped while it recovered, the
+  # next start goes on recovering.
+  if [ "$(state)" = "done" ] || tail -n +"$from" "$log" | grep -q 'database system is ready to accept connections'
+  then
+    set_state "done"
+    exit "$code"
+  fi
+  if [ -n "$stopping" ]; then exit "$code"; fi
+  set_state failed
+  echo "The recovery failed; the database idles so that its restore can say why." >&2
+  idle
+}
+
+case ${1:-} in
+  status) status ;;
+  health) health ;;
+esac
+
+if ! restoring; then exec docker-entrypoint.sh "$@"; fi
+case $(state) in
+  failed)
+    echo "The recovery failed before: see $log." >&2
+    idle
+    ;;
+  "done") exec docker-entrypoint.sh "$@" ;;
+esac
+if [ "$(state)" = fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
+  if ! fetch; then
+    set_state failed
+    echo "The base backup could not be fetched; the database idles so that its restore can say why." | tee -a "$log" >&2
+    idle
+  fi
+fi
+recover "$@"
