@@ -1,0 +1,668 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: postgres-managed
+  title: PostgreSQL (managed)
+  tagline: PostgreSQL that HivePaaS archives continuously and restores to any moment
+  description: |
+    PostgreSQL, looked after by HivePaaS: every change is archived to object
+    storage as it happens, so a failure loses about a minute of writes, not
+    everything since the last dump.
+
+    **This template sets up**
+
+    - a database, a user and a generated password, on a persistent data volume
+    - continuous WAL archiving with [WAL-G](https://github.com/wal-g/wal-g),
+      encrypted, to an S3 repository or cloud storage you choose - or to a volume
+      repository, which is only as safe as that volume is apart from the database
+    - a nightly base backup, with retention, and a check of the WAL chain
+    - an archive health check every five minutes, and a weekly restore test
+      that proves the archive restores
+    - restore into a new app, to the latest moment, a time, a restore point you
+      named, or a base backup
+
+    The data volume must be pinned to a node. Its engine's settings - where it
+    archives, its server arguments, its scripts - are HivePaaS's, and the app's
+    settings show them read-only.
+
+    Other apps in the same environment reach it by the app's name on port 5432,
+    with the credentials HivePaaS shares as `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD`
+    and `HIVEPAAS_DATABASE_NAME`.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source, backup]
+  aliases: [pg, postgresql, pitr, wal-g]
+  icon: icons/postgres.svg
+  links:
+    website: https://www.postgresql.org
+    documentation: https://www.postgresql.org/docs/
+    source: https://github.com/postgres/postgres
+  license: PostgreSQL
+  requires:
+    versionCode: v000002
+    features: [managed-databases]
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on, pinned to a node.
+    type: volume
+
+managed:
+  engine: postgres
+  engineApi: 1
+  postgres:
+    archiveTimeout: 60s
+    baseBackupSchedule: "0 2 * * *"
+    retainFull: 7
+    restoreTestSchedule: "0 4 * * 0"
+
+artifacts:
+  - name: wal-g
+    version: 3.0.9
+    mountPath: /opt/hivepaas/bin/wal-g
+    files:
+      amd64:
+        url: https://github.com/wal-g/wal-g/releases/download/v3.0.9/wal-g-pg-20.04-amd64
+        sha256: 965a7147852435bc4b54f272799b63df826b54ef65cf7c4fc688c82b96c0c4eb
+        size: 61379352
+      arm64:
+        url: https://github.com/wal-g/wal-g/releases/download/v3.0.9/wal-g-pg-20.04-aarch64
+        sha256: 89f0cea535eed8c5b742358bff5151e65b302eab90689d0afb38750f8d505936
+        size: 57671960
+
+versions:
+  - name: "18"
+    release: "18.6"
+    default: true
+    image: postgres:18.6-trixie
+  - name: "17"
+    release: "17.11"
+    image: postgres:17.11-trixie
+    override:
+      app:
+        deployment:
+          storage:
+            mounts:
+              # Before 18, the image's volume is /var/lib/postgresql/data. The data
+              # goes in a directory of it, so that a restore test has room beside it.
+              /var/lib/postgresql: null
+              /var/lib/postgresql/data: {type: volume, source: "${{ params.dataVolume }}"}
+        settings:
+          envVars:
+            data:
+              - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+              - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+              - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+              - {k: PGDATA, v: /var/lib/postgresql/data/pgdata}
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # From 18 on, the image declares its volume at /var/lib/postgresql and keeps
+        # each major's data in its own directory under it.
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # pg_isready, except while the database is being restored: a base backup
+        # takes as long to fetch as it is large.
+        command: /opt/hivepaas/bin/walg-entrypoint health
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+    configFiles:
+      walg-lib:
+        content: |
+          # What the walg-* scripts of engine API 1 share. Sourced, not run.
+          # shellcheck shell=bash disable=SC2034 # what it sets is the scripts' that source it
+          bin=/opt/hivepaas/bin
+          pg_user=${POSTGRES_USER:-postgres}
+          # pg_host is the server the scripts ask: the local one, or the live database
+          # a verifier's restore test makes its restore point on.
+          pg_host=/var/run/postgresql
+
+          # out KEY VALUE: one of the run's outputs, the engine's to read.
+          out() {
+            if [ -n "${HIVEPAAS_OUTPUT:-}" ]; then printf '%s=%s\n' "$1" "$2" >> "$HIVEPAAS_OUTPUT"; fi
+          }
+
+          # sql QUERY: what the server answers, one row a line, fields split by '|'.
+          sql() {
+            psql -h "$pg_host" -U "$pg_user" -d postgres -XAtq -v ON_ERROR_STOP=1 -c "$1"
+          }
+
+          # rfc3339 EPOCH: that second, in UTC.
+          rfc3339() {
+            date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
+          }
+
+          # data_root: the data volume's mount point, where what goes beside PGDATA goes.
+          data_root() {
+            local dir=$PGDATA
+            while [ ! -d "$dir" ]; do dir=$(dirname "$dir"); done
+            stat -c %m "$dir"
+          }
+
+          # backups [--source]: every base backup, oldest first, a line each:
+          # "name start-epoch compressed-bytes".
+          backups() {
+            local json obj name start bytes
+            json=$("$bin/walg-run" "$@" backup-list --detail --json)
+            while IFS= read -r obj; do
+              name=$(sed -n 's/.*"backup_name":"\([^"]*\)".*/\1/p' <<<"$obj")
+              start=$(sed -n 's/.*"start_time":"\([^"]*\)".*/\1/p' <<<"$obj")
+              bytes=$(sed -n 's/.*"compressed_size":\([0-9]*\).*/\1/p' <<<"$obj")
+              if [ -n "$name" ] && [ -n "$start" ]; then echo "$name $(date -u -d "$start" +%s) ${bytes:-0}"; fi
+            done <<<"${json//'},{'/$'}\n{'}" | sort -k2,2n
+          }
+
+          # backup_before EPOCH [--source]: the latest base backup that starts before it.
+          backup_before() {
+            local before=$1 name start bytes found=""
+            shift
+            while read -r name start bytes; do
+              if [ "$start" -le "$before" ]; then found=$name; fi
+            done < <(backups "$@")
+            if [ -z "$found" ]; then
+              echo "No base backup starts before $(rfc3339 "$before")" >&2
+              return 1
+            fi
+            echo "$found"
+          }
+
+          # wait_archived SEGMENT SECONDS: whether the archiver archives SEGMENT, or one
+          # after it, within SECONDS.
+          wait_archived() {
+            local segment=$1 deadline=$(($(date +%s) + $2)) last
+            while :; do
+              last=$(sql "select coalesce(last_archived_wal, '') from pg_stat_archiver")
+              last=${last:0:24}
+              if [[ $last =~ ^[0-9A-F]{24}$ ]] && [[ ! $last < $segment ]]; then return 0; fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then return 1; fi
+              sleep 1
+            done
+          }
+
+          # clear_recovery DIR: the recovery settings a data directory carries from where
+          # it was restored before, which would clash with the ones written next.
+          clear_recovery() {
+            local conf=$1/postgresql.auto.conf
+            if [ -f "$conf" ]; then
+              sed -i -E '/^[[:space:]]*(restore_command|recovery_target[a-z_]*|primary_conninfo)[[:space:]]*=/d' "$conf"
+            fi
+            rm -f "$1/standby.signal" "$1/recovery.signal"
+          }
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-lib, mode: 444}
+      walg-run:
+        content: |
+          #!/bin/bash
+          # walg-run [--source] ARGS...: wal-g ARGS, with the archive's keys exported for
+          # it alone - they are files, never the container's environment. With --source,
+          # the archive is the one a restored database is restored from: its settings are
+          # the HIVEPAAS_RESTORE_-prefixed variables, its keys in HIVEPAAS_RESTORE_SECRETS_DIR.
+          # It runs as the postgres user, which archive_command does already.
+          set -euo pipefail
+          dir=${HIVEPAAS_WALG_SECRETS_DIR:-/run/secrets/walg}
+          if [ "${1:-}" = --source ]; then
+            shift
+            dir=${HIVEPAAS_RESTORE_SECRETS_DIR:?this database is not being restored}
+            unset WALG_S3_PREFIX WALG_FILE_PREFIX AWS_ENDPOINT AWS_REGION AWS_S3_FORCE_PATH_STYLE
+            for var in $(compgen -e); do
+              case $var in
+                HIVEPAAS_RESTORE_WALG_* | HIVEPAAS_RESTORE_AWS_*) export "${var#HIVEPAAS_RESTORE_}=${!var}" ;;
+              esac
+            done
+          fi
+          for file in "$dir"/*; do
+            [ -f "$file" ] || continue
+            name=$(basename "$file")
+            case $name in
+              WALG_AWS_*) name=${name#WALG_} ;;
+            esac
+            export "$name=$(cat "$file")"
+          done
+          export PGHOST=${PGHOST:-/var/run/postgresql} PGUSER=${PGUSER:-${POSTGRES_USER:-postgres}} PGDATABASE=${PGDATABASE:-postgres}
+          if [ "$(id -u)" = 0 ]; then
+            exec gosu postgres /opt/hivepaas/bin/wal-g "$@"
+          fi
+          exec /opt/hivepaas/bin/wal-g "$@"
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-run, mode: 555}
+      walg-fetch:
+        content: |
+          #!/bin/bash
+          # walg-fetch FILE PATH: the restore_command. wal-g's 74, the file is not in the
+          # archive, passes through: recovery has reached the end of it. Any other failure
+          # is 255, which stops recovery, instead of letting it end early at an older point
+          # and promote there.
+          source=()
+          if [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; then source=(--source); fi
+          /opt/hivepaas/bin/walg-run "${source[@]}" wal-fetch "$1" "$2"
+          code=$?
+          case $code in
+            0 | 74) exit "$code" ;;
+            *) exit 255 ;;
+          esac
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-fetch, mode: 555}
+      walg-nightly:
+        content: |
+          #!/bin/bash
+          # walg-nightly backup | retain [BACKUP]: the nightly job's two steps. backup takes
+          # a base backup. retain deletes everything before BACKUP - the oldest the engine
+          # keeps, for retainFull and the restore points kept; nothing without one - and
+          # verifies the WAL chain. Each prints the backups kept as its outputs.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          list_outputs() {
+            local list="" oldest="" name start bytes
+            while read -r name start bytes; do
+              list+="$name@$(rfc3339 "$start")@$bytes "
+              if [ -z "$oldest" ]; then oldest=$start; fi
+            done < <(backups)
+            out BACKUPS "${list% }"
+            if [ -n "$oldest" ]; then out OLDEST_BACKUP_AT "$(rfc3339 "$oldest")"; fi
+          }
+
+          case ${1:-} in
+            backup)
+              echo "Taking a base backup of $PGDATA..."
+              "$bin/walg-run" backup-push "$PGDATA"
+              read -r name start bytes < <(backups | tail -n 1)
+              out BACKUP_NAME "$name"
+              out BACKUP_AT "$(rfc3339 "$start")"
+              out BACKUP_BYTES "$bytes"
+              echo "Took $name: $bytes bytes, compressed."
+              list_outputs
+              ;;
+            retain)
+              if [ -n "${2:-}" ]; then
+                if [[ ! $2 =~ ^base_[0-9A-Fa-f]{24}(_D_[0-9A-Fa-f]{24})?$ ]]; then
+                  echo "Not a base backup's name: $2" >&2
+                  exit 2
+                fi
+                echo "Deleting the backups and WAL before $2..."
+                "$bin/walg-run" delete before FIND_FULL "$2" --confirm
+              else
+                echo "Nothing to delete: there are not more base backups than are kept."
+              fi
+              list_outputs
+              echo "Verifying the WAL chain..."
+              report=$("$bin/walg-run" wal-verify integrity timeline --json)
+              echo "$report"
+              if grep -q '"status":"FAILURE"' <<<"$report"; then
+                echo "The WAL chain is broken: a restore would stop where it is" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "usage: walg-nightly backup | retain [BACKUP]" >&2
+              exit 2
+              ;;
+          esac
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-nightly, mode: 555}
+      walg-health:
+        content: |
+          #!/bin/bash
+          # walg-health: whether archiving keeps up. It fails when the last WAL archived
+          # failed and none has since, or when a segment has waited to be archived for
+          # three archive timeouts. It prints its reading as JSON, and the engine's
+          # outputs for Status.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          IFS='|' read -r last_archived failed_count last_failed timeout db_bytes < <(sql "
+            select coalesce(extract(epoch from last_archived_time)::bigint::text, ''), failed_count,
+              coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false),
+              (select setting from pg_settings where name = 'archive_timeout'),
+              (select sum(pg_database_size(datname)) from pg_database)
+            from pg_stat_archiver")
+          pg_wal_bytes=$(du -sb "$PGDATA/pg_wal" | cut -f1)
+          free_bytes=$(df -B1 --output=avail "$PGDATA" | tail -n 1 | tr -d ' ')
+          now=$(date +%s)
+          ready=0
+          oldest_ready=$now
+          for file in "$PGDATA"/pg_wal/archive_status/*.ready; do
+            [ -e "$file" ] || continue
+            ready=$((ready + 1))
+            mtime=$(stat -c %Y "$file")
+            if [ "$mtime" -lt "$oldest_ready" ]; then oldest_ready=$mtime; fi
+          done
+          if [ "$timeout" -le 0 ]; then timeout=60; fi
+
+          state=ok reason=""
+          if [ "$last_failed" = t ]; then
+            state=failing reason="the last WAL archived failed, and none has been archived since"
+          fi
+          if [ "$ready" -gt 0 ] && [ $((now - oldest_ready)) -gt $((3 * timeout)) ]; then
+            state=failing reason="$ready WAL segments wait to be archived, the oldest for $((now - oldest_ready))s"
+          fi
+
+          last_archived_at=""
+          if [ -n "$last_archived" ]; then last_archived_at=$(rfc3339 "$last_archived"); fi
+          out LAST_ARCHIVED_AT "$last_archived_at"
+          out FAILED_COUNT "$failed_count"
+          out PG_WAL_BYTES "$pg_wal_bytes"
+          out DB_BYTES "$db_bytes"
+          out FREE_BYTES "$free_bytes"
+          out READY_COUNT "$ready"
+          printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pgWalBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
+            "$state" "$last_archived_at" "$failed_count" "$ready" "$pg_wal_bytes" "$db_bytes" "$free_bytes"
+          if [ "$state" != ok ]; then
+            echo "Archiving is failing: $reason" >&2
+            exit 1
+          fi
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-health, mode: 555}
+      walg-mark:
+        content: |
+          #!/bin/bash
+          # walg-mark NAME SECONDS: a restore point named NAME. It switches to a new WAL
+          # segment, so the point's is archived, and waits up to SECONDS for that: a point
+          # is restorable only once it is. It prints LSN=, the point's, which is what a
+          # restore targets; it exits 75 when the segment was not archived in time.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          name=${1:?usage: walg-mark NAME SECONDS}
+          seconds=${2:-120}
+          if [[ ! $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$ ]]; then
+            echo "Not a restore point's name: $name" >&2
+            exit 2
+          fi
+          lsn=$(sql "select pg_create_restore_point('$name')")
+          segment=$(sql "select pg_walfile_name(pg_switch_wal())")
+          if ! wait_archived "$segment" "$seconds"; then
+            echo "The point is made, but $segment, the WAL it is in, was not archived in ${seconds}s" >&2
+            exit 75
+          fi
+          echo "LSN=$lsn"
+          echo "SEGMENT=$segment"
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-mark, mode: 555}
+      walg-restore-test:
+        content: |
+          #!/bin/bash
+          # walg-restore-test: proves the archive restores (HivePaaS's managed templates
+          # design, §5). It marks a restore point on the live database, restores the latest
+          # base backup before it into a scratch directory, recovers it to the point with a
+          # second server - archiving off, so the copy never writes to the archive - and
+          # checks what it reached. In a verifier, the live database is at
+          # HIVEPAAS_RESTORE_SOURCE_HOST and the scratch directory is
+          # HIVEPAAS_RESTORE_SCRATCH_DIR, on the verifier's own volume.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          recovery_timeout=${HIVEPAAS_RESTORE_TEST_TIMEOUT:-21600}
+          if [ -n "${HIVEPAAS_RESTORE_SOURCE_HOST:-}" ]; then
+            pg_host=$HIVEPAAS_RESTORE_SOURCE_HOST
+            export PGPASSWORD=${POSTGRES_PASSWORD:-}
+          fi
+          scratch=${HIVEPAAS_RESTORE_SCRATCH_DIR:-$(data_root)}/hivepaas-restore-test
+          socket=/tmp/hivepaas-restore-test
+          log=$socket/server.log
+
+          stop_copy() {
+            if [ -f "$scratch/postmaster.pid" ]; then gosu postgres pg_ctl -D "$scratch" -m immediate stop >/dev/null 2>&1 || true; fi
+            rm -rf "$scratch" "$socket"
+          }
+          trap stop_copy EXIT
+
+          # 1. The point, on the live database, its WAL archived.
+          point=hp-test-$(date -u +%Y%m%dT%H%M%SZ)
+          point_at=$(date +%s)
+          lsn=$(sql "select pg_create_restore_point('$point')")
+          segment=$(sql "select pg_walfile_name(pg_switch_wal())")
+          timeout=$(sql "select setting from pg_settings where name = 'archive_timeout'")
+          if ! wait_archived "$segment" $((3 * (timeout > 0 ? timeout : 60))); then
+            echo "The restore point's WAL, $segment, was not archived: archiving is failing" >&2
+            exit 1
+          fi
+          echo "Marked $point at $lsn."
+
+          # 2. Room for the copy, and room to replay into it.
+          db_bytes=$(sql "select sum(pg_database_size(datname)) from pg_database")
+          stop_copy
+          mkdir -p "$scratch"
+          free_bytes=$(df -B1 --output=avail "$scratch" | tail -n 1 | tr -d ' ')
+          if [ "$free_bytes" -lt $((db_bytes * 12 / 10)) ]; then
+            echo "Not enough room to restore into: $free_bytes bytes free beside a database of $db_bytes" >&2
+            exit 1
+          fi
+
+          # 3. The latest base backup before the point.
+          started=$(date +%s)
+          backup=$(backup_before "$point_at")
+          echo "Restoring $backup into $scratch..."
+          chown postgres:postgres "$scratch"
+          chmod 700 "$scratch"
+          gosu postgres "$bin/walg-run" backup-fetch "$scratch" "$backup"
+
+          # 4. Recovered to the point by a second server, which archives nothing.
+          clear_recovery "$scratch"
+          cat >> "$scratch/postgresql.auto.conf" <<CONF
+          restore_command = '$bin/walg-fetch %f %p'
+          recovery_target_name = '$point'
+          recovery_target_action = 'promote'
+          CONF
+          touch "$scratch/recovery.signal"
+          chown postgres:postgres "$scratch/postgresql.auto.conf" "$scratch/recovery.signal"
+          mkdir -p "$socket"
+          chown postgres:postgres "$socket"
+          gosu postgres pg_ctl -D "$scratch" -l "$log" -W start -o \
+            "-c port=5433 -c listen_addresses='' -c unix_socket_directories=$socket -c archive_mode=off" >/dev/null
+          started_copy=$(date +%s)
+          deadline=$((started_copy + recovery_timeout))
+          while :; do
+            # A server just started has no pid file for a moment: it is gone only when it
+            # says why, or stays gone.
+            if ! gosu postgres pg_ctl -D "$scratch" status >/dev/null 2>&1 &&
+              { grep -qE 'FATAL|PANIC' "$log" 2>/dev/null || [ $(($(date +%s) - started_copy)) -gt 30 ]; }; then
+              echo "The copy stopped before it reached $point:" >&2
+              tail -n 20 "$log" >&2
+              exit 1
+            fi
+            in_recovery=$(psql -h "$socket" -p 5433 -U "$pg_user" -d postgres -XAtqc "select pg_is_in_recovery()" 2>/dev/null || true)
+            if [ "$in_recovery" = f ]; then break; fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "The copy has not reached $point in ${recovery_timeout}s" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          duration=$(($(date +%s) - started))
+
+          # 5. What it reached.
+          copy() { psql -h "$socket" -p 5433 -U "$pg_user" -XAtq -v ON_ERROR_STOP=1 "$@"; }
+          copy -d postgres -c "select count(*) from pg_database" >/dev/null
+          if [ -n "${HIVEPAAS_RESTORE_CHECK_QUERY:-}" ]; then
+            echo "Checking: $HIVEPAAS_RESTORE_CHECK_QUERY"
+            copy -d "${POSTGRES_DB:-postgres}" -c "$HIVEPAAS_RESTORE_CHECK_QUERY"
+          fi
+          out RESTORED_TO "$point"
+          out DURATION_SECONDS "$duration"
+          echo "Restored to $point in ${duration}s."
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-restore-test, mode: 555}
+      walg-entrypoint:
+        content: |
+          #!/bin/bash
+          # walg-entrypoint [ARGS...]: a managed database's entrypoint. It hands over to
+          # the image's own, unless the database is a restore whose data is not there yet
+          # (HivePaaS's managed templates design, §4). Then it fetches the base backup from
+          # the source's archive, writes the recovery settings, and runs the server through
+          # the recovery, its log kept, to tell a recovery that failed from a restart.
+          # After one that failed, it idles, so that status can say why.
+          #   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
+          #     starts or recovers, 1 when the recovery failed, having printed why.
+          #   walg-entrypoint health: the container's health check, healthy while it
+          #     restores.
+          set -uo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          state_dir=$(data_root)/hivepaas-restore
+          log=$state_dir/recovery.log
+          state() { cat "$state_dir/state" 2>/dev/null || true; }
+          set_state() {
+            mkdir -p "$state_dir"
+            echo "$1" > "$state_dir/state.new" && mv "$state_dir/state.new" "$state_dir/state"
+          }
+          restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
+
+          status() {
+            case $(state) in
+              failed)
+                echo "The recovery failed:"
+                grep -E 'FATAL|PANIC' "$log" | tail -n 5 || tail -n 20 "$log"
+                exit 1
+                ;;
+              fetching) exit 75 ;;
+            esac
+            case $(sql "select pg_is_in_recovery()" 2>/dev/null) in
+              f)
+                if [ "$(state)" = recovering ]; then set_state "done"; fi
+                exit 0
+                ;;
+              *) exit 75 ;;
+            esac
+          }
+
+          health() {
+            if restoring; then
+              case $(state) in fetching | recovering | failed) exit 0 ;; esac
+            fi
+            exec pg_isready -h "$pg_host" -U "$pg_user" -d "${POSTGRES_DB:-postgres}"
+          }
+
+          idle() {
+            trap 'exit 0' TERM INT
+            while :; do sleep 3600 & wait $!; done
+          }
+
+          fetch() {
+            local backup=${HIVEPAAS_RESTORE_TARGET_BACKUP:-}
+            set_state fetching
+            mkdir -p "$PGDATA"
+            find "$PGDATA" -mindepth 1 -delete
+            chown postgres:postgres "$PGDATA"
+            chmod 700 "$PGDATA"
+            if [ -z "$backup" ]; then
+              backup=$(backup_before "$(date -u -d "${HIVEPAAS_RESTORE_TARGET_BEFORE:?a restore needs its target}" +%s)" \
+                --source) || return 1
+            fi
+            echo "Fetching $backup from the source's archive..."
+            gosu postgres "$bin/walg-run" --source backup-fetch "$PGDATA" "$backup" || return 1
+            clear_recovery "$PGDATA"
+            {
+              echo "restore_command = '$bin/walg-fetch %f %p'"
+              for setting in ${HIVEPAAS_RESTORE_RECOVERY:-}; do echo "${setting%%=*} = '${setting#*=}'"; done
+              echo "recovery_target_action = 'promote'"
+            } >> "$PGDATA/postgresql.auto.conf"
+            touch "$PGDATA/recovery.signal"
+            chown postgres:postgres "$PGDATA/postgresql.auto.conf" "$PGDATA/recovery.signal"
+            set_state recovering
+          }
+
+          recover() {
+            local pid code stopping="" from
+            mkdir -p "$state_dir"
+            touch "$log"
+            from=$(($(wc -l < "$log") + 1))
+            docker-entrypoint.sh "$@" > >(tee -a "$log") 2>&1 &
+            pid=$!
+            trap 'stopping=1; kill -TERM "$pid" 2>/dev/null' TERM
+            trap 'stopping=1; kill -INT "$pid" 2>/dev/null' INT
+            while kill -0 "$pid" 2>/dev/null; do wait "$pid"; done
+            wait "$pid"
+            code=$?
+            # Promoted - in this run's log, or seen by status - the server stopped as any
+            # does, and the next start is an ordinary one. Stopped while it recovered, the
+            # next start goes on recovering.
+            if [ "$(state)" = "done" ] || tail -n +"$from" "$log" | grep -q 'database system is ready to accept connections'
+            then
+              set_state "done"
+              exit "$code"
+            fi
+            if [ -n "$stopping" ]; then exit "$code"; fi
+            set_state failed
+            echo "The recovery failed; the database idles so that its restore can say why." >&2
+            idle
+          }
+
+          case ${1:-} in
+            status) status ;;
+            health) health ;;
+          esac
+
+          if ! restoring; then exec docker-entrypoint.sh "$@"; fi
+          case $(state) in
+            failed)
+              echo "The recovery failed before: see $log." >&2
+              idle
+              ;;
+            "done") exec docker-entrypoint.sh "$@" ;;
+          esac
+          if [ "$(state)" = fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
+            if ! fetch; then
+              set_state failed
+              echo "The base backup could not be fetched; the database idles so that its restore can say why." | tee -a "$log" >&2
+              idle
+            fi
+          fi
+          recover "$@"
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-entrypoint, mode: 555}
+    routing:
+      port: 5432

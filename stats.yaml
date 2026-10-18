@@ -285,6 +285,7 @@ templates:
   postgis: {added: "2026-09-17", stars: 1600}
   postgres: {added: "2026-09-17", stars: 22367}
   postgres-documentdb: {added: "2026-09-21", stars: 26}
+  postgres-managed: {added: "2026-10-18"}
   postgres-replica: {added: "2026-09-20", stars: 22367}
   postgres-vectorchord: {added: "2026-09-19", stars: 1812}
   postiz: {added: "2026-10-07", stars: 37064}

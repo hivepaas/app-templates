@@ -30,9 +30,10 @@ reference; the rules are:
   from `tags.yaml`; `aliases` are search terms that are never shown;
   `requires.versionCode` is the oldest HivePaaS that can provision it.
 - **parameters** - what the create form asks for. Types: `string`, `secret`,
-  `int`, `size` (`512MB`), `bool`, `select`, `volume`. A `secret` has no
-  `default`; give it `generate` to create one when left empty. A `volume` is a
-  cluster volume the user picks.
+  `int`, `size` (`512MB`), `bool`, `select`, `volume`, `domain` and `app`. A
+  `secret` has no `default`; give it `generate` to create one when left empty. A
+  `volume` is a cluster volume the user picks, a `domain` a host name, and an
+  `app` an app the person already runs in the environment, by its key.
 - **versions** - one per major line, each pinned to an exact image. `release` is
   the exact version shown to users. Moving tags such as `latest` or `17` are
   refused. `deprecated` hides a version from new apps.
@@ -89,7 +90,7 @@ renders to an ordinary reference, `${blog-db.HIVEPAAS_PASSWORD}`, resolved at de
 
 The rules, all checked by `apptemplate lint`:
 
-- at most three dependencies, one level deep - a dependency cannot have dependencies;
+- at most five dependencies, one level deep - a dependency cannot have dependencies;
 - the named template, version, variant and parameters must exist in this repository;
 - `ref.` names only what the dependency's kind shares - a database shares `HIVEPAAS_USER`,
   `HIVEPAAS_PASSWORD`, `HIVEPAAS_DATABASE_NAME` and `HIVEPAAS_SSL_MODE` besides the variables
@@ -102,6 +103,42 @@ generated secret, is asked of the person creating the app - for a database, its 
 app it was created for, and deleting an app deletes its logical children along with it. A
 database created as a dependency is not something to keep past the app that used it; treat
 it the same as any other data on an app you are about to delete.
+
+## Managed templates
+
+A managed template is an app HivePaaS's engine for it goes on looking after once it
+is created - `postgres-managed` is the first: its engine archives it, backs it up,
+tests that it restores and restores it into a new app. Two blocks, both new in
+`v000002`:
+
+```yaml
+managed:
+  engine: postgres          # an engine HivePaaS has
+  engineApi: 1              # the contract with it: the scripts, their arguments and exit codes
+  postgres:                 # the create form's defaults, all optional
+    archiveTimeout: 60s
+    baseBackupSchedule: "0 2 * * *"
+    retainFull: 7
+    restoreTestSchedule: "0 4 * * 0"
+artifacts:                  # binaries the engine mounts, downloaded by each node
+  - name: wal-g
+    version: 3.0.9
+    mountPath: /opt/hivepaas/bin/wal-g
+    files:
+      amd64: {url: https://..., sha256: ..., size: 61379352}
+      arm64: {url: https://..., sha256: ..., size: 57671960}
+```
+
+- The scripts are `settings.configFiles` in `/opt/hivepaas/bin`, and lint refuses
+  a template missing one its `engineApi` names. Its images are glibc ones, never
+  Alpine: the artifacts are built against glibc.
+- An artifact is pinned by its sha256 and size, which come from the project's own
+  published `.sha256`, and are checked by downloading it. Raise its version as an
+  image's: the new hashes, checked the same way.
+- A managed template needs a feature of the license, `requires.features:
+  [managed-databases]`, which also needs `v000002`.
+- `scripts/test/walg/run.sh` runs the scripts as HivePaaS does - the template's
+  images, its artifact, an S3 store - and is what a change to them is checked with.
 
 ## When a template needs a newer HivePaaS
 
