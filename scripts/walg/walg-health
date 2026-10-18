@@ -1,0 +1,50 @@
+#!/bin/bash
+# walg-health: whether archiving keeps up. It fails when the last WAL archived
+# failed and none has since, or when a segment has waited to be archived for
+# three archive timeouts. It prints its reading as JSON, and the engine's
+# outputs for Status.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+IFS='|' read -r last_archived failed_count last_failed timeout db_bytes < <(sql "
+  select coalesce(extract(epoch from last_archived_time)::bigint::text, ''), failed_count,
+    coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false),
+    (select setting from pg_settings where name = 'archive_timeout'),
+    (select sum(pg_database_size(datname)) from pg_database)
+  from pg_stat_archiver")
+pg_wal_bytes=$(du -sb "$PGDATA/pg_wal" | cut -f1)
+free_bytes=$(df -B1 --output=avail "$PGDATA" | tail -n 1 | tr -d ' ')
+now=$(date +%s)
+ready=0
+oldest_ready=$now
+for file in "$PGDATA"/pg_wal/archive_status/*.ready; do
+  [ -e "$file" ] || continue
+  ready=$((ready + 1))
+  mtime=$(stat -c %Y "$file")
+  if [ "$mtime" -lt "$oldest_ready" ]; then oldest_ready=$mtime; fi
+done
+if [ "$timeout" -le 0 ]; then timeout=60; fi
+
+state=ok reason=""
+if [ "$last_failed" = t ]; then
+  state=failing reason="the last WAL archived failed, and none has been archived since"
+fi
+if [ "$ready" -gt 0 ] && [ $((now - oldest_ready)) -gt $((3 * timeout)) ]; then
+  state=failing reason="$ready WAL segments wait to be archived, the oldest for $((now - oldest_ready))s"
+fi
+
+last_archived_at=""
+if [ -n "$last_archived" ]; then last_archived_at=$(rfc3339 "$last_archived"); fi
+out LAST_ARCHIVED_AT "$last_archived_at"
+out FAILED_COUNT "$failed_count"
+out PG_WAL_BYTES "$pg_wal_bytes"
+out DB_BYTES "$db_bytes"
+out FREE_BYTES "$free_bytes"
+out READY_COUNT "$ready"
+printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pgWalBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
+  "$state" "$last_archived_at" "$failed_count" "$ready" "$pg_wal_bytes" "$db_bytes" "$free_bytes"
+if [ "$state" != ok ]; then
+  echo "Archiving is failing: $reason" >&2
+  exit 1
+fi

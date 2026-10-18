@@ -1,0 +1,156 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: postgres-managed
+  title: PostgreSQL (managed)
+  tagline: PostgreSQL that HivePaaS archives continuously and restores to any moment
+  description: |
+    PostgreSQL, looked after by HivePaaS: every change is archived to object
+    storage as it happens, so a failure loses about a minute of writes, not
+    everything since the last dump.
+
+    **This template sets up**
+
+    - a database, a user and a generated password, on a persistent data volume
+    - continuous WAL archiving with [WAL-G](https://github.com/wal-g/wal-g),
+      encrypted, to an S3 repository or cloud storage you choose - or to a volume
+      repository, which is only as safe as that volume is apart from the database
+    - a nightly base backup, with retention, and a check of the WAL chain
+    - an archive health check every five minutes, and a weekly restore test
+      that proves the archive restores
+    - restore into a new app, to the latest moment, a time, a restore point you
+      named, or a base backup
+
+    The data volume must be pinned to a node. Its engine's settings - where it
+    archives, its server arguments, its scripts - are HivePaaS's, and the app's
+    settings show them read-only.
+
+    Other apps in the same environment reach it by the app's name on port 5432,
+    with the credentials HivePaaS shares as `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD`
+    and `HIVEPAAS_DATABASE_NAME`.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source, backup]
+  aliases: [pg, postgresql, pitr, wal-g]
+  icon: icons/postgres.svg
+  links:
+    website: https://www.postgresql.org
+    documentation: https://www.postgresql.org/docs/
+    source: https://github.com/postgres/postgres
+  license: PostgreSQL
+  requires:
+    versionCode: v000002
+    features: [managed-databases]
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[a-z_][a-z0-9_]{0,62}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on, pinned to a node.
+    type: volume
+
+managed:
+  engine: postgres
+  engineApi: 1
+  postgres:
+    archiveTimeout: 60s
+    baseBackupSchedule: "0 2 * * *"
+    retainFull: 7
+    restoreTestSchedule: "0 4 * * 0"
+
+artifacts:
+  - name: wal-g
+    version: 3.0.9
+    mountPath: /opt/hivepaas/bin/wal-g
+    files:
+      amd64:
+        url: https://github.com/wal-g/wal-g/releases/download/v3.0.9/wal-g-pg-20.04-amd64
+        sha256: 965a7147852435bc4b54f272799b63df826b54ef65cf7c4fc688c82b96c0c4eb
+        size: 61379352
+      arm64:
+        url: https://github.com/wal-g/wal-g/releases/download/v3.0.9/wal-g-pg-20.04-aarch64
+        sha256: 89f0cea535eed8c5b742358bff5151e65b302eab90689d0afb38750f8d505936
+        size: 57671960
+
+versions:
+  - name: "18"
+    release: "18.6"
+    default: true
+    image: postgres:18.6-trixie
+  - name: "17"
+    release: "17.11"
+    image: postgres:17.11-trixie
+    override:
+      app:
+        deployment:
+          storage:
+            mounts:
+              # Before 18, the image's volume is /var/lib/postgresql/data. The data
+              # goes in a directory of it, so that a restore test has room beside it.
+              /var/lib/postgresql: null
+              /var/lib/postgresql/data: {type: volume, source: "${{ params.dataVolume }}"}
+        settings:
+          envVars:
+            data:
+              - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+              - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+              - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+              - {k: PGDATA, v: /var/lib/postgresql/data/pgdata}
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # From 18 on, the image declares its volume at /var/lib/postgresql and keeps
+        # each major's data in its own directory under it.
+        /var/lib/postgresql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # pg_isready, except while the database is being restored: a base backup
+        # takes as long to fetch as it is large.
+        command: /opt/hivepaas/bin/walg-entrypoint health
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: postgres
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+    envVars:
+      data:
+        - {k: POSTGRES_DB, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: POSTGRES_USER, v: "${HIVEPAAS_USER}"}
+        - {k: POSTGRES_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
