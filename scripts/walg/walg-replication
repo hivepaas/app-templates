@@ -1,0 +1,26 @@
+#!/bin/bash
+# walg-replication: lets the database's replicas in. It reads the replication
+# role's password on stdin - never an argument, never the environment - makes the
+# role with it, or gives the role it; adds the pg_hba.conf line that lets the role
+# replicate, once; and reloads. It runs again as it is, the password changed or
+# not.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+IFS= read -r password || true
+if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+  echo "walg-replication: the password must be 16 to 128 letters and digits, on stdin" >&2
+  exit 2
+fi
+hba=$(sql "show hba_file")
+line="host replication $replication_user all scram-sha-256"
+if ! grep -qxF "$line" "$hba"; then printf '%s\n' "$line" >> "$hba"; fi
+# The password reaches psql on its stdin: it is in no process's arguments.
+printf '%s\n' \
+  "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$replication_user') THEN" \
+  "  CREATE ROLE $replication_user WITH REPLICATION LOGIN; END IF; END \$\$;" \
+  "ALTER ROLE $replication_user WITH REPLICATION LOGIN PASSWORD '$password';" \
+  "SELECT pg_reload_conf();" |
+  psql -h "$pg_host" -U "$pg_user" -d postgres -XAtq -v ON_ERROR_STOP=1 >/dev/null
+echo "Replicas may connect as $replication_user."

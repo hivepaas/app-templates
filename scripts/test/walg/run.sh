@@ -369,6 +369,83 @@ test_passthrough() {
   docker rm -fv "$run-plain" >/dev/null
 }
 
+# replica_follows NAME ID SECONDS: the row ID written on src is on the replica in time.
+replica_follows() {
+  for _ in $(seq "$3"); do
+    [ "$(psql_in "$1" "select count(*) from t where id = $2" 2>/dev/null)" = 1 ] && return 0
+    sleep 1
+  done
+  return 1
+}
+
+test_standby() {
+  say "a replica, seeded from the archive and streaming from the primary"
+  local password=ReplicaPass0123456789 secret
+  check "walg-replication: refuses a password that is not one" bash -c \
+    "! printf 'short\n' | docker exec -i $run-src /opt/hivepaas/bin/walg-replication >/dev/null 2>&1"
+  check "walg-replication: lets replicas in" bash -c \
+    "printf '%s\n' $password | docker exec -i $run-src /opt/hivepaas/bin/walg-replication >/dev/null"
+  check "walg-replication: runs again as it is" bash -c \
+    "printf '%s\n' $password | docker exec -i $run-src /opt/hivepaas/bin/walg-replication >/dev/null"
+  check "walg-replication: its pg_hba.conf line is there once" test "$(docker exec "$run-src" sh -c \
+    'grep -cx "host replication hivepaas_replica all scram-sha-256" "$(psql -h /var/run/postgresql -U app \
+    -d postgres -XAtq -c "show hba_file")"')" = 1
+  check "the password is in no process's arguments" bash -c \
+    "! docker exec $run-src sh -c 'cat /proc/[0-9]*/cmdline 2>/dev/null' | tr '\0' ' ' | grep -q $password"
+
+  secret=$work/replication-password-$major
+  rm -f "$secret"
+  printf '%s' "$password" > "$secret"
+  chmod 444 "$secret"
+  # The primary's archive, keys and server arguments: a standby does not archive.
+  start_db replica "walg/src-$major" "$work/secrets-src" -v "$secret:/run/secrets/hivepaas-replication/password:ro" \
+    -e "HIVEPAAS_STANDBY_HOST=$run-src" -e HIVEPAAS_STANDBY_NAME=src-r1 \
+    -e HIVEPAAS_STANDBY_PASSWORD_FILE=/run/secrets/hivepaas-replication/password \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+  if ! wait_ready replica; then
+    fail "the replica starts"
+    return
+  fi
+  docker logs "$run-replica" > "$work/job.log" 2>&1
+  check "it is seeded from the archive" grep -q "Seeding the replica from the archive" "$work/job.log"
+  check "it is a standby" test "$(psql_in replica "select pg_is_in_recovery()")" = t
+  check "health: healthy" docker exec "$run-replica" /opt/hivepaas/bin/walg-entrypoint health
+  : > "$work/job.log"
+  psql_in src "insert into t (id) values (7000)"
+  check "it follows the primary" replica_follows replica 7000 30
+  check "it streams" test "$(psql_in src \
+    "select state from pg_stat_replication where application_name = 'src-r1'")" = streaming
+  check "its passfile is not on the data volume" bash -c \
+    "! docker exec $run-replica grep -rqs $password $data_mount"
+  job_env=()
+  check "walg-health: healthy" job src walg-health
+  check "walg-health: lists the replica, streaming" grep -qE '(^| )src-r1@streaming@[0-9]+@' <<<"$(output REPLICAS)"
+  check "it archives nothing" test "$(psql_in replica "select archived_count from pg_stat_archiver")" = 0
+
+  docker restart "$run-replica" >/dev/null
+  wait_ready replica || true
+  check "restarted, it is still a standby" test "$(psql_in replica "select pg_is_in_recovery()" 2>/dev/null)" = t
+  psql_in src "insert into t (id) values (7001)"
+  check "and follows the primary again" replica_follows replica 7001 30
+  docker rm -fv "$run-replica" >/dev/null
+
+  # A replica it cannot seed idles: it never starts a database of its own.
+  start_db replica-unseeded "walg/nothing-here-$major" "$work/secrets-src" \
+    -v "$secret:/run/secrets/hivepaas-replication/password:ro" \
+    -e "HIVEPAAS_STANDBY_HOST=$run-src" -e HIVEPAAS_STANDBY_PASSWORD_FILE=/run/secrets/hivepaas-replication/password \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+  for _ in $(seq 30); do
+    docker logs "$run-replica-unseeded" 2>&1 | grep -q "idles rather than start empty" && break
+    sleep 1
+  done
+  check "a replica with no base backup to seed from idles" bash -c \
+    "docker logs $run-replica-unseeded 2>&1 | grep -q 'idles rather than start empty'"
+  check "and starts no database" bash -c \
+    "! docker exec $run-replica-unseeded sh -c 'test -s \"\$PGDATA/PG_VERSION\"'"
+  docker rm -fv "$run-replica-unseeded" >/dev/null
+  psql_in src "delete from t where id >= 7000"
+}
+
 test_removed_segment() {
   say "a WAL segment gone from the archive"
   local start segment
@@ -410,6 +487,7 @@ print(next(v['image'] for v in d['versions'] if v['name']==sys.argv[2]))" "$temp
     test_verifier
     test_restores
     test_passthrough
+    test_standby
     test_retention
     test_removed_segment
   fi

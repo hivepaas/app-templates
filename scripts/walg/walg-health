@@ -42,6 +42,15 @@ out PG_WAL_BYTES "$pg_wal_bytes"
 out DB_BYTES "$db_bytes"
 out FREE_BYTES "$free_bytes"
 out READY_COUNT "$ready"
+# The replicas streaming from it, space-separated name@state@bytes@seconds: how far
+# behind each has replayed, in WAL and in time; the time is empty while nothing is
+# written.
+replicas=$(sql "
+  select coalesce(string_agg(format('%s@%s@%s@%s', application_name, state,
+    coalesce(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)::bigint, -1),
+    coalesce(round(extract(epoch from replay_lag)::numeric, 1)::text, '')), ' ' order by application_name), '')
+  from pg_stat_replication where not pg_is_in_recovery()")
+out REPLICAS "$replicas"
 printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pgWalBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
   "$state" "$last_archived_at" "$failed_count" "$ready" "$pg_wal_bytes" "$db_bytes" "$free_bytes"
 if [ "$state" != ok ]; then

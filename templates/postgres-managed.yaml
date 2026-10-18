@@ -164,6 +164,8 @@ app:
           # pg_host is the server the scripts ask: the local one, or the live database
           # a verifier's restore test makes its restore point on.
           pg_host=/var/run/postgresql
+          # replication_user is the role a database's replicas stream as.
+          replication_user=hivepaas_replica
 
           # out KEY VALUE: one of the run's outputs, the engine's to read.
           out() {
@@ -395,6 +397,15 @@ app:
           out DB_BYTES "$db_bytes"
           out FREE_BYTES "$free_bytes"
           out READY_COUNT "$ready"
+          # The replicas streaming from it, space-separated name@state@bytes@seconds: how far
+          # behind each has replayed, in WAL and in time; the time is empty while nothing is
+          # written.
+          replicas=$(sql "
+            select coalesce(string_agg(format('%s@%s@%s@%s', application_name, state,
+              coalesce(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)::bigint, -1),
+              coalesce(round(extract(epoch from replay_lag)::numeric, 1)::text, '')), ' ' order by application_name), '')
+            from pg_stat_replication where not pg_is_in_recovery()")
+          out REPLICAS "$replicas"
           printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pgWalBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
             "$state" "$last_archived_at" "$failed_count" "$ready" "$pg_wal_bytes" "$db_bytes" "$free_bytes"
           if [ "$state" != ok ]; then
@@ -544,6 +555,11 @@ app:
           # the source's archive, writes the recovery settings, and runs the server through
           # the recovery, its log kept, to tell a recovery that failed from a restart.
           # After one that failed, it idles, so that status can say why.
+          #   A replica (§9) is a standby of the primary HIVEPAAS_STANDBY_HOST names: seeded
+          # from the archive's latest base backup, never from an empty directory, then
+          # streaming as $replication_user, the archive its fallback. Its password is the
+          # file HIVEPAAS_STANDBY_PASSWORD_FILE names, written for libpq to a passfile in
+          # memory at each start; HIVEPAAS_STANDBY_NAME is what the primary knows it by.
           #   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
           #     starts or recovers, 1 when the recovery failed, having printed why.
           #   walg-entrypoint health: the container's health check, healthy while it
@@ -560,6 +576,9 @@ app:
             echo "$1" > "$state_dir/state.new" && mv "$state_dir/state.new" "$state_dir/state"
           }
           restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
+          standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+          # A passfile in memory: the password is never on the data volume.
+          passfile=/dev/shm/hivepaas-standby.pgpass
 
           status() {
             case $(state) in
@@ -582,6 +601,9 @@ app:
           health() {
             if restoring; then
               case $(state) in fetching | recovering | failed) exit 0 ;; esac
+            fi
+            if standby; then
+              case $(state) in standby-fetching | standby-failed) exit 0 ;; esac
             fi
             exec pg_isready -h "$pg_host" -U "$pg_user" -d "${POSTGRES_DB:-postgres}"
           }
@@ -641,6 +663,35 @@ app:
             idle
           }
 
+          # standby_setup: the passfile, the data seeded from the archive when there is
+          # none, and the standby's settings, written again at each start: the primary
+          # named may have moved.
+          standby_setup() {
+            local password
+            password=$(cat "${HIVEPAAS_STANDBY_PASSWORD_FILE:?a replica needs the replication password}") || return 1
+            (umask 077 && printf '%s:5432:*:%s:%s\n' "$HIVEPAAS_STANDBY_HOST" "$replication_user" "$password" > "$passfile")
+            chown postgres:postgres "$passfile"
+            if [ "$(state)" = standby-fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
+              set_state standby-fetching
+              mkdir -p "$PGDATA"
+              find "$PGDATA" -mindepth 1 -delete
+              chown postgres:postgres "$PGDATA"
+              chmod 700 "$PGDATA"
+              echo "Seeding the replica from the archive's latest base backup..."
+              gosu postgres "$bin/walg-run" backup-fetch "$PGDATA" LATEST || return 1
+            fi
+            clear_recovery "$PGDATA"
+            {
+              echo "primary_conninfo = 'host=$HIVEPAAS_STANDBY_HOST port=5432 user=$replication_user passfile=$passfile \
+          application_name=${HIVEPAAS_STANDBY_NAME:-replica}'"
+              echo "restore_command = '$bin/walg-fetch %f %p'"
+              echo "recovery_target_timeline = 'latest'"
+            } >> "$PGDATA/postgresql.auto.conf"
+            touch "$PGDATA/standby.signal"
+            chown postgres:postgres "$PGDATA/postgresql.auto.conf" "$PGDATA/standby.signal"
+            set_state standby
+          }
+
           # checkpoint_once: one CHECKPOINT, once the server is up. After a start PostgreSQL
           # forces no segment switch until its first checkpoint, checkpoint_timeout later, so
           # archive_timeout would only hold from then. It waits for the server itself, not
@@ -675,6 +726,15 @@ app:
             health) health ;;
           esac
 
+          # A replica never starts from an empty directory: one it cannot seed idles.
+          if standby; then
+            if ! standby_setup; then
+              set_state standby-failed
+              echo "The replica could not be seeded from the archive; it idles rather than start empty." >&2
+              idle
+            fi
+            serve "$@"
+          fi
           if ! restoring; then serve "$@"; fi
           case $(state) in
             failed)
@@ -693,5 +753,35 @@ app:
           recover "$@"
         swarmRef:
           file: {name: /opt/hivepaas/bin/walg-entrypoint, mode: 555}
+      walg-replication:
+        content: |
+          #!/bin/bash
+          # walg-replication: lets the database's replicas in. It reads the replication
+          # role's password on stdin - never an argument, never the environment - makes the
+          # role with it, or gives the role it; adds the pg_hba.conf line that lets the role
+          # replicate, once; and reloads. It runs again as it is, the password changed or
+          # not.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          IFS= read -r password || true
+          if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+            echo "walg-replication: the password must be 16 to 128 letters and digits, on stdin" >&2
+            exit 2
+          fi
+          hba=$(sql "show hba_file")
+          line="host replication $replication_user all scram-sha-256"
+          if ! grep -qxF "$line" "$hba"; then printf '%s\n' "$line" >> "$hba"; fi
+          # The password reaches psql on its stdin: it is in no process's arguments.
+          printf '%s\n' \
+            "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$replication_user') THEN" \
+            "  CREATE ROLE $replication_user WITH REPLICATION LOGIN; END IF; END \$\$;" \
+            "ALTER ROLE $replication_user WITH REPLICATION LOGIN PASSWORD '$password';" \
+            "SELECT pg_reload_conf();" |
+            psql -h "$pg_host" -U "$pg_user" -d postgres -XAtq -v ON_ERROR_STOP=1 >/dev/null
+          echo "Replicas may connect as $replication_user."
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-replication, mode: 555}
     routing:
       port: 5432
