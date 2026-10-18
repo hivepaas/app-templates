@@ -13,7 +13,7 @@ template="$(cd "$dir/../.." && pwd)/templates/postgres-managed.yaml"
 
 # In the order they appear in the template. walg-lib is sourced, not run.
 scripts=(walg-lib walg-run walg-fetch walg-nightly walg-health walg-mark walg-restore-test walg-entrypoint
-  walg-replication)
+  walg-replication walg-promote)
 
 render() {
   # $(...) drops the files' trailing newlines; each block below ends its own lines.

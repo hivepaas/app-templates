@@ -1,0 +1,35 @@
+#!/bin/bash
+# walg-promote: promotes the replica it runs in to the cluster's primary, once the
+# primary it followed is fenced. It leaves a marker on the data volume, so that the
+# server starts as the primary from then on, whatever the standby variables say;
+# and it runs again as it is. It exits 0 once the server is the primary, 3 when it
+# certainly is not - nothing was promoted - and 1 when that is not known.
+set -uo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+promoted() {
+  touch "$(promoted_marker)" && chown postgres:postgres "$(promoted_marker)"
+  echo "Promoted: this server is the primary, on timeline $(sql "select timeline_id from pg_control_checkpoint()")."
+  exit 0
+}
+
+case $(sql "select pg_is_in_recovery()" 2>/dev/null) in
+  f) promoted ;;
+  t) ;;
+  *)
+    echo "walg-promote: the server does not answer; nothing was promoted" >&2
+    exit 3
+    ;;
+esac
+echo "Promoting the standby..."
+if [ "$(sql "select pg_promote(true, 60)" 2>/dev/null)" = t ]; then promoted; fi
+case $(sql "select pg_is_in_recovery()" 2>/dev/null) in
+  f) promoted ;;
+  t)
+    echo "walg-promote: the server is still a standby; nothing was promoted" >&2
+    exit 3
+    ;;
+esac
+echo "walg-promote: whether the server was promoted is not known; run it again" >&2
+exit 1
