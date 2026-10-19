@@ -404,6 +404,11 @@ test_restores() {
   restore restored-backup backup
   check "backup: holds the 10 rows of the base backup" test "$restored_rows" = 10
   restore restored-missing missing
+
+  # The state of a restore before, on the volume, is not this one's.
+  restore restored-reused time
+  restore restored-reused latest
+  check "latest, into a volume restored to a time before: holds the 40 rows" test "$restored_rows" = 40
 }
 
 test_passthrough() {
@@ -420,7 +425,38 @@ test_passthrough() {
     "test \"\$(docker exec $run-plain stat -c %U /var/lib/mysql/hivepaas-archive.state)\" = mysql"
   docker restart "$run-plain" >/dev/null
   check "restarted, it starts again" wait_ready plain
-  docker rm -fv "$run-plain" >/dev/null
+
+  # A second container on its volume, as a rollout's next task can be before the
+  # last one has stopped: one server at a time.
+  local code
+  check "a process of its own holds the data lock" bash -c "docker exec $run-plain sh -c \
+    'ls -l /proc/\$(pgrep -f ^hivepaas-data-lock)/fd' | grep hivepaas-server.lock >/dev/null"
+  twin twin-late -e HIVEPAAS_DATA_LOCK_TIMEOUT=3
+  code=$(timeout 60 docker wait "$run-twin-late" 2>/dev/null || echo running)
+  docker logs "$run-twin-late" > "$work/job.log" 2>&1
+  check "a second server beside it gives up after its wait" test "$code" = 1
+  check "saying so" grep -q "another server still runs on this volume" "$work/job.log"
+  : > "$work/job.log"
+  twin twin
+  sleep 5
+  docker logs "$run-twin" > "$work/job.log" 2>&1
+  check "a second server waits for the first" grep -q "waiting for it to stop" "$work/job.log"
+  : > "$work/job.log"
+  check "and starts none meanwhile" bash -c "! docker exec $run-twin pidof mariadbd >/dev/null"
+  docker stop "$run-plain" >/dev/null
+  check "it starts once the first has stopped" wait_ready twin
+  docker rm -fv "$run-twin" "$run-twin-late" "$run-plain" >/dev/null
+}
+
+# twin NAME [docker options...]: a second database on plain's volume.
+twin() {
+  local name=$1
+  shift
+  local -a env
+  mapfile -t env < <(archive_env "walg/plain-$version")
+  docker run -d --init --label "$run" --label "$run-db" --name "$run-$name" --network "$run" \
+    -v "$run-plain:/var/lib/mysql" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$work/secrets-plain:/run/secrets/walg:ro" \
+    "${env[@]}" "$@" --entrypoint /opt/hivepaas/bin/walg-entrypoint "$image" "${server_args[@]}" >/dev/null
 }
 
 test_fresh_start() {
