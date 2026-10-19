@@ -115,9 +115,9 @@ parameters:
 
 versions:
   - name: "0.71"
-    release: "0.71.0"
+    release: "0.71.1"
     default: true
-    image: fatedier/frps:v0.71.0
+    image: fatedier/frps:v0.71.1
 
 app:
   deployment:

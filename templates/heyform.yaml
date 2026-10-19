@@ -150,9 +150,9 @@ dependencies:
 
 versions:
   - name: "3.0"
-    release: "3.0.3"
+    release: "3.0.4"
     default: true
-    image: heyform/community-edition:v3.0.3
+    image: heyform/community-edition:v3.0.4
 
 app:
   deployment:

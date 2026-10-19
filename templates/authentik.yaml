@@ -115,9 +115,9 @@ dependencies:
 
 versions:
   - name: "2026.8"
-    release: "2026.8.3"
+    release: "2026.8.4"
     default: true
-    image: ghcr.io/goauthentik/server:2026.8.3
+    image: ghcr.io/goauthentik/server:2026.8.4
 
 app:
   deployment:
