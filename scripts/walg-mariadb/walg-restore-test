@@ -1,0 +1,90 @@
+#!/bin/bash
+# walg-restore-test: proves the archive restores (HivePaaS's managed templates
+# design, §5). It marks a point on the live database, its binary log archived;
+# restores the latest base backup before it into a scratch directory; starts a
+# second server on that copy - on a socket of its own, with no binary log, so
+# that it never writes to the archive - and replays the archived logs into it,
+# to the point; and checks what it reached. In a verifier, the live database is
+# at HIVEPAAS_RESTORE_SOURCE_HOST and the scratch directory is under
+# HIVEPAAS_RESTORE_SCRATCH_DIR, on the verifier's own volume.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+start_timeout=${HIVEPAAS_RESTORE_TEST_TIMEOUT:-21600}
+scratch=${HIVEPAAS_RESTORE_SCRATCH_DIR:-$data_root}/hivepaas-restore-test
+copy_socket=/run/mysqld/hivepaas-restore-test.sock
+log=$scratch/server.log
+copy_pid=""
+
+stop_copy() {
+  if [ -n "$copy_pid" ] && kill -0 "$copy_pid" 2>/dev/null; then
+    as_mysql mariadb-admin --protocol=socket -S "$copy_socket" -umysql shutdown >/dev/null 2>&1 ||
+      kill "$copy_pid" 2>/dev/null || true
+    wait "$copy_pid" 2>/dev/null || true
+  fi
+  rm -rf "$scratch"
+}
+trap stop_copy EXIT
+
+# 1. The point, on the live database, its binary log archived.
+timeout=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
+code=0
+mark_point $((3 * timeout)) || code=$?
+if [ "$code" != 0 ]; then
+  echo "The point's binary log, $point_file, was not archived: archiving is failing" >&2
+  exit 1
+fi
+point=$point_file:$point_offset
+echo "Marked $point ($point_gtid)."
+
+# 2. Room for the copy, and room to replay into it.
+db_bytes=$(sql "select coalesce(sum(data_length + index_length), 0) from information_schema.tables")
+stop_copy
+mkdir -p "$scratch/data"
+free_bytes=$(df -B1 --output=avail "$scratch" | tail -n 1 | tr -d ' ')
+if [ "$free_bytes" -lt $((db_bytes * 12 / 10)) ]; then
+  echo "Not enough room to restore into: $free_bytes bytes free beside a database of $db_bytes" >&2
+  exit 1
+fi
+
+# 3. The latest base backup before the point.
+started=$(date +%s)
+backup=$(backup_before "$point_at")
+echo "Restoring $backup into $scratch..."
+chown -R mysql:mysql "$scratch"
+HIVEPAAS_RESTORE_DIR=$scratch/data "$bin/walg-run" backup-fetch "$backup"
+
+# 4. A second server on the copy, which writes no binary log.
+as_mysql mariadbd --datadir="$scratch/data" --socket="$copy_socket" --pid-file="$scratch/server.pid" \
+  --log-error="$log" --skip-networking --skip-log-bin --innodb-buffer-pool-size=64M &
+copy_pid=$!
+deadline=$(($(date +%s) + start_timeout))
+until sql "select 1" "$copy_socket" >/dev/null 2>&1; do
+  if ! kill -0 "$copy_pid" 2>/dev/null; then
+    echo "The copy stopped before it answered:" >&2
+    tail -n 20 "$log" >&2
+    exit 1
+  fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "The copy has not answered in ${start_timeout}s" >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+# 5. Replayed to the point.
+"$bin/walg-replay" --since "$backup" --position "$point" --datadir "$scratch/data" --socket "$copy_socket" \
+  --work "$scratch/binlogs"
+duration=$(($(date +%s) - started))
+
+# 6. What it reached.
+sql "select count(*) from mysql.user" "$copy_socket" >/dev/null
+if [ -n "${HIVEPAAS_RESTORE_CHECK_QUERY:-}" ]; then
+  echo "Checking: $HIVEPAAS_RESTORE_CHECK_QUERY"
+  as_mysql mariadb --protocol=socket -S "$copy_socket" -umysql -N -B "${MARIADB_DATABASE:-mysql}" \
+    -e "$HIVEPAAS_RESTORE_CHECK_QUERY"
+fi
+out RESTORED_TO "$point"
+out DURATION_SECONDS "$duration"
+echo "Restored to $point in ${duration}s."

@@ -35,11 +35,16 @@ jobs:
         working-directory: hivepaas
         run: go run ./tools/apptemplate index -check ../app-templates
 
-      # The managed template's config files are its scripts, which live in
-      # scripts/walg and are copied into it by generate.sh.
+      # The managed templates' config files are their scripts, which live in
+      # scripts/walg and scripts/walg-mariadb and are copied into them by each
+      # directory's generate.sh.
       - name: Check postgres-managed is made from scripts/walg
         working-directory: app-templates
         run: scripts/walg/generate.sh -check
+
+      - name: Check mariadb-managed is made from scripts/walg-mariadb
+        working-directory: app-templates
+        run: scripts/walg-mariadb/generate.sh -check
 
   # Every installation of a channel reads the templates the channel pins, whatever
   # release it runs. So each release still supported lints - with its own code,

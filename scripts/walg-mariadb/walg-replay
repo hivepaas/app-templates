@@ -1,0 +1,73 @@
+#!/bin/bash
+# walg-replay [--source] --since BACKUP [--until TIME | --position FILE:OFFSET]
+#             [--datadir DIR] [--socket SOCKET] [--work DIR]
+# Replays the binary logs archived since the base backup BACKUP into the server
+# on SOCKET, whose data directory DIR was fetched from that backup: from where
+# the backup stopped - the position it recorded beside the data - to TIME (RFC
+# 3339), to FILE:OFFSET, or to the last log archived. WAL-G's own binlog-replay
+# starts every log at its beginning, and the first one holds what the backup
+# already has. The logs are fetched into the work directory, on the data volume
+# unless DIR names another, and each goes once it is replayed.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+source_flag=() since="" until="" position="" dir=$datadir sock=$socket work=$data_root/hivepaas-replay
+while [ $# -gt 0 ]; do
+  case $1 in
+    --source) source_flag=(--source) ;;
+    --since) since=$2; shift ;;
+    --until) until=$2; shift ;;
+    --position) position=$2; shift ;;
+    --datadir) dir=$2; shift ;;
+    --socket) sock=$2; shift ;;
+    --work) work=$2; shift ;;
+    *) echo "walg-replay: unknown argument $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+[ -n "$since" ] || { echo "usage: walg-replay [--source] --since BACKUP [--until TIME | --position FILE:OFFSET]" >&2; exit 2; }
+
+# The backup's position: MariaDB 11 names the file mariadb_backup_binlog_info,
+# 10.x xtrabackup_binlog_info.
+info=$dir/mariadb_backup_binlog_info
+[ -f "$info" ] || info=$dir/xtrabackup_binlog_info
+read -r start_file start_pos _ < "$info"
+stop_file="" stop_pos=""
+if [ -n "$position" ]; then
+  stop_file=${position%%:*}
+  stop_pos=${position#*:}
+fi
+stop_time=""
+if [ -n "$until" ]; then stop_time=$(date -u -d "$until" '+%Y-%m-%d %H:%M:%S'); fi
+
+rm -rf "$work"
+mkdir -p "$work"
+trap 'rm -rf "$work"' EXIT
+if [ "$(id -u)" = 0 ]; then chown mysql:mysql "$work"; fi
+# WAL-G fetches the logs uploaded up to the time given, and the one after it: the
+# log a time falls in is uploaded after that time.
+fetch_until=${until:-$(date -u -d '+1 minute' +%Y-%m-%dT%H:%M:%SZ)}
+WALG_MYSQL_BINLOG_DST=$work "$bin/walg-run" "${source_flag[@]}" binlog-fetch --since "$since" --until "$fetch_until"
+
+# A point in a log the archive does not have is not reached: nothing is replayed.
+if [ -n "$stop_file" ] && ! grep -x "$stop_file" "$work/binlogs_order" >/dev/null 2>&1; then
+  echo "The archive has no $stop_file: the point's binary log is not archived" >&2
+  exit 1
+fi
+replayed=0
+while read -r file; do
+  if [[ $file < $start_file ]]; then continue; fi
+  if [ -n "$stop_file" ] && [[ $file > $stop_file ]]; then break; fi
+  opts=()
+  if [ "$file" = "$start_file" ]; then opts+=("--start-position=$start_pos"); fi
+  if [ -n "$stop_time" ]; then opts+=("--stop-datetime=$stop_time"); fi
+  if [ "$file" = "$stop_file" ]; then opts+=("--stop-position=$stop_pos"); fi
+  echo "Replaying $file ${opts[*]}"
+  TZ=UTC as_mysql mariadb-binlog "${opts[@]}" "$work/$file" |
+    as_mysql mariadb --protocol=socket -S "$sock" -umysql
+  rm -f "$work/$file"
+  replayed=$((replayed + 1))
+  if [ "$file" = "$stop_file" ]; then break; fi
+done < <(cat "$work/binlogs_order" 2>/dev/null || true)
+echo "Replayed $replayed binary log(s) since $since."

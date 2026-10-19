@@ -1,0 +1,42 @@
+#!/bin/bash
+# walg-run [--source] ARGS...: wal-g ARGS, as the mysql user, with the archive's
+# keys exported for it alone - they are files, never the container's
+# environment. With --source, the archive is the one a restored database is
+# restored from: its settings are the HIVEPAAS_RESTORE_-prefixed variables, its
+# keys in HIVEPAAS_RESTORE_SECRETS_DIR.
+#   WAL-G reaches the server on its socket as mysql@localhost, by the socket's
+# credentials; mariadb-backup does the same. A base backup is fetched into
+# HIVEPAAS_RESTORE_DIR, the data directory unless a restore test names another.
+set -euo pipefail
+dir=${HIVEPAAS_WALG_SECRETS_DIR:-/run/secrets/walg}
+if [ "${1:-}" = --source ]; then
+  shift
+  dir=${HIVEPAAS_RESTORE_SECRETS_DIR:?this database is not being restored}
+  unset WALG_S3_PREFIX WALG_FILE_PREFIX AWS_ENDPOINT AWS_REGION AWS_S3_FORCE_PATH_STYLE
+  for var in $(compgen -e); do
+    case $var in
+      HIVEPAAS_RESTORE_WALG_* | HIVEPAAS_RESTORE_AWS_*) export "${var#HIVEPAAS_RESTORE_}=${!var}" ;;
+    esac
+  done
+fi
+for file in "$dir"/*; do
+  [ -f "$file" ] || continue
+  name=$(basename "$file")
+  case $name in
+    WALG_AWS_*) name=${name#WALG_} ;;
+  esac
+  export "$name=$(cat "$file")"
+done
+socket=${HIVEPAAS_SOCKET:-/run/mysqld/mysqld.sock}
+target=${HIVEPAAS_RESTORE_DIR:-/var/lib/mysql/data}
+export WALG_MYSQL_DATASOURCE_NAME="mysql@unix($socket)/mysql"
+export WALG_STREAM_CREATE_COMMAND="mariadb-backup --backup --stream=xbstream --user=mysql --socket=$socket --datadir=/var/lib/mysql/data"
+export WALG_STREAM_RESTORE_COMMAND="mbstream -x -C $target"
+export WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariadb-backup --prepare --target-dir=$target"
+export WALG_MYSQL_BINLOG_DST=${WALG_MYSQL_BINLOG_DST:-/tmp/hivepaas-binlogs}
+# WAL-G keeps what it pushed in a cache under HOME; the mysql user has none.
+export HOME=/tmp
+if [ "$(id -u)" = 0 ]; then
+  exec gosu mysql /opt/hivepaas/bin/wal-g "$@"
+fi
+exec /opt/hivepaas/bin/wal-g "$@"

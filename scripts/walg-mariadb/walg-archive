@@ -1,0 +1,89 @@
+#!/bin/bash
+# walg-archive loop | once: archives the binary logs, as archive_command and
+# archive_timeout do for PostgreSQL - MariaDB has neither, and rotates a log
+# only when it is full. Each pass, once the server answers: when the active log
+# has events past where the last flush left it, FLUSH BINARY LOGS closes it;
+# binlog-push uploads every closed log; and the logs before the active one,
+# now archived, are purged from the server. A pass records how it went in the
+# archive state, which walg-health reads. loop runs a pass every
+# HIVEPAAS_ARCHIVE_TIMEOUT seconds (60) for as long as the container lives;
+# walg-entrypoint starts it beside the server.
+set -uo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+interval=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
+state=$(archive_state)
+
+get() { sed -n "s/^$1=//p" "$state" 2>/dev/null | tail -n 1; }
+put() { # put KEY=VALUE...: the state with those keys replaced, written whole
+  local tmp=$state.new kv
+  {
+    grep -vE "^($(printf '%s|' "${@%%=*}" | sed 's/|$//'))=" "$state" 2>/dev/null || true
+    for kv in "$@"; do echo "$kv"; done
+  } > "$tmp" && mv "$tmp" "$state"
+}
+
+pass() {
+  local status file offset flushed
+  if ! status=$(binlog_status 2>/dev/null) || [ -z "$status" ]; then
+    return 0 # not up yet, or still initializing: nothing to archive
+  fi
+  file=${status% *}
+  offset=${status#* }
+  flushed=$(get FLUSHED_AT)
+  # The active log has events when it is longer than one just flushed is. One the
+  # server only rotated to, or opened as it started, is not, and stays open.
+  if [ -z "$flushed" ] || [ "$offset" -gt "${flushed#* }" ]; then
+    if ! sql "flush binary logs" >/dev/null; then
+      fail "flushing the binary log failed"
+      return 1
+    fi
+    status=$(binlog_status)
+    file=${status% *}
+    put "FLUSHED_AT=$status"
+  fi
+  # A pass that cannot reach the archive fails at once, for the next to try
+  # again: WAL-G's own retries would hold it, and the lock, for many minutes.
+  if ! WALG_S3_MAX_RETRIES=3 "$bin/walg-run" binlog-push >/dev/null 2>"$state.err"; then
+    fail "binlog-push failed: $(grep -m1 ERROR "$state.err" | cut -c1-300)"
+    return 1
+  fi
+  # Everything before the active log is archived: the server keeps no copy.
+  sql "purge binary logs to '$file'" >/dev/null || true
+  put "LAST_SUCCESS=$(date +%s)" "FAILED_COUNT=0" "LAST_ERROR="
+  rm -f "$state.err"
+}
+
+fail() {
+  local count
+  count=$(get FAILED_COUNT)
+  put "FAILED_COUNT=$((${count:-0} + 1))" "LAST_ERROR=$1"
+  echo "walg-archive: $1" >&2
+}
+
+locked_pass() {
+  # One pass at a time with walg-mark's push: a purge never takes a log
+  # another push is reading.
+  local fd rc
+  exec {fd}>>"$(archive_lock)"
+  flock "$fd"
+  pass
+  rc=$?
+  exec {fd}>&-
+  return $rc
+}
+
+case ${1:-} in
+  once) locked_pass ;;
+  loop)
+    while :; do
+      sleep "$interval"
+      locked_pass || true
+    done
+    ;;
+  *)
+    echo "usage: walg-archive loop | once" >&2
+    exit 2
+    ;;
+esac

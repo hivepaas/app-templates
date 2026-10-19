@@ -1,0 +1,178 @@
+#!/bin/bash
+# walg-entrypoint [ARGS...]: a managed MariaDB's entrypoint. It starts the
+# archive loop (walg-archive) beside the server and hands over to the image's
+# own entrypoint, unless the database is a restore whose data is not there yet.
+# Then it fetches the base backup from the source's archive, starts the server on
+# its socket alone, replays the binary logs to the target, stops it, and serves.
+# After a restore that failed, it idles, so that status can say why.
+#   A restore is told by HIVEPAAS_RESTORE_SECRETS_DIR, with the source's archive
+# in the HIVEPAAS_RESTORE_-prefixed variables, and its target:
+#   HIVEPAAS_RESTORE_TARGET_BACKUP   the base backup to fetch, or else the latest
+#   HIVEPAAS_RESTORE_TARGET_BEFORE   that starts before this time (RFC 3339);
+#   HIVEPAAS_RESTORE_STOP_TIME       replay to this time (RFC 3339), or
+#   HIVEPAAS_RESTORE_STOP_POSITION   to this binary log position (FILE:OFFSET), or
+#   HIVEPAAS_RESTORE_REPLAY=none     replay nothing: the base backup as it is;
+#   none of these, to the last binary log archived.
+#   A binary log replay is not repeatable, as PostgreSQL's recovery is: a restore
+# stopped before it ended fetches the base backup again.
+#   A primary initializes an empty data directory only over an archive that holds
+# nothing. One that holds base backups or binary logs was written by this
+# database: initialized here, it would archive into that history. It idles
+# instead, saying why. An archive it cannot read within
+# HIVEPAAS_ARCHIVE_CHECK_TIMEOUT seconds (60) fails the start, for Swarm to start
+# it again.
+#   walg-entrypoint status: 0 once the server is up and serving, 75 while it
+#     starts or restores, 1 when the restore failed, having printed why.
+#   walg-entrypoint health: the container's health check, healthy while it
+#     restores and while it idles refused.
+set -uo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+restore_state=$data_root/hivepaas-restore.state
+log=$data_root/hivepaas-restore.log
+state() { cat "$restore_state" 2>/dev/null || true; }
+set_state() { echo "$1" > "$restore_state.new" && mv "$restore_state.new" "$restore_state"; }
+restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
+
+status() {
+  case $(state) in
+    failed)
+      # What the scripts and WAL-G said last, without the server's own lines,
+      # which start with their time.
+      echo "The restore failed:"
+      grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$log" | tail -n 5
+      exit 1
+      ;;
+    fetching | replaying) exit 75 ;;
+  esac
+  if sql "select 1" >/dev/null 2>&1; then exit 0; fi
+  exit 75
+}
+
+health() {
+  if [ -s "$(refusal_file)" ]; then exit 0; fi
+  if restoring; then
+    case $(state) in fetching | replaying | failed) exit 0 ;; esac
+  fi
+  sql "select 1" >/dev/null 2>&1
+}
+
+idle() {
+  trap 'exit 0' TERM INT
+  while :; do sleep 3600 & wait $!; done
+}
+
+# guard_fresh_start: what an empty data directory is initialized over. An archive
+# that holds anything refuses it, which the refusal file keeps for health and
+# walg-health; one that cannot be read fails the start.
+guard_fresh_start() {
+  local listed reason
+  if ! listed=$(timeout "${HIVEPAAS_ARCHIVE_CHECK_TIMEOUT:-60}" "$bin/walg-run" st ls 2>/dev/null); then
+    echo "walg-entrypoint: the archive could not be read, so whether it holds this database's history is" \
+      "not known: the start fails, to be tried again, rather than initialize the data directory" >&2
+    exit 1
+  fi
+  if grep -qE '(basebackups_005|binlog_005)/' <<<"$listed"; then
+    reason="The data directory is empty, and the archive at ${WALG_S3_PREFIX:-${WALG_FILE_PREFIX:-}} holds this"
+    reason+=" database's history: its data is lost, or on another volume than this one. The database is not"
+    reason+=" initialized afresh, which would archive into that history: restore it into a new app, or give it"
+    reason+=" its volume back."
+    echo "$reason" > "$(refusal_file)"
+    echo "walg-entrypoint: $reason" >&2
+    idle
+  fi
+}
+
+# serve ARGS...: the image's entrypoint, with the archive loop beside the server.
+# The loop runs detached twice, so that it is not the server's child once this
+# script has become the server.
+serve() {
+  local file
+  # The loop keeps its state beside the data directory, as the mysql user: on a
+  # volume that was not the image's, the mount point is root's.
+  for file in "$(archive_state)" "$(archive_lock)"; do
+    if [ ! -e "$file" ]; then touch "$file"; fi
+  done
+  chown mysql:mysql "$data_root" "$(archive_state)" "$(archive_lock)"
+  ( as_mysql "$bin/walg-archive" loop & )
+  exec docker-entrypoint.sh "$@"
+}
+
+fetch() {
+  local backup=${HIVEPAAS_RESTORE_TARGET_BACKUP:-}
+  set_state fetching
+  mkdir -p "$datadir"
+  find "$datadir" -mindepth 1 -delete
+  chown mysql:mysql "$data_root" "$datadir"
+  if [ -z "$backup" ]; then
+    backup=$(backup_before "$(date -u -d "${HIVEPAAS_RESTORE_TARGET_BEFORE:?a restore needs its target}" +%s)" \
+      --source) || return 1
+  fi
+  echo "$backup" > "$data_root/hivepaas-restore.backup"
+  echo "Fetching $backup from the source's archive..."
+  "$bin/walg-run" --source backup-fetch "$backup" || return 1
+  set_state replaying
+}
+
+# replay ARGS...: the server on its socket alone, the binary logs replayed into
+# it to the target, and the server stopped: the next start is an ordinary one.
+replay() {
+  local backup pid rc opts=()
+  backup=$(cat "$data_root/hivepaas-restore.backup")
+  if [ "${HIVEPAAS_RESTORE_REPLAY:-}" = none ]; then return 0; fi
+  as_mysql "$@" --skip-networking --socket="$socket" &
+  pid=$!
+  for _ in $(seq 300); do
+    if sql "select 1" >/dev/null 2>&1; then break; fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "The server stopped before it answered" >&2
+      return 1
+    fi
+    sleep 1
+  done
+  if [ -n "${HIVEPAAS_RESTORE_STOP_TIME:-}" ]; then opts+=(--until "$HIVEPAAS_RESTORE_STOP_TIME"); fi
+  if [ -n "${HIVEPAAS_RESTORE_STOP_POSITION:-}" ]; then opts+=(--position "$HIVEPAAS_RESTORE_STOP_POSITION"); fi
+  "$bin/walg-replay" --source --since "$backup" "${opts[@]}"
+  rc=$?
+  as_mysql mariadb-admin --protocol=socket -S "$socket" -umysql shutdown >/dev/null 2>&1 || kill "$pid"
+  wait "$pid"
+  return $rc
+}
+
+case ${1:-} in
+  status) status ;;
+  health)
+    health
+    exit
+    ;;
+esac
+
+if ! restoring; then
+  rm -f "$(refusal_file)"
+  if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then guard_fresh_start; fi
+  serve "$@"
+fi
+case $(state) in
+  failed)
+    echo "The restore failed before: see $log." >&2
+    idle
+    ;;
+  "done") serve "$@" ;;
+esac
+mkdir -p "$data_root"
+touch "$log"
+chown mysql:mysql "$log"
+if ! fetch >> "$log" 2>&1; then
+  set_state failed
+  echo "The base backup could not be fetched; the database idles so that its restore can say why." | tee -a "$log" >&2
+  idle
+fi
+if ! replay "$@" >> "$log" 2>&1; then
+  set_state failed
+  echo "The replay failed; the database idles so that its restore can say why." | tee -a "$log" >&2
+  idle
+fi
+set_state "done"
+echo "walg-entrypoint: restored; serving"
+serve "$@"
