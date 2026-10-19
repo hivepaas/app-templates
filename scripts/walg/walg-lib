@@ -24,6 +24,12 @@ promoted_marker() {
   echo "$(data_root)/hivepaas-promoted"
 }
 
+# refusal_file: where walg-entrypoint says why it would not initialize an empty
+# data directory, beside the data, for health and walg-health to tell.
+refusal_file() {
+  echo "$(data_root)/hivepaas-refused"
+}
+
 # rfc3339 EPOCH: that second, in UTC.
 rfc3339() {
   date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ

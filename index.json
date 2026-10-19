@@ -13935,7 +13935,7 @@
       "name": "postgres-managed",
       "file": {
         "path": "templates/postgres-managed.yaml",
-        "sha256": "9d53fb2dc108a754f06f9e197643e01e8b2e53cbb4649d0f5f18d073dce45016"
+        "sha256": "a1a2ab3d225b4cbc8726c5ce2f77cff373513d81ae62618ad3bb4f29472e72ba"
       },
       "icon": {
         "path": "icons/postgres.svg",
