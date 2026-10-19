@@ -465,6 +465,60 @@ test_standby() {
   psql_in src "delete from t where id >= 7000"
 }
 
+# base_backups NAME: how many base backups the archive NAME writes to holds.
+base_backups() {
+  docker exec "$run-$1" /opt/hivepaas/bin/walg-run backup-list --json 2>/dev/null | grep -o '"backup_name"' | wc -l
+}
+
+test_fresh_start() {
+  say "an empty data directory is initialized over an empty archive only"
+  local before
+  before=$(base_backups src)
+  # src's archive, as a database whose volume is lost - or a shared one that is not - sees it.
+  start_db lost "walg/src-$major" "$work/secrets-src" --entrypoint /opt/hivepaas/bin/walg-entrypoint -- \
+    "${server_args[@]}"
+  for _ in $(seq 60); do
+    docker logs "$run-lost" 2>&1 | grep -q "is not initialized afresh" && break
+    sleep 1
+  done
+  docker logs "$run-lost" > "$work/job.log" 2>&1
+  check "over an archive with history, it is not initialized" grep -q "is not initialized afresh" "$work/job.log"
+  check "it names the archive" grep -q "walg/src-$major holds this database's history" "$work/job.log"
+  : > "$work/job.log"
+  check "and initializes nothing" bash -c "! docker exec $run-lost sh -c 'test -s \"\$PGDATA/PG_VERSION\"'"
+  check "health: healthy while it idles" docker exec "$run-lost" /opt/hivepaas/bin/walg-entrypoint health
+  job_env=()
+  if job lost walg-health; then
+    fail "walg-health: fails"
+  else
+    pass "walg-health: fails"
+  fi
+  check "walg-health: says why" grep -q "The database is not started: The data directory is empty" "$work/job.log"
+  : > "$work/job.log"
+  check "the archive is as it was" test "$(base_backups src)" = "$before"
+  docker rm -fv "$run-lost" >/dev/null
+
+  # An archive it cannot read: the start fails, and nothing is initialized.
+  start_db unread "walg/src-$major" "$work/secrets-src" -e "AWS_ENDPOINT=http://$run-nowhere:8333" \
+    -e HIVEPAAS_ARCHIVE_CHECK_TIMEOUT=5 --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+  local code
+  code=$(timeout 60 docker wait "$run-unread" 2>/dev/null || echo running)
+  docker logs "$run-unread" > "$work/job.log" 2>&1
+  check "over an archive it cannot read, the start fails" test "$code" = 1
+  check "saying so" grep -q "the archive could not be read" "$work/job.log"
+  : > "$work/job.log"
+  check "and initializes nothing" bash -c "docker run --rm --entrypoint sh -v $run-unread:/v $image -c \
+    '! find /v -name PG_VERSION | grep -q .'"
+  docker rm -fv "$run-unread" >/dev/null
+
+  # An archive that holds nothing: a new database, initialized as any is.
+  start_db fresh "walg/fresh-$major" "$work/secrets-src" --entrypoint /opt/hivepaas/bin/walg-entrypoint -- \
+    "${server_args[@]}"
+  check "over an empty archive, a new database starts" wait_ready fresh
+  check "with no refusal beside its data" bash -c "! docker exec $run-fresh test -e $data_mount/hivepaas-refused"
+  docker rm -fv "$run-fresh" >/dev/null
+}
+
 # follows NAME TABLE ID SECONDS: the row ID is on NAME in time.
 follows() {
   for _ in $(seq "$4"); do
@@ -598,6 +652,7 @@ print(next(v['image'] for v in d['versions'] if v['name']==sys.argv[2]))" "$temp
     test_verifier
     test_restores
     test_passthrough
+    test_fresh_start
     test_standby
     test_retention
     test_promote

@@ -7,6 +7,12 @@ set -euo pipefail
 # shellcheck source=walg-lib
 . /opt/hivepaas/bin/walg-lib
 
+# A database walg-entrypoint would not initialize afresh runs no server: it says why.
+if [ -s "$(refusal_file)" ]; then
+  echo "The database is not started: $(cat "$(refusal_file)")" >&2
+  exit 1
+fi
+
 IFS='|' read -r last_archived failed_count last_failed timeout db_bytes < <(sql "
   select coalesce(extract(epoch from last_archived_time)::bigint::text, ''), failed_count,
     coalesce(last_failed_time > coalesce(last_archived_time, 'epoch'), false),

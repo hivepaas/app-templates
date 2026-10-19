@@ -183,6 +183,12 @@ app:
             echo "$(data_root)/hivepaas-promoted"
           }
 
+          # refusal_file: where walg-entrypoint says why it would not initialize an empty
+          # data directory, beside the data, for health and walg-health to tell.
+          refusal_file() {
+            echo "$(data_root)/hivepaas-refused"
+          }
+
           # rfc3339 EPOCH: that second, in UTC.
           rfc3339() {
             date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
@@ -367,6 +373,12 @@ app:
           set -euo pipefail
           # shellcheck source=walg-lib
           . /opt/hivepaas/bin/walg-lib
+
+          # A database walg-entrypoint would not initialize afresh runs no server: it says why.
+          if [ -s "$(refusal_file)" ]; then
+            echo "The database is not started: $(cat "$(refusal_file)")" >&2
+            exit 1
+          fi
 
           IFS='|' read -r last_archived failed_count last_failed timeout db_bytes < <(sql "
             select coalesce(extract(epoch from last_archived_time)::bigint::text, ''), failed_count,
@@ -570,6 +582,12 @@ app:
           #   A database HIVEPAAS_FENCED is set on is a primary another was promoted over:
           # it idles and never starts its server, whoever starts its service, so that no
           # two primaries write to the cluster's archive.
+          #   A primary initializes an empty data directory only over an archive that holds
+          # nothing. One that holds base backups or WAL was written by this database: its
+          # data is lost, or on another volume than this one - a "shared" one that is not.
+          # Initialized here, it would archive into that history: it idles instead, saying
+          # why. An archive it cannot read within HIVEPAAS_ARCHIVE_CHECK_TIMEOUT seconds
+          # (60) fails the start, for Swarm to start it again.
           #   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
           #     starts or recovers, 1 when the recovery failed, having printed why.
           #   walg-entrypoint health: the container's health check, healthy while it
@@ -610,7 +628,7 @@ app:
           }
 
           health() {
-            if fenced; then exit 0; fi
+            if fenced || [ -s "$(refusal_file)" ]; then exit 0; fi
             if restoring; then
               case $(state) in fetching | recovering | failed) exit 0 ;; esac
             fi
@@ -725,6 +743,27 @@ app:
             exit 0
           }
 
+          # guard_fresh_start: what an empty data directory is initialized over. An
+          # archive that holds anything refuses it, which the refusal file keeps for health
+          # and walg-health; one that cannot be read fails the start.
+          guard_fresh_start() {
+            local listed reason
+            if ! listed=$(timeout "${HIVEPAAS_ARCHIVE_CHECK_TIMEOUT:-60}" "$bin/walg-run" st ls 2>/dev/null); then
+              echo "walg-entrypoint: the archive could not be read, so whether it holds this database's history is" \
+                "not known: the start fails, to be tried again, rather than initialize the data directory" >&2
+              exit 1
+            fi
+            if grep -qE '(basebackups_005|wal_005)/' <<<"$listed"; then
+              reason="The data directory is empty, and the archive at ${WALG_S3_PREFIX:-${WALG_FILE_PREFIX:-}} holds this"
+              reason+=" database's history: its data is lost, or on another volume than this one. The database is not"
+              reason+=" initialized afresh, which would archive into that history: restore it into a new app, or give it"
+              reason+=" its volume back."
+              echo "$reason" > "$(refusal_file)"
+              echo "walg-entrypoint: $reason" >&2
+              idle
+            fi
+          }
+
           # serve ARGS...: the image's entrypoint, with one checkpoint once a server it
           # starts is up. The checkpoint runs detached twice, so that it is not the server's
           # child once this script has become the server.
@@ -756,7 +795,11 @@ app:
             fi
             serve "$@"
           fi
-          if ! restoring; then serve "$@"; fi
+          if ! restoring; then
+            rm -f "$(refusal_file)"
+            if [ "${1:-}" = postgres ] && [ ! -s "$PGDATA/PG_VERSION" ]; then guard_fresh_start; fi
+            serve "$@"
+          fi
           case $(state) in
             failed)
               echo "The recovery failed before: see $log." >&2
