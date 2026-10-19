@@ -83,12 +83,12 @@ versions:
     default: true
     image: mongo:8.2.12-noble
   - name: "8.0"
-    release: "8.0.32"
-    image: mongo:8.0.32-noble
+    release: "8.0.34"
+    image: mongo:8.0.34-noble
   # Supported until August 2027.
   - name: "7.0"
-    release: "7.0.43"
-    image: mongo:7.0.43-jammy
+    release: "7.0.45"
+    image: mongo:7.0.45-jammy
 
 app:
   deployment:

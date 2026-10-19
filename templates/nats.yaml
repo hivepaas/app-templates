@@ -67,9 +67,9 @@ parameters:
 
 versions:
   - name: "2.15"
-    release: "2.15.0"
+    release: "2.15.1"
     default: true
-    image: nats:2.15.0-alpine3.22
+    image: nats:2.15.1-alpine3.22
 
 app:
   deployment:

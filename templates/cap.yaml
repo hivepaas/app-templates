@@ -79,9 +79,9 @@ dependencies:
 
 versions:
   - name: "3.1"
-    release: "3.1.14"
+    release: "3.1.15"
     default: true
-    image: tiago2/cap:3.1.14@sha256:8a83e06c4fde9ada7cfe15528c79885bbdfdf886863fd97c02666e40014cfa9c
+    image: tiago2/cap:3.1.15
 
 app:
   deployment:
