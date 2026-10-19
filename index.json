@@ -9610,6 +9610,56 @@
       }
     },
     {
+      "name": "mariadb-managed",
+      "file": {
+        "path": "templates/mariadb-managed.yaml",
+        "sha256": "a82ea890f123c0486e786db553816b1b8cd9766404eddf746b0590e05f19e6ff"
+      },
+      "icon": {
+        "path": "icons/mariadb.svg",
+        "sha256": "89951d6e8abc9786602859be82605ba1b1a8003409eebf15037a5620e6ea2fd4"
+      },
+      "title": "MariaDB (managed)",
+      "tagline": "MariaDB that HivePaaS archives continuously and restores to any moment",
+      "categories": [
+        "databases/sql"
+      ],
+      "tags": [
+        "sql",
+        "relational",
+        "open-source",
+        "mysql-compatible",
+        "backup"
+      ],
+      "aliases": [
+        "mysql",
+        "pitr",
+        "wal-g"
+      ],
+      "license": "GPL-2.0",
+      "versions": [
+        {
+          "name": "11.8",
+          "release": "11.8.9",
+          "default": true
+        },
+        {
+          "name": "11.4",
+          "release": "11.4.13"
+        }
+      ],
+      "requires": {
+        "versionCode": "v000003",
+        "features": [
+          "managed-databases"
+        ]
+      },
+      "managed": "mariadb",
+      "stats": {
+        "added": "2026-10-19"
+      }
+    },
+    {
       "name": "mariadb-replica",
       "file": {
         "path": "templates/mariadb-replica.yaml",

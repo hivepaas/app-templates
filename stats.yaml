@@ -197,6 +197,7 @@ templates:
   mailpit: {added: "2026-09-18", stars: 10602}
   manticore: {added: "2026-09-21", stars: 12050}
   mariadb: {added: "2026-09-17", stars: 8350}
+  mariadb-managed: {added: "2026-10-19"}
   mariadb-replica: {added: "2026-09-20", stars: 8350}
   marimo: {added: "2026-09-30", stars: 23120}
   martin: {added: "2026-09-30", stars: 3988}
