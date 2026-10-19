@@ -1,0 +1,144 @@
+# What the walg-* scripts of the mariadb engine's API 1 share. Sourced, not run.
+# shellcheck shell=bash disable=SC2034 # what it sets is the scripts' that source it
+bin=/opt/hivepaas/bin
+# The data volume is mounted at data_root, and the server's data directory is
+# datadir below it: MariaDB takes every directory in its data directory for a
+# database, so what HivePaaS keeps beside the data - its state, a restore test's
+# scratch copy - is kept beside the data directory, not in it.
+data_root=/var/lib/mysql
+datadir=$data_root/data
+socket=/run/mysqld/mysqld.sock
+
+# as_mysql COMMAND...: COMMAND as the mysql user, the owner of the data. The
+# scripts reach the server as mysql@localhost, which the unix socket identifies:
+# no password is used, or kept anywhere.
+as_mysql() {
+  if [ "$(id -u)" = 0 ]; then
+    gosu mysql "$@"
+  else
+    "$@"
+  fi
+}
+
+# sql QUERY [SOCKET]: what the server answers, one row a line, fields split by
+# tabs. In a verifier, with no SOCKET, the server is the live database at
+# HIVEPAAS_RESTORE_SOURCE_HOST, reached as root: its password goes in an option
+# file in memory, never on the command line.
+sql() {
+  if [ -z "${2:-}" ] && [ -n "${HIVEPAAS_RESTORE_SOURCE_HOST:-}" ]; then
+    mariadb --defaults-extra-file="$(source_options)" -h "$HIVEPAAS_RESTORE_SOURCE_HOST" -N -B -e "$1"
+    return
+  fi
+  as_mysql mariadb --protocol=socket -S "${2:-$socket}" -umysql -N -B -e "$1"
+}
+
+# source_options: the option file a verifier reaches the live database with.
+source_options() {
+  local file=/dev/shm/hivepaas-source.cnf
+  if [ ! -s "$file" ]; then
+    (
+      umask 077
+      printf '[client]\nuser=root\npassword="%s"\n' "${MARIADB_ROOT_PASSWORD:?a verifier needs the live database root password}" > "$file"
+    )
+  fi
+  echo "$file"
+}
+
+# out KEY VALUE: one of the run's outputs, the engine's to read.
+out() {
+  if [ -n "${HIVEPAAS_OUTPUT:-}" ]; then printf '%s=%s\n' "$1" "$2" >> "$HIVEPAAS_OUTPUT"; fi
+}
+
+# rfc3339 EPOCH: that second, in UTC.
+rfc3339() {
+  date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
+}
+
+# refusal_file: where walg-entrypoint says why it would not initialize an empty
+# data directory, for health and walg-health to tell.
+refusal_file() {
+  echo "$data_root/hivepaas-refused"
+}
+
+# archive_state: the archive loop's last pass, KEY=VALUE lines: LAST_SUCCESS (an
+# epoch), FAILED_COUNT, LAST_ERROR, FLUSHED_AT (the binary log position just
+# after its last flush).
+archive_state() {
+  echo "$data_root/hivepaas-archive.state"
+}
+
+# archive_lock: held by whatever pushes or purges binary logs, so that a purge
+# never takes a log another push is reading.
+archive_lock() {
+  echo "$data_root/hivepaas-archive.lock"
+}
+
+# binlog_status: the active binary log and the offset of its end, "FILE OFFSET".
+binlog_status() {
+  sql "show master status" | awk 'NR == 1 {print $1, $2}'
+}
+
+# backups [--source]: every base backup, oldest first, a line each:
+# "name start-epoch compressed-bytes".
+backups() {
+  local json obj name start bytes
+  json=$("$bin/walg-run" "$@" backup-list --detail --json)
+  while IFS= read -r obj; do
+    name=$(sed -n 's/.*"backup_name":"\([^"]*\)".*/\1/p' <<<"$obj")
+    start=$(sed -n 's/.*"start_local_time":"\([^"]*\)".*/\1/p' <<<"$obj")
+    bytes=$(sed -n 's/.*"compressed_size":\([0-9]*\).*/\1/p' <<<"$obj")
+    if [ -n "$name" ] && [ -n "$start" ]; then echo "$name $(date -u -d "$start" +%s) ${bytes:-0}"; fi
+  done <<<"${json//'},{'/$'}\n{'}" | sort -k2,2n
+}
+
+# backup_before EPOCH [--source]: the latest base backup that starts before it.
+backup_before() {
+  local before=$1 name start bytes found=""
+  shift
+  while read -r name start bytes; do
+    if [ "$start" -le "$before" ]; then found=$name; fi
+  done < <(backups "$@")
+  if [ -z "$found" ]; then
+    echo "No base backup starts before $(rfc3339 "$before")" >&2
+    return 1
+  fi
+  echo "$found"
+}
+
+# archived_binlogs: the binary logs in the archive, by name; none when the
+# archive cannot be reached, which it says at once rather than after WAL-G's
+# own retries.
+archived_binlogs() {
+  WALG_S3_MAX_RETRIES=3 "$bin/walg-run" binlog-list --json 2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort
+}
+
+# mark_point SECONDS: the point the live database has reached, made restorable:
+# its binary log is closed and archived within SECONDS. It sets point_file,
+# point_offset, point_gtid and point_at; it returns 75 when the log was not
+# archived in time. On the database itself it archives the log; in a verifier,
+# which cannot, the live database's own archive loop does.
+mark_point() {
+  local deadline=$(($(date +%s) + $1)) status left
+  status=$(binlog_status)
+  point_file=${status% *}
+  point_offset=${status#* }
+  point_gtid=$(sql "select @@gtid_binlog_pos")
+  point_at=$(date +%s)
+  if [ -z "$point_file" ]; then
+    echo "The server writes no binary log" >&2
+    return 1
+  fi
+  if ! sql "flush binary logs" >/dev/null; then
+    echo "The binary log could not be closed" >&2
+    return 1
+  fi
+  while :; do
+    left=$((deadline - $(date +%s)))
+    if [ -z "${HIVEPAAS_RESTORE_SOURCE_HOST:-}" ] && [ "$left" -gt 0 ]; then
+      as_mysql timeout "$left" "$bin/walg-archive" once >/dev/null 2>&1 || true
+    fi
+    if archived_binlogs | grep -x "$point_file" >/dev/null; then return 0; fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then return 75; fi
+    sleep 2
+  done
+}

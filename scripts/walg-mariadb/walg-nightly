@@ -1,0 +1,81 @@
+#!/bin/bash
+# walg-nightly backup | retain [BACKUP]: the nightly job's two steps. backup takes
+# a base backup. retain deletes everything before BACKUP - the oldest the engine
+# keeps, for retainFull and the restore points kept; nothing without one - and
+# checks that the binary logs from the oldest base backup kept on have no gap.
+# Each prints the backups kept as its outputs.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+list_outputs() {
+  local list="" oldest="" name start bytes
+  while read -r name start bytes; do
+    list+="$name@$(rfc3339 "$start")@$bytes "
+    if [ -z "$oldest" ]; then oldest=$start; fi
+  done < <(backups)
+  out BACKUPS "${list% }"
+  if [ -n "$oldest" ]; then out OLDEST_BACKUP_AT "$(rfc3339 "$oldest")"; fi
+}
+
+# verify_chain: every binary log a restore of the oldest base backup kept
+# replays, one after another, to the last archived. A backup's binlog_start is
+# the last log archived when it started: it begins in a later one, and the
+# retention that keeps it may delete binlog_start itself.
+verify_chain() {
+  local start first prev name number missing=""
+  start=$("$bin/walg-run" backup-list --detail --json | grep -o '"binlog_start":"[^"]*"' | cut -d'"' -f4 |
+    sort | sed -n 1p || true)
+  if [ -z "$start" ]; then
+    echo "No base backup: no binary log chain to check."
+    return 0
+  fi
+  first=${start%.*}.$(printf '%06d' $((10#${start##*.} + 1)))
+  prev=$((10#${first##*.} - 1))
+  while read -r name; do
+    if [[ $name < $first ]]; then continue; fi
+    number=$((10#${name##*.}))
+    if [ "$number" != $((prev + 1)) ]; then
+      missing+=" ${name%.*}.$(printf '%06d' $((prev + 1)))"
+    fi
+    prev=$number
+  done < <(archived_binlogs)
+  if [ -n "$missing" ]; then
+    echo "The binary log chain is broken: the archive lacks${missing} and what follows each, to the next" \
+      "it has. A restore would stop there" >&2
+    return 1
+  fi
+  echo "The binary logs from $first on follow one another."
+}
+
+case ${1:-} in
+  backup)
+    echo "Taking a base backup of $datadir..."
+    "$bin/walg-run" backup-push
+    read -r name start bytes < <(backups | tail -n 1)
+    out BACKUP_NAME "$name"
+    out BACKUP_AT "$(rfc3339 "$start")"
+    out BACKUP_BYTES "$bytes"
+    echo "Took $name: $bytes bytes, compressed."
+    list_outputs
+    ;;
+  retain)
+    if [ -n "${2:-}" ]; then
+      if [[ ! $2 =~ ^stream_[0-9]{8}T[0-9]{6}Z$ ]]; then
+        echo "Not a base backup's name: $2" >&2
+        exit 2
+      fi
+      echo "Deleting the backups and binary logs before $2..."
+      "$bin/walg-run" delete before FIND_FULL "$2" --confirm
+    else
+      echo "Nothing to delete: there are not more base backups than are kept."
+    fi
+    list_outputs
+    echo "Checking the binary log chain..."
+    verify_chain
+    ;;
+  *)
+    echo "usage: walg-nightly backup | retain [BACKUP]" >&2
+    exit 2
+    ;;
+esac

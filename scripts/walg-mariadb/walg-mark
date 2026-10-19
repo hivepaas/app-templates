@@ -1,0 +1,27 @@
+#!/bin/bash
+# walg-mark NAME SECONDS: a restore point named NAME, at the end of what the
+# server has written. It closes the binary log the point is in and archives it,
+# waiting up to SECONDS for that: a point is restorable only once it is. It
+# prints POSITION=FILE:OFFSET, which is what a restore targets, and GTID=, the
+# server's position as GTID replication counts it; it exits 75 when the log was
+# not archived in time. MariaDB has no named restore points: the name is the
+# engine's, and the server keeps nothing of it.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+name=${1:?usage: walg-mark NAME SECONDS}
+seconds=${2:-120}
+if [[ ! $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$ ]]; then
+  echo "Not a restore point's name: $name" >&2
+  exit 2
+fi
+code=0
+mark_point "$seconds" || code=$?
+if [ "$code" = 75 ]; then
+  echo "The point is made, but $point_file, the binary log it is in, was not archived in ${seconds}s" >&2
+  exit 75
+fi
+if [ "$code" != 0 ]; then exit "$code"; fi
+echo "POSITION=$point_file:$point_offset"
+echo "GTID=$point_gtid"

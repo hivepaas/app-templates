@@ -1,0 +1,57 @@
+#!/bin/bash
+# walg-health: whether archiving keeps up. It fails when the archive loop's last
+# pass failed, or when none has succeeded for three archive timeouts. It prints
+# its reading as JSON, and the engine's outputs for Status.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+# A database walg-entrypoint would not initialize afresh runs no server: it says why.
+if [ -s "$(refusal_file)" ]; then
+  echo "The database is not started: $(cat "$(refusal_file)")" >&2
+  exit 1
+fi
+
+state=$(archive_state)
+get() { sed -n "s/^$1=//p" "$state" 2>/dev/null | tail -n 1; }
+timeout=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
+last_success=$(get LAST_SUCCESS)
+failed_count=$(get FAILED_COUNT)
+failed_count=${failed_count:-0}
+last_error=$(get LAST_ERROR)
+uptime=$(sql "show global status like 'Uptime'" | cut -f2)
+db_bytes=$(sql "select coalesce(sum(data_length + index_length), 0) from information_schema.tables")
+# The logs on the server are the ones not archived yet: the loop purges the rest.
+# All but the active one are closed, and wait for the next pass.
+logs=$(sql "show binary logs")
+pending_bytes=$(awk '{sum += $2} END {print sum + 0}' <<<"$logs")
+ready=$(($(grep -c . <<<"$logs" || true) - 1))
+if [ "$ready" -lt 0 ]; then ready=0; fi
+free_bytes=$(df -B1 --output=avail "$datadir" | tail -n 1 | tr -d ' ')
+now=$(date +%s)
+
+health=ok reason=""
+if [ "$failed_count" -gt 0 ]; then
+  health=failing reason="the last pass failed ($last_error), and none has succeeded since"
+elif [ -n "$last_success" ] && [ $((now - last_success)) -gt $((3 * timeout)) ]; then
+  health=failing reason="no pass has succeeded for $((now - last_success))s"
+elif [ -z "$last_success" ] && [ "$uptime" -gt $((3 * timeout)) ]; then
+  health=failing reason="no pass has succeeded in the ${uptime}s the server has been up"
+fi
+
+last_archived_at=""
+if [ -n "$last_success" ]; then last_archived_at=$(rfc3339 "$last_success"); fi
+out LAST_ARCHIVED_AT "$last_archived_at"
+out FAILED_COUNT "$failed_count"
+out PENDING_BYTES "$pending_bytes"
+out DB_BYTES "$db_bytes"
+out FREE_BYTES "$free_bytes"
+out READY_COUNT "$ready"
+# Replicas come in a later engine API.
+out REPLICAS ""
+printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pendingBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
+  "$health" "$last_archived_at" "$failed_count" "$ready" "$pending_bytes" "$db_bytes" "$free_bytes"
+if [ "$health" != ok ]; then
+  echo "Archiving is failing: $reason" >&2
+  exit 1
+fi

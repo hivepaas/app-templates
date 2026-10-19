@@ -1,0 +1,975 @@
+apiVersion: hivepaas.com/v1
+kind: AppTemplate
+
+metadata:
+  name: mariadb-managed
+  title: MariaDB (managed)
+  tagline: MariaDB that HivePaaS archives continuously and restores to any moment
+  description: |
+    MariaDB, looked after by HivePaaS: its binary logs are archived to object
+    storage every minute, so a failure loses about a minute of writes, not
+    everything since the last dump.
+
+    **This template sets up**
+
+    - a database, a user, and generated user and root passwords, on a persistent
+      data volume
+    - binary log archiving with [WAL-G](https://github.com/wal-g/wal-g), encrypted,
+      to an S3 repository or cloud storage you choose - or to a volume repository,
+      which is only as safe as that volume is apart from the database
+    - a nightly base backup with `mariadb-backup`, with retention, and a check that
+      the binary logs since have no gap
+    - an archive health check every five minutes, and a weekly restore test
+      that proves the archive restores
+    - restore into a new app, to the latest moment, a time, a restore point you
+      named, or a base backup
+
+    The data volume must be pinned to a node. Its engine's settings - where it
+    archives, its server arguments, its scripts - are HivePaaS's, and the app's
+    settings show them read-only.
+
+    Other apps in the same environment reach it by the app's name on port 3306,
+    with the credentials HivePaaS shares as `HIVEPAAS_USER`, `HIVEPAAS_PASSWORD`
+    and `HIVEPAAS_DATABASE_NAME`. The root password stays with this app.
+  categories: [databases/sql]
+  tags: [sql, relational, open-source, mysql-compatible, backup]
+  aliases: [mysql, pitr, wal-g]
+  icon: icons/mariadb.svg
+  links:
+    website: https://mariadb.org
+    documentation: https://mariadb.com/kb/en/documentation/
+    source: https://github.com/MariaDB/server
+  license: GPL-2.0
+  requires:
+    versionCode: v000003
+    features: [managed-databases]
+
+parameters:
+  - name: dbName
+    title: Database name
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,63}$'
+  - name: username
+    title: Username
+    type: string
+    default: app
+    pattern: '^[A-Za-z_][A-Za-z0-9_]{0,79}$'
+  - name: password
+    title: Password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: rootPassword
+    title: Root password
+    description: Leave empty to generate one.
+    type: secret
+    minLength: 12
+    generate: {length: 32}
+  - name: memoryLimit
+    title: Memory limit
+    type: size
+    default: 1GB
+    min: 256MB
+  - name: dataVolume
+    title: Data volume
+    description: The volume the database files are kept on, pinned to a node.
+    type: volume
+
+managed:
+  engine: mariadb
+  engineApi: 1
+  mariadb:
+    archiveTimeout: 60s
+    baseBackupSchedule: "0 2 * * *"
+    retainFull: 7
+    restoreTestSchedule: "0 4 * * 0"
+
+artifacts:
+  - name: wal-g
+    version: 3.0.9
+    mountPath: /opt/hivepaas/bin/wal-g
+    files:
+      amd64:
+        url: https://github.com/wal-g/wal-g/releases/download/v3.0.9/wal-g-mysql-20.04-amd64
+        sha256: 0fef8a61a9d6d7795a60e82f1adc1f61422dd625eaa9ef8531cd54dddbeb3721
+        size: 59276952
+      arm64:
+        url: https://github.com/wal-g/wal-g/releases/download/v3.0.9/wal-g-mysql-20.04-aarch64
+        sha256: a1b08439ecb9580c117123c9851293c1d1e89bd1c35de322de8373ebac82c6da
+        size: 55655608
+
+versions:
+  - name: "11.8"
+    release: "11.8.9"
+    default: true
+    image: mariadb:11.8.9-noble
+  - name: "11.4"
+    release: "11.4.13"
+    image: mariadb:11.4.13-noble
+
+app:
+  deployment:
+    source:
+      activeMethod: image
+      imageSource: {image: "${{ image }}"}
+    storage:
+      mounts:
+        # The server's data directory is /var/lib/mysql/data, a directory of the
+        # volume: what HivePaaS keeps beside it - its state, a restore test's copy -
+        # would be a database in it.
+        /var/lib/mysql: {type: volume, source: "${{ params.dataVolume }}"}
+    container:
+      healthcheck:
+        enabled: true
+        mode: CMD-SHELL
+        # The server answering on its socket, except while the database is being
+        # restored: a base backup takes as long to fetch as it is large.
+        command: /opt/hivepaas/bin/walg-entrypoint health
+        interval: 10s
+        timeout: 5s
+        startPeriod: 30s
+        retries: 5
+    resources:
+      limits: {memory: "${{ params.memoryLimit }}"}
+  settings:
+    kind:
+      category: database
+      engine: mariadb
+      version: "${{ version.name }}"
+      database:
+        dbName: "${{ params.dbName }}"
+        username: "${{ params.username }}"
+        password: "${{ params.password }}"
+        rootPassword: "${{ params.rootPassword }}"
+    envVars:
+      data:
+        - {k: MARIADB_DATABASE, v: "${HIVEPAAS_DATABASE_NAME}"}
+        - {k: MARIADB_USER, v: "${HIVEPAAS_USER}"}
+        - {k: MARIADB_PASSWORD, v: "${HIVEPAAS_PASSWORD}"}
+        - {k: MARIADB_ROOT_PASSWORD, v: "${HIVEPAAS_ROOT_PASSWORD}"}
+        # mysql@localhost, which the unix socket identifies: the account the
+        # walg-* scripts reach the server as, run as the owner of the data files.
+        - {k: MARIADB_MYSQL_LOCALHOST_USER, v: "1"}
+        - {k: MARIADB_MYSQL_LOCALHOST_GRANTS, v: ALL}
+    configFiles:
+      walg-lib:
+        content: |
+          # What the walg-* scripts of the mariadb engine's API 1 share. Sourced, not run.
+          # shellcheck shell=bash disable=SC2034 # what it sets is the scripts' that source it
+          bin=/opt/hivepaas/bin
+          # The data volume is mounted at data_root, and the server's data directory is
+          # datadir below it: MariaDB takes every directory in its data directory for a
+          # database, so what HivePaaS keeps beside the data - its state, a restore test's
+          # scratch copy - is kept beside the data directory, not in it.
+          data_root=/var/lib/mysql
+          datadir=$data_root/data
+          socket=/run/mysqld/mysqld.sock
+
+          # as_mysql COMMAND...: COMMAND as the mysql user, the owner of the data. The
+          # scripts reach the server as mysql@localhost, which the unix socket identifies:
+          # no password is used, or kept anywhere.
+          as_mysql() {
+            if [ "$(id -u)" = 0 ]; then
+              gosu mysql "$@"
+            else
+              "$@"
+            fi
+          }
+
+          # sql QUERY [SOCKET]: what the server answers, one row a line, fields split by
+          # tabs. In a verifier, with no SOCKET, the server is the live database at
+          # HIVEPAAS_RESTORE_SOURCE_HOST, reached as root: its password goes in an option
+          # file in memory, never on the command line.
+          sql() {
+            if [ -z "${2:-}" ] && [ -n "${HIVEPAAS_RESTORE_SOURCE_HOST:-}" ]; then
+              mariadb --defaults-extra-file="$(source_options)" -h "$HIVEPAAS_RESTORE_SOURCE_HOST" -N -B -e "$1"
+              return
+            fi
+            as_mysql mariadb --protocol=socket -S "${2:-$socket}" -umysql -N -B -e "$1"
+          }
+
+          # source_options: the option file a verifier reaches the live database with.
+          source_options() {
+            local file=/dev/shm/hivepaas-source.cnf
+            if [ ! -s "$file" ]; then
+              (
+                umask 077
+                printf '[client]\nuser=root\npassword="%s"\n' "${MARIADB_ROOT_PASSWORD:?a verifier needs the live database root password}" > "$file"
+              )
+            fi
+            echo "$file"
+          }
+
+          # out KEY VALUE: one of the run's outputs, the engine's to read.
+          out() {
+            if [ -n "${HIVEPAAS_OUTPUT:-}" ]; then printf '%s=%s\n' "$1" "$2" >> "$HIVEPAAS_OUTPUT"; fi
+          }
+
+          # rfc3339 EPOCH: that second, in UTC.
+          rfc3339() {
+            date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
+          }
+
+          # refusal_file: where walg-entrypoint says why it would not initialize an empty
+          # data directory, for health and walg-health to tell.
+          refusal_file() {
+            echo "$data_root/hivepaas-refused"
+          }
+
+          # archive_state: the archive loop's last pass, KEY=VALUE lines: LAST_SUCCESS (an
+          # epoch), FAILED_COUNT, LAST_ERROR, FLUSHED_AT (the binary log position just
+          # after its last flush).
+          archive_state() {
+            echo "$data_root/hivepaas-archive.state"
+          }
+
+          # archive_lock: held by whatever pushes or purges binary logs, so that a purge
+          # never takes a log another push is reading.
+          archive_lock() {
+            echo "$data_root/hivepaas-archive.lock"
+          }
+
+          # binlog_status: the active binary log and the offset of its end, "FILE OFFSET".
+          binlog_status() {
+            sql "show master status" | awk 'NR == 1 {print $1, $2}'
+          }
+
+          # backups [--source]: every base backup, oldest first, a line each:
+          # "name start-epoch compressed-bytes".
+          backups() {
+            local json obj name start bytes
+            json=$("$bin/walg-run" "$@" backup-list --detail --json)
+            while IFS= read -r obj; do
+              name=$(sed -n 's/.*"backup_name":"\([^"]*\)".*/\1/p' <<<"$obj")
+              start=$(sed -n 's/.*"start_local_time":"\([^"]*\)".*/\1/p' <<<"$obj")
+              bytes=$(sed -n 's/.*"compressed_size":\([0-9]*\).*/\1/p' <<<"$obj")
+              if [ -n "$name" ] && [ -n "$start" ]; then echo "$name $(date -u -d "$start" +%s) ${bytes:-0}"; fi
+            done <<<"${json//'},{'/$'}\n{'}" | sort -k2,2n
+          }
+
+          # backup_before EPOCH [--source]: the latest base backup that starts before it.
+          backup_before() {
+            local before=$1 name start bytes found=""
+            shift
+            while read -r name start bytes; do
+              if [ "$start" -le "$before" ]; then found=$name; fi
+            done < <(backups "$@")
+            if [ -z "$found" ]; then
+              echo "No base backup starts before $(rfc3339 "$before")" >&2
+              return 1
+            fi
+            echo "$found"
+          }
+
+          # archived_binlogs: the binary logs in the archive, by name; none when the
+          # archive cannot be reached, which it says at once rather than after WAL-G's
+          # own retries.
+          archived_binlogs() {
+            WALG_S3_MAX_RETRIES=3 "$bin/walg-run" binlog-list --json 2>/dev/null | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sort
+          }
+
+          # mark_point SECONDS: the point the live database has reached, made restorable:
+          # its binary log is closed and archived within SECONDS. It sets point_file,
+          # point_offset, point_gtid and point_at; it returns 75 when the log was not
+          # archived in time. On the database itself it archives the log; in a verifier,
+          # which cannot, the live database's own archive loop does.
+          mark_point() {
+            local deadline=$(($(date +%s) + $1)) status left
+            status=$(binlog_status)
+            point_file=${status% *}
+            point_offset=${status#* }
+            point_gtid=$(sql "select @@gtid_binlog_pos")
+            point_at=$(date +%s)
+            if [ -z "$point_file" ]; then
+              echo "The server writes no binary log" >&2
+              return 1
+            fi
+            if ! sql "flush binary logs" >/dev/null; then
+              echo "The binary log could not be closed" >&2
+              return 1
+            fi
+            while :; do
+              left=$((deadline - $(date +%s)))
+              if [ -z "${HIVEPAAS_RESTORE_SOURCE_HOST:-}" ] && [ "$left" -gt 0 ]; then
+                as_mysql timeout "$left" "$bin/walg-archive" once >/dev/null 2>&1 || true
+              fi
+              if archived_binlogs | grep -x "$point_file" >/dev/null; then return 0; fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then return 75; fi
+              sleep 2
+            done
+          }
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-lib, mode: 444}
+      walg-run:
+        content: |
+          #!/bin/bash
+          # walg-run [--source] ARGS...: wal-g ARGS, as the mysql user, with the archive's
+          # keys exported for it alone - they are files, never the container's
+          # environment. With --source, the archive is the one a restored database is
+          # restored from: its settings are the HIVEPAAS_RESTORE_-prefixed variables, its
+          # keys in HIVEPAAS_RESTORE_SECRETS_DIR.
+          #   WAL-G reaches the server on its socket as mysql@localhost, by the socket's
+          # credentials; mariadb-backup does the same. A base backup is fetched into
+          # HIVEPAAS_RESTORE_DIR, the data directory unless a restore test names another.
+          set -euo pipefail
+          dir=${HIVEPAAS_WALG_SECRETS_DIR:-/run/secrets/walg}
+          if [ "${1:-}" = --source ]; then
+            shift
+            dir=${HIVEPAAS_RESTORE_SECRETS_DIR:?this database is not being restored}
+            unset WALG_S3_PREFIX WALG_FILE_PREFIX AWS_ENDPOINT AWS_REGION AWS_S3_FORCE_PATH_STYLE
+            for var in $(compgen -e); do
+              case $var in
+                HIVEPAAS_RESTORE_WALG_* | HIVEPAAS_RESTORE_AWS_*) export "${var#HIVEPAAS_RESTORE_}=${!var}" ;;
+              esac
+            done
+          fi
+          for file in "$dir"/*; do
+            [ -f "$file" ] || continue
+            name=$(basename "$file")
+            case $name in
+              WALG_AWS_*) name=${name#WALG_} ;;
+            esac
+            export "$name=$(cat "$file")"
+          done
+          socket=${HIVEPAAS_SOCKET:-/run/mysqld/mysqld.sock}
+          target=${HIVEPAAS_RESTORE_DIR:-/var/lib/mysql/data}
+          export WALG_MYSQL_DATASOURCE_NAME="mysql@unix($socket)/mysql"
+          export WALG_STREAM_CREATE_COMMAND="mariadb-backup --backup --stream=xbstream --user=mysql --socket=$socket --datadir=/var/lib/mysql/data"
+          export WALG_STREAM_RESTORE_COMMAND="mbstream -x -C $target"
+          export WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariadb-backup --prepare --target-dir=$target"
+          export WALG_MYSQL_BINLOG_DST=${WALG_MYSQL_BINLOG_DST:-/tmp/hivepaas-binlogs}
+          # WAL-G keeps what it pushed in a cache under HOME; the mysql user has none.
+          export HOME=/tmp
+          if [ "$(id -u)" = 0 ]; then
+            exec gosu mysql /opt/hivepaas/bin/wal-g "$@"
+          fi
+          exec /opt/hivepaas/bin/wal-g "$@"
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-run, mode: 555}
+      walg-archive:
+        content: |
+          #!/bin/bash
+          # walg-archive loop | once: archives the binary logs, as archive_command and
+          # archive_timeout do for PostgreSQL - MariaDB has neither, and rotates a log
+          # only when it is full. Each pass, once the server answers: when the active log
+          # has events past where the last flush left it, FLUSH BINARY LOGS closes it;
+          # binlog-push uploads every closed log; and the logs before the active one,
+          # now archived, are purged from the server. A pass records how it went in the
+          # archive state, which walg-health reads. loop runs a pass every
+          # HIVEPAAS_ARCHIVE_TIMEOUT seconds (60) for as long as the container lives;
+          # walg-entrypoint starts it beside the server.
+          set -uo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          interval=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
+          state=$(archive_state)
+
+          get() { sed -n "s/^$1=//p" "$state" 2>/dev/null | tail -n 1; }
+          put() { # put KEY=VALUE...: the state with those keys replaced, written whole
+            local tmp=$state.new kv
+            {
+              grep -vE "^($(printf '%s|' "${@%%=*}" | sed 's/|$//'))=" "$state" 2>/dev/null || true
+              for kv in "$@"; do echo "$kv"; done
+            } > "$tmp" && mv "$tmp" "$state"
+          }
+
+          pass() {
+            local status file offset flushed
+            if ! status=$(binlog_status 2>/dev/null) || [ -z "$status" ]; then
+              return 0 # not up yet, or still initializing: nothing to archive
+            fi
+            file=${status% *}
+            offset=${status#* }
+            flushed=$(get FLUSHED_AT)
+            # The active log has events when it is longer than one just flushed is. One the
+            # server only rotated to, or opened as it started, is not, and stays open.
+            if [ -z "$flushed" ] || [ "$offset" -gt "${flushed#* }" ]; then
+              if ! sql "flush binary logs" >/dev/null; then
+                fail "flushing the binary log failed"
+                return 1
+              fi
+              status=$(binlog_status)
+              file=${status% *}
+              put "FLUSHED_AT=$status"
+            fi
+            # A pass that cannot reach the archive fails at once, for the next to try
+            # again: WAL-G's own retries would hold it, and the lock, for many minutes.
+            if ! WALG_S3_MAX_RETRIES=3 "$bin/walg-run" binlog-push >/dev/null 2>"$state.err"; then
+              fail "binlog-push failed: $(grep -m1 ERROR "$state.err" | cut -c1-300)"
+              return 1
+            fi
+            # Everything before the active log is archived: the server keeps no copy.
+            sql "purge binary logs to '$file'" >/dev/null || true
+            put "LAST_SUCCESS=$(date +%s)" "FAILED_COUNT=0" "LAST_ERROR="
+            rm -f "$state.err"
+          }
+
+          fail() {
+            local count
+            count=$(get FAILED_COUNT)
+            put "FAILED_COUNT=$((${count:-0} + 1))" "LAST_ERROR=$1"
+            echo "walg-archive: $1" >&2
+          }
+
+          locked_pass() {
+            # One pass at a time with walg-mark's push: a purge never takes a log
+            # another push is reading.
+            local fd rc
+            exec {fd}>>"$(archive_lock)"
+            flock "$fd"
+            pass
+            rc=$?
+            exec {fd}>&-
+            return $rc
+          }
+
+          case ${1:-} in
+            once) locked_pass ;;
+            loop)
+              while :; do
+                sleep "$interval"
+                locked_pass || true
+              done
+              ;;
+            *)
+              echo "usage: walg-archive loop | once" >&2
+              exit 2
+              ;;
+          esac
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-archive, mode: 555}
+      walg-replay:
+        content: |
+          #!/bin/bash
+          # walg-replay [--source] --since BACKUP [--until TIME | --position FILE:OFFSET]
+          #             [--datadir DIR] [--socket SOCKET] [--work DIR]
+          # Replays the binary logs archived since the base backup BACKUP into the server
+          # on SOCKET, whose data directory DIR was fetched from that backup: from where
+          # the backup stopped - the position it recorded beside the data - to TIME (RFC
+          # 3339), to FILE:OFFSET, or to the last log archived. WAL-G's own binlog-replay
+          # starts every log at its beginning, and the first one holds what the backup
+          # already has. The logs are fetched into the work directory, on the data volume
+          # unless DIR names another, and each goes once it is replayed.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          source_flag=() since="" until="" position="" dir=$datadir sock=$socket work=$data_root/hivepaas-replay
+          while [ $# -gt 0 ]; do
+            case $1 in
+              --source) source_flag=(--source) ;;
+              --since) since=$2; shift ;;
+              --until) until=$2; shift ;;
+              --position) position=$2; shift ;;
+              --datadir) dir=$2; shift ;;
+              --socket) sock=$2; shift ;;
+              --work) work=$2; shift ;;
+              *) echo "walg-replay: unknown argument $1" >&2; exit 2 ;;
+            esac
+            shift
+          done
+          [ -n "$since" ] || { echo "usage: walg-replay [--source] --since BACKUP [--until TIME | --position FILE:OFFSET]" >&2; exit 2; }
+
+          # The backup's position: MariaDB 11 names the file mariadb_backup_binlog_info,
+          # 10.x xtrabackup_binlog_info.
+          info=$dir/mariadb_backup_binlog_info
+          [ -f "$info" ] || info=$dir/xtrabackup_binlog_info
+          read -r start_file start_pos _ < "$info"
+          stop_file="" stop_pos=""
+          if [ -n "$position" ]; then
+            stop_file=${position%%:*}
+            stop_pos=${position#*:}
+          fi
+          stop_time=""
+          if [ -n "$until" ]; then stop_time=$(date -u -d "$until" '+%Y-%m-%d %H:%M:%S'); fi
+
+          rm -rf "$work"
+          mkdir -p "$work"
+          trap 'rm -rf "$work"' EXIT
+          if [ "$(id -u)" = 0 ]; then chown mysql:mysql "$work"; fi
+          # WAL-G fetches the logs uploaded up to the time given, and the one after it: the
+          # log a time falls in is uploaded after that time.
+          fetch_until=${until:-$(date -u -d '+1 minute' +%Y-%m-%dT%H:%M:%SZ)}
+          WALG_MYSQL_BINLOG_DST=$work "$bin/walg-run" "${source_flag[@]}" binlog-fetch --since "$since" --until "$fetch_until"
+
+          # A point in a log the archive does not have is not reached: nothing is replayed.
+          if [ -n "$stop_file" ] && ! grep -x "$stop_file" "$work/binlogs_order" >/dev/null 2>&1; then
+            echo "The archive has no $stop_file: the point's binary log is not archived" >&2
+            exit 1
+          fi
+          replayed=0
+          while read -r file; do
+            if [[ $file < $start_file ]]; then continue; fi
+            if [ -n "$stop_file" ] && [[ $file > $stop_file ]]; then break; fi
+            opts=()
+            if [ "$file" = "$start_file" ]; then opts+=("--start-position=$start_pos"); fi
+            if [ -n "$stop_time" ]; then opts+=("--stop-datetime=$stop_time"); fi
+            if [ "$file" = "$stop_file" ]; then opts+=("--stop-position=$stop_pos"); fi
+            echo "Replaying $file ${opts[*]}"
+            TZ=UTC as_mysql mariadb-binlog "${opts[@]}" "$work/$file" |
+              as_mysql mariadb --protocol=socket -S "$sock" -umysql
+            rm -f "$work/$file"
+            replayed=$((replayed + 1))
+            if [ "$file" = "$stop_file" ]; then break; fi
+          done < <(cat "$work/binlogs_order" 2>/dev/null || true)
+          echo "Replayed $replayed binary log(s) since $since."
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-replay, mode: 555}
+      walg-nightly:
+        content: |
+          #!/bin/bash
+          # walg-nightly backup | retain [BACKUP]: the nightly job's two steps. backup takes
+          # a base backup. retain deletes everything before BACKUP - the oldest the engine
+          # keeps, for retainFull and the restore points kept; nothing without one - and
+          # checks that the binary logs from the oldest base backup kept on have no gap.
+          # Each prints the backups kept as its outputs.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          list_outputs() {
+            local list="" oldest="" name start bytes
+            while read -r name start bytes; do
+              list+="$name@$(rfc3339 "$start")@$bytes "
+              if [ -z "$oldest" ]; then oldest=$start; fi
+            done < <(backups)
+            out BACKUPS "${list% }"
+            if [ -n "$oldest" ]; then out OLDEST_BACKUP_AT "$(rfc3339 "$oldest")"; fi
+          }
+
+          # verify_chain: every binary log a restore of the oldest base backup kept
+          # replays, one after another, to the last archived. A backup's binlog_start is
+          # the last log archived when it started: it begins in a later one, and the
+          # retention that keeps it may delete binlog_start itself.
+          verify_chain() {
+            local start first prev name number missing=""
+            start=$("$bin/walg-run" backup-list --detail --json | grep -o '"binlog_start":"[^"]*"' | cut -d'"' -f4 |
+              sort | sed -n 1p || true)
+            if [ -z "$start" ]; then
+              echo "No base backup: no binary log chain to check."
+              return 0
+            fi
+            first=${start%.*}.$(printf '%06d' $((10#${start##*.} + 1)))
+            prev=$((10#${first##*.} - 1))
+            while read -r name; do
+              if [[ $name < $first ]]; then continue; fi
+              number=$((10#${name##*.}))
+              if [ "$number" != $((prev + 1)) ]; then
+                missing+=" ${name%.*}.$(printf '%06d' $((prev + 1)))"
+              fi
+              prev=$number
+            done < <(archived_binlogs)
+            if [ -n "$missing" ]; then
+              echo "The binary log chain is broken: the archive lacks${missing} and what follows each, to the next" \
+                "it has. A restore would stop there" >&2
+              return 1
+            fi
+            echo "The binary logs from $first on follow one another."
+          }
+
+          case ${1:-} in
+            backup)
+              echo "Taking a base backup of $datadir..."
+              "$bin/walg-run" backup-push
+              read -r name start bytes < <(backups | tail -n 1)
+              out BACKUP_NAME "$name"
+              out BACKUP_AT "$(rfc3339 "$start")"
+              out BACKUP_BYTES "$bytes"
+              echo "Took $name: $bytes bytes, compressed."
+              list_outputs
+              ;;
+            retain)
+              if [ -n "${2:-}" ]; then
+                if [[ ! $2 =~ ^stream_[0-9]{8}T[0-9]{6}Z$ ]]; then
+                  echo "Not a base backup's name: $2" >&2
+                  exit 2
+                fi
+                echo "Deleting the backups and binary logs before $2..."
+                "$bin/walg-run" delete before FIND_FULL "$2" --confirm
+              else
+                echo "Nothing to delete: there are not more base backups than are kept."
+              fi
+              list_outputs
+              echo "Checking the binary log chain..."
+              verify_chain
+              ;;
+            *)
+              echo "usage: walg-nightly backup | retain [BACKUP]" >&2
+              exit 2
+              ;;
+          esac
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-nightly, mode: 555}
+      walg-health:
+        content: |
+          #!/bin/bash
+          # walg-health: whether archiving keeps up. It fails when the archive loop's last
+          # pass failed, or when none has succeeded for three archive timeouts. It prints
+          # its reading as JSON, and the engine's outputs for Status.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          # A database walg-entrypoint would not initialize afresh runs no server: it says why.
+          if [ -s "$(refusal_file)" ]; then
+            echo "The database is not started: $(cat "$(refusal_file)")" >&2
+            exit 1
+          fi
+
+          state=$(archive_state)
+          get() { sed -n "s/^$1=//p" "$state" 2>/dev/null | tail -n 1; }
+          timeout=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
+          last_success=$(get LAST_SUCCESS)
+          failed_count=$(get FAILED_COUNT)
+          failed_count=${failed_count:-0}
+          last_error=$(get LAST_ERROR)
+          uptime=$(sql "show global status like 'Uptime'" | cut -f2)
+          db_bytes=$(sql "select coalesce(sum(data_length + index_length), 0) from information_schema.tables")
+          # The logs on the server are the ones not archived yet: the loop purges the rest.
+          # All but the active one are closed, and wait for the next pass.
+          logs=$(sql "show binary logs")
+          pending_bytes=$(awk '{sum += $2} END {print sum + 0}' <<<"$logs")
+          ready=$(($(grep -c . <<<"$logs" || true) - 1))
+          if [ "$ready" -lt 0 ]; then ready=0; fi
+          free_bytes=$(df -B1 --output=avail "$datadir" | tail -n 1 | tr -d ' ')
+          now=$(date +%s)
+
+          health=ok reason=""
+          if [ "$failed_count" -gt 0 ]; then
+            health=failing reason="the last pass failed ($last_error), and none has succeeded since"
+          elif [ -n "$last_success" ] && [ $((now - last_success)) -gt $((3 * timeout)) ]; then
+            health=failing reason="no pass has succeeded for $((now - last_success))s"
+          elif [ -z "$last_success" ] && [ "$uptime" -gt $((3 * timeout)) ]; then
+            health=failing reason="no pass has succeeded in the ${uptime}s the server has been up"
+          fi
+
+          last_archived_at=""
+          if [ -n "$last_success" ]; then last_archived_at=$(rfc3339 "$last_success"); fi
+          out LAST_ARCHIVED_AT "$last_archived_at"
+          out FAILED_COUNT "$failed_count"
+          out PENDING_BYTES "$pending_bytes"
+          out DB_BYTES "$db_bytes"
+          out FREE_BYTES "$free_bytes"
+          out READY_COUNT "$ready"
+          # Replicas come in a later engine API.
+          out REPLICAS ""
+          printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pendingBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
+            "$health" "$last_archived_at" "$failed_count" "$ready" "$pending_bytes" "$db_bytes" "$free_bytes"
+          if [ "$health" != ok ]; then
+            echo "Archiving is failing: $reason" >&2
+            exit 1
+          fi
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-health, mode: 555}
+      walg-mark:
+        content: |
+          #!/bin/bash
+          # walg-mark NAME SECONDS: a restore point named NAME, at the end of what the
+          # server has written. It closes the binary log the point is in and archives it,
+          # waiting up to SECONDS for that: a point is restorable only once it is. It
+          # prints POSITION=FILE:OFFSET, which is what a restore targets, and GTID=, the
+          # server's position as GTID replication counts it; it exits 75 when the log was
+          # not archived in time. MariaDB has no named restore points: the name is the
+          # engine's, and the server keeps nothing of it.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          name=${1:?usage: walg-mark NAME SECONDS}
+          seconds=${2:-120}
+          if [[ ! $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$ ]]; then
+            echo "Not a restore point's name: $name" >&2
+            exit 2
+          fi
+          code=0
+          mark_point "$seconds" || code=$?
+          if [ "$code" = 75 ]; then
+            echo "The point is made, but $point_file, the binary log it is in, was not archived in ${seconds}s" >&2
+            exit 75
+          fi
+          if [ "$code" != 0 ]; then exit "$code"; fi
+          echo "POSITION=$point_file:$point_offset"
+          echo "GTID=$point_gtid"
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-mark, mode: 555}
+      walg-restore-test:
+        content: |
+          #!/bin/bash
+          # walg-restore-test: proves the archive restores (HivePaaS's managed templates
+          # design, §5). It marks a point on the live database, its binary log archived;
+          # restores the latest base backup before it into a scratch directory; starts a
+          # second server on that copy - on a socket of its own, with no binary log, so
+          # that it never writes to the archive - and replays the archived logs into it,
+          # to the point; and checks what it reached. In a verifier, the live database is
+          # at HIVEPAAS_RESTORE_SOURCE_HOST and the scratch directory is under
+          # HIVEPAAS_RESTORE_SCRATCH_DIR, on the verifier's own volume.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          start_timeout=${HIVEPAAS_RESTORE_TEST_TIMEOUT:-21600}
+          scratch=${HIVEPAAS_RESTORE_SCRATCH_DIR:-$data_root}/hivepaas-restore-test
+          copy_socket=/run/mysqld/hivepaas-restore-test.sock
+          log=$scratch/server.log
+          copy_pid=""
+
+          stop_copy() {
+            if [ -n "$copy_pid" ] && kill -0 "$copy_pid" 2>/dev/null; then
+              as_mysql mariadb-admin --protocol=socket -S "$copy_socket" -umysql shutdown >/dev/null 2>&1 ||
+                kill "$copy_pid" 2>/dev/null || true
+              wait "$copy_pid" 2>/dev/null || true
+            fi
+            rm -rf "$scratch"
+          }
+          trap stop_copy EXIT
+
+          # 1. The point, on the live database, its binary log archived.
+          timeout=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
+          code=0
+          mark_point $((3 * timeout)) || code=$?
+          if [ "$code" != 0 ]; then
+            echo "The point's binary log, $point_file, was not archived: archiving is failing" >&2
+            exit 1
+          fi
+          point=$point_file:$point_offset
+          echo "Marked $point ($point_gtid)."
+
+          # 2. Room for the copy, and room to replay into it.
+          db_bytes=$(sql "select coalesce(sum(data_length + index_length), 0) from information_schema.tables")
+          stop_copy
+          mkdir -p "$scratch/data"
+          free_bytes=$(df -B1 --output=avail "$scratch" | tail -n 1 | tr -d ' ')
+          if [ "$free_bytes" -lt $((db_bytes * 12 / 10)) ]; then
+            echo "Not enough room to restore into: $free_bytes bytes free beside a database of $db_bytes" >&2
+            exit 1
+          fi
+
+          # 3. The latest base backup before the point.
+          started=$(date +%s)
+          backup=$(backup_before "$point_at")
+          echo "Restoring $backup into $scratch..."
+          chown -R mysql:mysql "$scratch"
+          HIVEPAAS_RESTORE_DIR=$scratch/data "$bin/walg-run" backup-fetch "$backup"
+
+          # 4. A second server on the copy, which writes no binary log.
+          as_mysql mariadbd --datadir="$scratch/data" --socket="$copy_socket" --pid-file="$scratch/server.pid" \
+            --log-error="$log" --skip-networking --skip-log-bin --innodb-buffer-pool-size=64M &
+          copy_pid=$!
+          deadline=$(($(date +%s) + start_timeout))
+          until sql "select 1" "$copy_socket" >/dev/null 2>&1; do
+            if ! kill -0 "$copy_pid" 2>/dev/null; then
+              echo "The copy stopped before it answered:" >&2
+              tail -n 20 "$log" >&2
+              exit 1
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "The copy has not answered in ${start_timeout}s" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # 5. Replayed to the point.
+          "$bin/walg-replay" --since "$backup" --position "$point" --datadir "$scratch/data" --socket "$copy_socket" \
+            --work "$scratch/binlogs"
+          duration=$(($(date +%s) - started))
+
+          # 6. What it reached.
+          sql "select count(*) from mysql.user" "$copy_socket" >/dev/null
+          if [ -n "${HIVEPAAS_RESTORE_CHECK_QUERY:-}" ]; then
+            echo "Checking: $HIVEPAAS_RESTORE_CHECK_QUERY"
+            as_mysql mariadb --protocol=socket -S "$copy_socket" -umysql -N -B "${MARIADB_DATABASE:-mysql}" \
+              -e "$HIVEPAAS_RESTORE_CHECK_QUERY"
+          fi
+          out RESTORED_TO "$point"
+          out DURATION_SECONDS "$duration"
+          echo "Restored to $point in ${duration}s."
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-restore-test, mode: 555}
+      walg-entrypoint:
+        content: |
+          #!/bin/bash
+          # walg-entrypoint [ARGS...]: a managed MariaDB's entrypoint. It starts the
+          # archive loop (walg-archive) beside the server and hands over to the image's
+          # own entrypoint, unless the database is a restore whose data is not there yet.
+          # Then it fetches the base backup from the source's archive, starts the server on
+          # its socket alone, replays the binary logs to the target, stops it, and serves.
+          # After a restore that failed, it idles, so that status can say why.
+          #   A restore is told by HIVEPAAS_RESTORE_SECRETS_DIR, with the source's archive
+          # in the HIVEPAAS_RESTORE_-prefixed variables, and its target:
+          #   HIVEPAAS_RESTORE_TARGET_BACKUP   the base backup to fetch, or else the latest
+          #   HIVEPAAS_RESTORE_TARGET_BEFORE   that starts before this time (RFC 3339);
+          #   HIVEPAAS_RESTORE_STOP_TIME       replay to this time (RFC 3339), or
+          #   HIVEPAAS_RESTORE_STOP_POSITION   to this binary log position (FILE:OFFSET), or
+          #   HIVEPAAS_RESTORE_REPLAY=none     replay nothing: the base backup as it is;
+          #   none of these, to the last binary log archived.
+          #   A binary log replay is not repeatable, as PostgreSQL's recovery is: a restore
+          # stopped before it ended fetches the base backup again.
+          #   A primary initializes an empty data directory only over an archive that holds
+          # nothing. One that holds base backups or binary logs was written by this
+          # database: initialized here, it would archive into that history. It idles
+          # instead, saying why. An archive it cannot read within
+          # HIVEPAAS_ARCHIVE_CHECK_TIMEOUT seconds (60) fails the start, for Swarm to start
+          # it again.
+          #   walg-entrypoint status: 0 once the server is up and serving, 75 while it
+          #     starts or restores, 1 when the restore failed, having printed why.
+          #   walg-entrypoint health: the container's health check, healthy while it
+          #     restores and while it idles refused.
+          set -uo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          restore_state=$data_root/hivepaas-restore.state
+          log=$data_root/hivepaas-restore.log
+          state() { cat "$restore_state" 2>/dev/null || true; }
+          set_state() { echo "$1" > "$restore_state.new" && mv "$restore_state.new" "$restore_state"; }
+          restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
+
+          status() {
+            case $(state) in
+              failed)
+                # What the scripts and WAL-G said last, without the server's own lines,
+                # which start with their time.
+                echo "The restore failed:"
+                grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$log" | tail -n 5
+                exit 1
+                ;;
+              fetching | replaying) exit 75 ;;
+            esac
+            if sql "select 1" >/dev/null 2>&1; then exit 0; fi
+            exit 75
+          }
+
+          health() {
+            if [ -s "$(refusal_file)" ]; then exit 0; fi
+            if restoring; then
+              case $(state) in fetching | replaying | failed) exit 0 ;; esac
+            fi
+            sql "select 1" >/dev/null 2>&1
+          }
+
+          idle() {
+            trap 'exit 0' TERM INT
+            while :; do sleep 3600 & wait $!; done
+          }
+
+          # guard_fresh_start: what an empty data directory is initialized over. An archive
+          # that holds anything refuses it, which the refusal file keeps for health and
+          # walg-health; one that cannot be read fails the start.
+          guard_fresh_start() {
+            local listed reason
+            if ! listed=$(timeout "${HIVEPAAS_ARCHIVE_CHECK_TIMEOUT:-60}" "$bin/walg-run" st ls 2>/dev/null); then
+              echo "walg-entrypoint: the archive could not be read, so whether it holds this database's history is" \
+                "not known: the start fails, to be tried again, rather than initialize the data directory" >&2
+              exit 1
+            fi
+            if grep -qE '(basebackups_005|binlog_005)/' <<<"$listed"; then
+              reason="The data directory is empty, and the archive at ${WALG_S3_PREFIX:-${WALG_FILE_PREFIX:-}} holds this"
+              reason+=" database's history: its data is lost, or on another volume than this one. The database is not"
+              reason+=" initialized afresh, which would archive into that history: restore it into a new app, or give it"
+              reason+=" its volume back."
+              echo "$reason" > "$(refusal_file)"
+              echo "walg-entrypoint: $reason" >&2
+              idle
+            fi
+          }
+
+          # serve ARGS...: the image's entrypoint, with the archive loop beside the server.
+          # The loop runs detached twice, so that it is not the server's child once this
+          # script has become the server.
+          serve() {
+            local file
+            # The loop keeps its state beside the data directory, as the mysql user: on a
+            # volume that was not the image's, the mount point is root's.
+            for file in "$(archive_state)" "$(archive_lock)"; do
+              if [ ! -e "$file" ]; then touch "$file"; fi
+            done
+            chown mysql:mysql "$data_root" "$(archive_state)" "$(archive_lock)"
+            ( as_mysql "$bin/walg-archive" loop & )
+            exec docker-entrypoint.sh "$@"
+          }
+
+          fetch() {
+            local backup=${HIVEPAAS_RESTORE_TARGET_BACKUP:-}
+            set_state fetching
+            mkdir -p "$datadir"
+            find "$datadir" -mindepth 1 -delete
+            chown mysql:mysql "$data_root" "$datadir"
+            if [ -z "$backup" ]; then
+              backup=$(backup_before "$(date -u -d "${HIVEPAAS_RESTORE_TARGET_BEFORE:?a restore needs its target}" +%s)" \
+                --source) || return 1
+            fi
+            echo "$backup" > "$data_root/hivepaas-restore.backup"
+            echo "Fetching $backup from the source's archive..."
+            "$bin/walg-run" --source backup-fetch "$backup" || return 1
+            set_state replaying
+          }
+
+          # replay ARGS...: the server on its socket alone, the binary logs replayed into
+          # it to the target, and the server stopped: the next start is an ordinary one.
+          replay() {
+            local backup pid rc opts=()
+            backup=$(cat "$data_root/hivepaas-restore.backup")
+            if [ "${HIVEPAAS_RESTORE_REPLAY:-}" = none ]; then return 0; fi
+            as_mysql "$@" --skip-networking --socket="$socket" &
+            pid=$!
+            for _ in $(seq 300); do
+              if sql "select 1" >/dev/null 2>&1; then break; fi
+              if ! kill -0 "$pid" 2>/dev/null; then
+                echo "The server stopped before it answered" >&2
+                return 1
+              fi
+              sleep 1
+            done
+            if [ -n "${HIVEPAAS_RESTORE_STOP_TIME:-}" ]; then opts+=(--until "$HIVEPAAS_RESTORE_STOP_TIME"); fi
+            if [ -n "${HIVEPAAS_RESTORE_STOP_POSITION:-}" ]; then opts+=(--position "$HIVEPAAS_RESTORE_STOP_POSITION"); fi
+            "$bin/walg-replay" --source --since "$backup" "${opts[@]}"
+            rc=$?
+            as_mysql mariadb-admin --protocol=socket -S "$socket" -umysql shutdown >/dev/null 2>&1 || kill "$pid"
+            wait "$pid"
+            return $rc
+          }
+
+          case ${1:-} in
+            status) status ;;
+            health)
+              health
+              exit
+              ;;
+          esac
+
+          if ! restoring; then
+            rm -f "$(refusal_file)"
+            if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then guard_fresh_start; fi
+            serve "$@"
+          fi
+          case $(state) in
+            failed)
+              echo "The restore failed before: see $log." >&2
+              idle
+              ;;
+            "done") serve "$@" ;;
+          esac
+          mkdir -p "$data_root"
+          touch "$log"
+          chown mysql:mysql "$log"
+          if ! fetch >> "$log" 2>&1; then
+            set_state failed
+            echo "The base backup could not be fetched; the database idles so that its restore can say why." | tee -a "$log" >&2
+            idle
+          fi
+          if ! replay "$@" >> "$log" 2>&1; then
+            set_state failed
+            echo "The replay failed; the database idles so that its restore can say why." | tee -a "$log" >&2
+            idle
+          fi
+          set_state "done"
+          echo "walg-entrypoint: restored; serving"
+          serve "$@"
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-entrypoint, mode: 555}
+    routing:
+      port: 3306
