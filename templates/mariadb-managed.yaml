@@ -814,6 +814,8 @@ app:
           # instead, saying why. An archive it cannot read within
           # HIVEPAAS_ARCHIVE_CHECK_TIMEOUT seconds (60) fails the start, for Swarm to start
           # it again.
+          #   One server at a time runs on the volume: a second container waits up to
+          # HIVEPAAS_DATA_LOCK_TIMEOUT seconds (300) for the first to stop, then fails.
           #   walg-entrypoint status: 0 once the server is up and serving, 75 while it
           #     starts or restores, 1 when the restore failed, having printed why.
           #   walg-entrypoint health: the container's health check, healthy while it
@@ -824,8 +826,21 @@ app:
 
           restore_state=$data_root/hivepaas-restore.state
           log=$data_root/hivepaas-restore.log
-          state() { cat "$restore_state" 2>/dev/null || true; }
-          set_state() { echo "$1" > "$restore_state.new" && mv "$restore_state.new" "$restore_state"; }
+          # restore_id: this restore, as the variables it is given say it - its source,
+          # its target, and the archive of the app it restores into, which is each app's
+          # own. The state of another restore on the volume - a volume restored before,
+          # into another app or to another target - is none of this one's: it fetches
+          # again.
+          restore_id() {
+            env | grep -E '^(HIVEPAAS_RESTORE_|WALG_S3_PREFIX=|WALG_FILE_PREFIX=)' | sort | sha256sum | cut -c1-16
+          }
+          state() {
+            local value id
+            if [ ! -f "$restore_state" ]; then return 0; fi
+            read -r value id < "$restore_state" || true
+            if [ "$id" = "$(restore_id)" ]; then echo "$value"; fi
+          }
+          set_state() { echo "$1 $(restore_id)" > "$restore_state.new" && mv "$restore_state.new" "$restore_state"; }
           restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
 
           status() {
@@ -875,6 +890,25 @@ app:
               echo "walg-entrypoint: $reason" >&2
               idle
             fi
+          }
+
+          # hold_data_lock: the data directory is this container's alone, for as long as
+          # its server runs. Two tasks of the service can overlap on the volume for a
+          # moment - Swarm starts a rollout's task without waiting for the task of one it
+          # superseded to stop - and two servers on one data directory corrupt it. The
+          # lock is on the volume, held by a process of its own for as long as the
+          # container lives - the server closes the files it inherits: it goes when the
+          # container does.
+          hold_data_lock() {
+            exec 9>>"$data_root/hivepaas-server.lock"
+            if ! flock -n 9; then
+              echo "walg-entrypoint: another server runs on this volume; waiting for it to stop" >&2
+              if ! flock -w "${HIVEPAAS_DATA_LOCK_TIMEOUT:-300}" 9; then
+                echo "walg-entrypoint: another server still runs on this volume: not starting beside it" >&2
+                exit 1
+              fi
+            fi
+            ( exec -a hivepaas-data-lock sleep infinity & )
           }
 
           # serve ARGS...: the image's entrypoint, with the archive loop beside the server.
@@ -941,6 +975,7 @@ app:
               ;;
           esac
 
+          hold_data_lock
           if ! restoring; then
             rm -f "$(refusal_file)"
             if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then guard_fresh_start; fi
