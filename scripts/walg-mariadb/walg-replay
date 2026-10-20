@@ -55,6 +55,8 @@ if [ -n "$stop_file" ] && ! grep -x "$stop_file" "$work/binlogs_order" >/dev/nul
   echo "The archive has no $stop_file: the point's binary log is not archived" >&2
   exit 1
 fi
+# The logs may hold a GRANT, which only an account that may grant replays.
+ensure_grant_option "$sock"
 replayed=0
 while read -r file; do
   if [[ $file < $start_file ]]; then continue; fi
