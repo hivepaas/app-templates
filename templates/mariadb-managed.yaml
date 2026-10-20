@@ -172,8 +172,18 @@ app:
           # HIVEPAAS_STANDBY_PASSWORD_FILE names, its name HIVEPAAS_STANDBY_NAME. Every
           # member's server has an id and binary logs of its own: HIVEPAAS_SERVER_ID and
           # HIVEPAAS_LOG_BIN, when the engine gives them, override the command's.
+          #   A replica walg-entrypoint promote promoted keeps a marker beside its data and is the
+          # primary from then on, whatever the standby variables say. A member
+          # HIVEPAAS_FENCED is set on is one another was promoted over: it never starts
+          # its server.
           replication_user=hivepaas_replica
-          standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+          standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ] && [ ! -e "$(promoted_marker)" ]; }
+          fenced() { [ -n "${HIVEPAAS_FENCED:-}" ]; }
+
+          # promoted_marker: the file a promoted replica keeps beside its data.
+          promoted_marker() {
+            echo "$data_root/hivepaas-promoted"
+          }
 
           # replication_options: the option file walg-health reaches the replicas with, as
           # replication_user: walg-replication writes it beside the data directory - not
@@ -1052,7 +1062,10 @@ app:
           # state reached made where replication starts. walg-archive connects it to the
           # member that writes once it serves. One it cannot seed idles, and never starts
           # a database of its own. Each start adds the member's server arguments
-          # (member_args).
+          # (member_args). A replica promoted (promote, below) starts as the primary.
+          #   A member HIVEPAAS_FENCED is set on - one another was promoted over - idles
+          # and never starts its server, whoever starts its service, so that no two
+          # primaries write to the cluster's archive.
           #   A primary initializes an empty data directory only over an archive that holds
           # nothing. One that holds base backups or binary logs was written by this
           # database: initialized here, it would archive into that history. It idles
@@ -1065,6 +1078,9 @@ app:
           #     starts or restores, 1 when the restore failed, having printed why.
           #   walg-entrypoint health: the container's health check, healthy while it
           #     restores and while it idles refused.
+          #   walg-entrypoint promote: promotes the replica it runs in to the cluster's
+          #     primary, once the member it followed is fenced (promote, below): 0 once the
+          #     server is the primary, 3 when it certainly is not, 1 when that is not known.
           set -uo pipefail
           # shellcheck source=walg-lib
           . /opt/hivepaas/bin/walg-lib
@@ -1109,7 +1125,7 @@ app:
           }
 
           health() {
-            if [ -s "$(refusal_file)" ]; then exit 0; fi
+            if fenced || [ -s "$(refusal_file)" ]; then exit 0; fi
             if restoring; then
               case $(state) in fetching | replaying | failed) exit 0 ;; esac
             fi
@@ -1117,6 +1133,46 @@ app:
               case $(state) in standby-seeding | standby-failed) exit 0 ;; esac
             fi
             sql "select 1" >/dev/null 2>&1
+          }
+
+          # promote: the replica made the cluster's primary. It stops replication and
+          # forgets the member it followed, lets the server write, and leaves the marker,
+          # so that it starts as the primary from then on, whatever the standby variables
+          # say. Then it archives its own binary logs: they hold what it applied of the
+          # fenced member's last transactions, which that member may never have archived;
+          # a replay skips what of them the archive has. From then on the archive loop
+          # archives as a primary's does. It runs again as it is.
+          promote() {
+            if ! sql "select 1" >/dev/null 2>&1; then
+              echo "walg-entrypoint promote: the server does not answer; nothing was promoted" >&2
+              exit 3
+            fi
+            if [ ! -e "$(promoted_marker)" ]; then
+              echo "Promoting the replica..."
+              if ! as_mysql mariadb --protocol=socket -S "$socket" -umysql \
+                -e "STOP SLAVE; RESET SLAVE ALL; SET GLOBAL read_only = 0"; then
+                if [ "$(sql "select @@read_only")" = 1 ]; then
+                  echo "walg-entrypoint promote: the server is still a replica; nothing was promoted" >&2
+                  exit 3
+                fi
+                echo "walg-entrypoint promote: whether the server was promoted is not known; run it again" >&2
+                exit 1
+              fi
+              touch "$(promoted_marker)"
+              chown mysql:mysql "$(promoted_marker)"
+            fi
+            if [ "$(sql "select @@read_only")" != 0 ] && ! sql "SET GLOBAL read_only = 0" >/dev/null; then
+              echo "walg-entrypoint promote: the server is promoted but still read-only; run it again" >&2
+              exit 1
+            fi
+            # Its own logs, the active one closed, into the cluster's archive.
+            if sql "flush binary logs" >/dev/null && as_mysql "$bin/walg-archive" once; then
+              echo "Its binary logs are archived."
+            else
+              echo "walg-entrypoint promote: its binary logs could not be archived yet; the archive loop goes on trying" >&2
+            fi
+            echo "Promoted: this server is the primary, at $(sql "select @@gtid_binlog_pos")."
+            exit 0
           }
 
           idle() {
@@ -1302,9 +1358,18 @@ app:
               health
               exit
               ;;
+            promote) promote ;;
           esac
 
           hold_data_lock
+          if fenced; then
+            echo "walg-entrypoint: fenced ($HIVEPAAS_FENCED): another member is the primary; this one idles and never" \
+              "starts its server" >&2
+            idle
+          fi
+          if [ -n "${HIVEPAAS_STANDBY_HOST:-}" ] && [ -e "$(promoted_marker)" ]; then
+            echo "walg-entrypoint: promoted before; starts as the primary"
+          fi
           args=("$@")
           if [ "${1:-}" = mariadbd ]; then
             mapfile -t member < <(member_args)

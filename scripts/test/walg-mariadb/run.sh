@@ -680,7 +680,7 @@ test_basenames() {
 # name, and the replication password as a file.
 start_replica() {
   local name=$1 id=$2 prefix=${3:-walg/prim-$version}
-  start_db "$name" "$prefix" "$work/secrets-src" -e "HIVEPAAS_STANDBY_HOST=$run-prim" \
+  start_db "$name" "$prefix" "$work/secrets-src" -e "HIVEPAAS_STANDBY_HOST=$run-${WRITER:-prim}" \
     -e "HIVEPAAS_STANDBY_NAME=$run-$name" -e HIVEPAAS_STANDBY_PASSWORD_FILE=/run/hivepaas-replication/password \
     -e "HIVEPAAS_SERVER_ID=$id" -e "HIVEPAAS_LOG_BIN=mariadb-bin-$name" -v "$work/repl:/run/hivepaas-replication:ro" \
     --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
@@ -704,15 +704,16 @@ stop_writing() {
   wait "$writer_pid" 2>/dev/null || true
 }
 
-# same_rows NAME SECONDS: the replica holds prim's rows of t, in time.
+# same_rows NAME SECONDS: the replica holds the writer's rows of t, in time:
+# prim's, or WRITER's.
 same_rows() {
   local want
-  want=$(sql_in prim "select count(*), max(id) from t")
+  want=$(sql_in "${WRITER:-prim}" "select count(*), max(id) from t")
   for _ in $(seq "${2:-60}"); do
     if [ "$(sql_in "$1" "select count(*), max(id) from t" 2>/dev/null)" = "$want" ]; then return 0; fi
     sleep 1
   done
-  echo "$1: $(sql_in "$1" "select count(*), max(id) from t" 2>&1), prim: $want" > "$work/job.log"
+  echo "$1: $(sql_in "$1" "select count(*), max(id) from t" 2>&1), ${WRITER:-prim}: $want" > "$work/job.log"
   docker logs "$run-$1" 2>&1 | grep -E "walg-|ERROR" | tail -n 10 >> "$work/job.log"
   return 1
 }
@@ -807,6 +808,98 @@ test_replicas() {
   check "healthy, so that it is not restarted" docker exec "$run-r9" /opt/hivepaas/bin/walg-entrypoint health
   check "and runs no server" bash -c "! docker exec $run-r9 sh -c 'cat /proc/[0-9]*/comm' | grep -qx mariadbd"
   docker rm -fv "$run-r1" "$run-r2" "$run-r9" "$run-prim" >/dev/null
+  docker volume rm "$run-r1" "$run-r2" "$run-r9" "$run-prim" >/dev/null
+}
+
+# stop_archiving NAME: its archive loop stopped, so that what it writes from now
+# is archived by none - as by a primary that dies.
+stop_archiving() {
+  docker exec "$run-$1" sh -c 'for p in /proc/[0-9]*; do
+    if tr "\0" " " < "$p/cmdline" 2>/dev/null | grep -q "walg-archiv[e] loop"; then kill "${p#/proc/}"; fi; done'
+}
+
+follows_r1() { WRITER=r1 same_rows r2 90; }
+
+test_promotion() {
+  say "promotion: a replica over its fenced primary, the primary's last writes unarchived"
+  local password code before rows
+  password=$(head -c 30 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-40)
+  mkdir -p "$work/repl"
+  rm -f "$work/repl/password"
+  printf '%s' "$password" > "$work/repl/password"
+  chmod 444 "$work/repl/password"
+  start_db prim "walg/prom-$version" "$work/secrets-src" --entrypoint /opt/hivepaas/bin/walg-entrypoint \
+    -- "${server_args[@]}"
+  wait_ready prim || { fail "the primary starts"; return; }
+  sql_in prim "create table t (id int primary key, at timestamp(6) not null default current_timestamp(6))"
+  sql_in prim "insert into t (id) select seq from seq_1_to_10"
+  job_env=()
+  job prim walg-nightly backup >/dev/null || fail "the primary's base backup"
+  docker exec -i "$run-prim" /opt/hivepaas/bin/walg-replication <<<"$password" >/dev/null ||
+    fail "replicas let in"
+  start_replica r1 2 "walg/prom-$version"
+  start_replica r2 3 "walg/prom-$version"
+  wait_ready r1 || fail "replica 1 starts"
+  wait_ready r2 || fail "replica 2 starts"
+  sql_in prim "insert into t (id) select seq from seq_11_to_20"
+  check "the primary archives its rows" caught_up prim
+  before=$(archived_logs prim | grep -c .)
+
+  stop_archiving prim
+  sql_in prim "insert into t (id) select seq from seq_21_to_30"
+  check "replica 1 has the primary's last rows" same_rows r1
+  check "replica 2 too" same_rows r2
+  sleep $((archive_timeout * 2))
+  check "which the primary never archived" test "$(archived_logs prim | grep -c .)" = "$before"
+  docker stop "$run-prim" >/dev/null
+
+  docker exec "$run-r1" /opt/hivepaas/bin/walg-entrypoint promote > "$work/job.log" 2>&1 && code=0 || code=$?
+  check "walg-entrypoint promote: promotes replica 1" test "$code" = 0
+  check "walg-entrypoint promote: archives its logs" grep -q "Its binary logs are archived" "$work/job.log"
+  check "it writes" sql_in r1 "insert into t (id) select seq from seq_31_to_40"
+  check "replicates from none" test -z "$(docker exec -u mysql "$run-r1" mariadb -umysql -N -e 'show slave status')"
+  check "its own logs are in the cluster's archive" bash -c "grep -q '^mariadb-bin-r1\.' <<<'$(archived_logs r1)'"
+  check "it archives on, as a primary" caught_up r1
+  docker exec "$run-r1" /opt/hivepaas/bin/walg-entrypoint promote > "$work/job.log" 2>&1 && code=0 || code=$?
+  check "walg-entrypoint promote: again, as it is" test "$code" = 0
+  check "its new writes are the cluster's next GTIDs, under its own server id" grep -qE '(^|,)0-2-[0-9]+' \
+    <<<"$(sql_in r1 "select @@gtid_binlog_pos")"
+
+  # Replica 2 follows it, its standby variables pointed at it: restarted.
+  docker rm -f "$run-r2" >/dev/null
+  WRITER=r1 DB_VOLUME=$run-r2 start_replica r2 3 "walg/prom-$version"
+  wait_ready r2 || fail "replica 2 starts again"
+  check "replica 2 follows the promoted member" follows_r1
+  check "not seeded again" test "$(docker exec "$run-r2" grep -c '^Seeding' /var/lib/mysql/hivepaas-restore.log)" = 1
+  check "walg-health on the promoted member lists replica 2" job r1 walg-health
+  check "streaming" grep -q "$run-r2@streaming@" <<<"$(output REPLICAS)"
+
+  # A restore across the promotion: the old primary's base backup, its logs, and
+  # the promoted member's, which hold the rows the old primary never archived.
+  rows=$(sql_in r1 "select count(*) from t")
+  RESTORE_SOURCE=prom restore restored-promoted latest
+  check "latest, across the promotion: the $rows rows" test "$restored_rows" = "$rows"
+  check "walg-nightly retain on the promoted member: the chain of both names follows" job r1 walg-nightly retain
+
+  # The old primary, fenced, never starts its server.
+  docker rm "$run-prim" >/dev/null
+  DB_VOLUME=$run-prim start_db prim "walg/prom-$version" "$work/secrets-src" -e "HIVEPAAS_FENCED=r1 was promoted" \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+  sleep 5
+  check "a fenced member idles" test "$(docker inspect -f '{{.State.Running}}' "$run-prim")" = true
+  check "healthy, so that it is not restarted" docker exec "$run-prim" /opt/hivepaas/bin/walg-entrypoint health
+  check "and runs no server" bash -c "! docker exec $run-prim sh -c 'cat /proc/[0-9]*/comm' | grep -qx mariadbd"
+  docker exec "$run-prim" /opt/hivepaas/bin/walg-entrypoint promote > "$work/job.log" 2>&1 && code=0 || code=$?
+  check "walg-entrypoint promote where no server answers: certainly nothing promoted (3)" test "$code" = 3
+
+  # The promoted member restarted, its standby variables still there: the
+  # marker keeps it the primary.
+  docker restart "$run-r1" >/dev/null
+  wait_ready r1 || fail "the promoted member starts again"
+  check "restarted, it is still the primary, writing" sql_in r1 "insert into t (id) values (41)"
+  check "under its own log name" grep -q '^mariadb-bin-r1\.' <<<"$(active_log r1)"
+  docker rm -fv "$run-r1" "$run-r2" "$run-prim" >/dev/null
+  docker volume rm "$run-r1" "$run-r2" "$run-prim" >/dev/null
 }
 
 # --- each version ------------------------------------------------------------
@@ -827,6 +920,7 @@ print(next(v['image'] for v in d['versions'] if v['name']==sys.argv[2]))" "$temp
     test_restores
     test_basenames
     test_replicas
+    test_promotion
     test_passthrough
     test_fresh_start
     test_secrets
