@@ -14,8 +14,18 @@ socket=/run/mysqld/mysqld.sock
 # HIVEPAAS_STANDBY_PASSWORD_FILE names, its name HIVEPAAS_STANDBY_NAME. Every
 # member's server has an id and binary logs of its own: HIVEPAAS_SERVER_ID and
 # HIVEPAAS_LOG_BIN, when the engine gives them, override the command's.
+#   A replica walg-entrypoint promote promoted keeps a marker beside its data and is the
+# primary from then on, whatever the standby variables say. A member
+# HIVEPAAS_FENCED is set on is one another was promoted over: it never starts
+# its server.
 replication_user=hivepaas_replica
-standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ] && [ ! -e "$(promoted_marker)" ]; }
+fenced() { [ -n "${HIVEPAAS_FENCED:-}" ]; }
+
+# promoted_marker: the file a promoted replica keeps beside its data.
+promoted_marker() {
+  echo "$data_root/hivepaas-promoted"
+}
 
 # replication_options: the option file walg-health reaches the replicas with, as
 # replication_user: walg-replication writes it beside the data directory - not
