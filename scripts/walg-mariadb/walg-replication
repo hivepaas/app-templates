@@ -16,6 +16,9 @@ if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
   echo "walg-replication: the password must be 16 to 128 letters and digits, on stdin" >&2
   exit 2
 fi
+# Granting needs GRANT OPTION, which a database made before its scripts gave it
+# at initialization lacks: it gets it here, from root.
+ensure_grant_option "$socket"
 # The password reaches the client on its stdin: it is in no process's arguments.
 printf '%s\n' \
   "CREATE USER IF NOT EXISTS '$replication_user'@'%' IDENTIFIED BY '$password';" \
