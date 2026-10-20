@@ -142,3 +142,24 @@ mark_point() {
     sleep 2
   done
 }
+
+# ensure_grant_option SOCKET: mysql@localhost may grant, which a replay of a
+# GRANT in the logs needs. A database walg-entrypoint initializes gets that at
+# once; one made before, or restored from one, gets it here from root, whose
+# password is the app's, in an option file in memory. The grant is not logged:
+# no replica and no archive sees it.
+ensure_grant_option() {
+  local sock=$1 file rc
+  if sql "show grants" "$sock" | grep "WITH GRANT OPTION" >/dev/null; then return 0; fi
+  if [ -z "${MARIADB_ROOT_PASSWORD:-}" ]; then
+    echo "mysql@localhost may not grant, and no root password is given: a GRANT in the logs stops the replay" >&2
+    return 0
+  fi
+  file=$(mktemp /dev/shm/hivepaas-root.XXXXXX)
+  printf '[client]\nuser=root\npassword="%s"\n' "$MARIADB_ROOT_PASSWORD" > "$file"
+  mariadb --defaults-extra-file="$file" --protocol=socket -S "$sock" \
+    -e "SET sql_log_bin=0; GRANT ALL PRIVILEGES ON *.* TO 'mysql'@'localhost' WITH GRANT OPTION"
+  rc=$?
+  rm -f "$file"
+  return $rc
+}

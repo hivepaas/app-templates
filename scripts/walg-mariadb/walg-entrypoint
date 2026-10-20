@@ -127,6 +127,14 @@ forget_archive_state() {
   rm -f "$(archive_state)" "$(archive_state).err" "$data_root/.walg_mysql_binlogs_cache"
 }
 
+# grant_at_init: the image makes mysql@localhost with every privilege but
+# GRANT OPTION, which a replay of a GRANT needs; the image's entrypoint runs
+# this as root once the data directory is initialized.
+grant_at_init() {
+  echo "GRANT ALL PRIVILEGES ON *.* TO 'mysql'@'localhost' WITH GRANT OPTION;" \
+    > /docker-entrypoint-initdb.d/hivepaas-grant-option.sql
+}
+
 # serve ARGS...: the image's entrypoint, with the archive loop beside the server.
 # The loop runs detached twice, so that it is not the server's child once this
 # script has become the server.
@@ -198,6 +206,7 @@ if ! restoring; then
   if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then
     guard_fresh_start
     forget_archive_state
+    grant_at_init
   fi
   serve "$@"
 fi

@@ -134,6 +134,11 @@ start_db() {
     "${env[@]}" "${opts[@]}" "$image" "$@" >/dev/null
 }
 
+root_sql() { # root_sql NAME SQL: as root, its password in an option file in the container
+  docker exec "$run-$1" sh -c "umask 077; printf '[client]\nuser=root\npassword=\"%s\"\n' \"\$MARIADB_ROOT_PASSWORD\" \
+    > /dev/shm/root.cnf; mariadb --defaults-extra-file=/dev/shm/root.cnf -e \"$2\"; rc=\$?; rm -f /dev/shm/root.cnf; exit \$rc"
+}
+
 sql_in() { # sql_in NAME QUERY: as the scripts reach the server, on the app's database
   docker exec -u mysql "$run-$1" mariadb -umysql -N -B app -e "$2"
 }
@@ -213,6 +218,11 @@ test_archive() {
   fi
   check "it runs the archive loop" bash -c "docker exec $run-src sh -c 'cat /proc/[0-9]*/cmdline' 2>/dev/null |
     tr '\0' ' ' | grep 'walg-archive loop' >/dev/null"
+  check "its scripts' account may grant, from its initialization" bash -c \
+    "docker exec -u mysql $run-src mariadb -umysql -N -e 'show grants' | grep 'WITH GRANT OPTION' >/dev/null"
+  # A database made before that: the base backups and restores below need the
+  # grant given back, for the GRANT in the logs.
+  root_sql src "REVOKE GRANT OPTION ON *.* FROM 'mysql'@'localhost'"
   sql_in src "create table t (id int primary key, at timestamp(6) not null default current_timestamp(6))"
   sql_in src "insert into t (id) select seq from seq_1_to_10"
   check "a write is archived within the archive timeout + 15s, unasked" caught_up src $((archive_timeout + 15))
@@ -237,6 +247,7 @@ test_archive() {
   check "walg-nightly backup: lists what is kept" grep -q "^$first@" <<<"$(output BACKUPS)"
   backup_at_10=$first
   sql_in src "insert into t (id) select seq from seq_11_to_20"
+  root_sql src "CREATE USER 'reader'@'%' IDENTIFIED BY 'reader-password-1'; GRANT SELECT ON app.* TO 'reader'@'%'"
   sleep 2
   time_at_20=$(sql_in src "select date_format(utc_timestamp(), '%Y-%m-%dT%H:%i:%sZ')")
   sleep 2
@@ -397,6 +408,10 @@ restore() {
       pass "$kind: archives to its own prefix"
     fi
     restored_r=$(sql_in "$name" "select count(*) from r" 2>/dev/null || echo none)
+    if [ "$kind" != backup ]; then
+      check "$kind: the GRANT in the logs replayed" bash -c \
+        "docker exec -u mysql $run-$name mariadb -umysql -N -e \"show grants for 'reader'@'%'\" | grep 'SELECT ON' >/dev/null"
+    fi
   else
     restored_rows=none restored_r=none
   fi
