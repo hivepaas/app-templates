@@ -734,9 +734,11 @@ test_replicas() {
   job_env=()
   check "the primary's first base backup" job prim walg-nightly backup
 
+  # A database made before its scripts gave its account GRANT OPTION.
+  root_sql prim "REVOKE GRANT OPTION ON *.* FROM 'mysql'@'localhost'"
   docker exec -i "$run-prim" /opt/hivepaas/bin/walg-replication <<<"$password" > "$work/job.log" 2>&1 &&
     code=0 || code=$?
-  check "walg-replication: lets replicas in" test "$code" = 0
+  check "walg-replication: lets replicas in, on a database made before GRANT OPTION" test "$code" = 0
   check "walg-replication: again, as it is" bash -c \
     "docker exec -i $run-prim /opt/hivepaas/bin/walg-replication <<<'$password' >/dev/null"
   check "walg-replication: refuses a password that is not one" bash -c \
