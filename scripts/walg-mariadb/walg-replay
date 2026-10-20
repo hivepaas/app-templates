@@ -1,23 +1,30 @@
 #!/bin/bash
-# walg-replay [--source] --since BACKUP [--until TIME | --position FILE:OFFSET]
+# walg-replay [--source] --since BACKUP [--until TIME | --gtid GTIDS | --position FILE:OFFSET]
 #             [--datadir DIR] [--socket SOCKET] [--work DIR]
 # Replays the binary logs archived since the base backup BACKUP into the server
-# on SOCKET, whose data directory DIR was fetched from that backup: from where
-# the backup stopped - the position it recorded beside the data - to TIME (RFC
-# 3339), to FILE:OFFSET, or to the last log archived. WAL-G's own binlog-replay
-# starts every log at its beginning, and the first one holds what the backup
-# already has. The logs are fetched into the work directory, on the data volume
-# unless DIR names another, and each goes once it is replayed.
+# on SOCKET, whose data directory DIR was fetched from that backup: from the
+# GTID state the backup recorded beside the data, to TIME (RFC 3339), to the
+# transactions GTIDS name (a GTID list, which it includes), to FILE:OFFSET (a
+# point made before points named their GTID), or to the last log archived.
+#   The logs are replayed in the order they were archived, one at a time, each
+# from the GTID state the ones before reached. An archive holds the logs of
+# more than one server - a replica the backup was taken on, a member promoted
+# over the primary - and they repeat each other's transactions: a log all of
+# which is applied already is skipped, and one that starts past the state is a
+# gap, which fails the replay, naming the log. The logs are fetched into the
+# work directory, on the data volume unless DIR names another, and each goes
+# once it is replayed.
 set -euo pipefail
 # shellcheck source=walg-lib
 . /opt/hivepaas/bin/walg-lib
 
-source_flag=() since="" until="" position="" dir=$datadir sock=$socket work=$data_root/hivepaas-replay
+source_flag=() since="" until="" stop_gtid="" position="" dir=$datadir sock=$socket work=$data_root/hivepaas-replay
 while [ $# -gt 0 ]; do
   case $1 in
     --source) source_flag=(--source) ;;
     --since) since=$2; shift ;;
     --until) until=$2; shift ;;
+    --gtid) stop_gtid=$2; shift ;;
     --position) position=$2; shift ;;
     --datadir) dir=$2; shift ;;
     --socket) sock=$2; shift ;;
@@ -26,13 +33,18 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-[ -n "$since" ] || { echo "usage: walg-replay [--source] --since BACKUP [--until TIME | --position FILE:OFFSET]" >&2; exit 2; }
+if [ -z "$since" ]; then
+  echo "usage: walg-replay [--source] --since BACKUP [--until TIME | --gtid GTIDS | --position FILE:OFFSET]" >&2
+  exit 2
+fi
 
-# The backup's position: MariaDB 11 names the file mariadb_backup_binlog_info,
-# 10.x xtrabackup_binlog_info.
+# The backup's GTID state: MariaDB 11 names the file mariadb_backup_binlog_info,
+# 10.x xtrabackup_binlog_info. Its log and offset are the server's it was taken
+# on, which may be a replica's, not in the archive.
 info=$dir/mariadb_backup_binlog_info
 [ -f "$info" ] || info=$dir/xtrabackup_binlog_info
-read -r start_file start_pos _ < "$info"
+state=""
+read -r _ _ state < "$info" || true
 stop_file="" stop_pos=""
 if [ -n "$position" ]; then
   stop_file=${position%%:*}
@@ -40,6 +52,28 @@ if [ -n "$position" ]; then
 fi
 stop_time=""
 if [ -n "$until" ]; then stop_time=$(date -u -d "$until" '+%Y-%m-%d %H:%M:%S'); fi
+
+# advance STATE: STATE moved to the last transaction of each domain the
+# replayed log on stdin names.
+advance() {
+  { grep -o 'GTID [0-9]*-[0-9]*-[0-9]*' || true; } | awk -v state="$1" '
+    { split($2, g, "-"); last[g[1]] = $2 }
+    END {
+      n = split(state, kept, ",")
+      for (i = 1; i <= n; i++) { split(kept[i], g, "-"); if (kept[i] != "" && !(g[1] in last)) last[g[1]] = kept[i] }
+      out = ""
+      for (d in last) out = out (out == "" ? "" : ",") last[d]
+      print out
+    }'
+}
+
+# reached STATE TARGET: whether STATE is at or past every transaction TARGET names.
+reached() {
+  awk -v state="$1" -v target="$2" 'BEGIN {
+    n = split(state, s, ","); for (i = 1; i <= n; i++) { split(s[i], g, "-"); at[g[1]] = g[3] }
+    n = split(target, t, ","); for (i = 1; i <= n; i++) { split(t[i], g, "-"); if (!(g[1] in at) || at[g[1]] + 0 < g[3] + 0) exit 1 }
+    exit 0 }'
+}
 
 rm -rf "$work"
 mkdir -p "$work"
@@ -57,19 +91,31 @@ if [ -n "$stop_file" ] && ! grep -x "$stop_file" "$work/binlogs_order" >/dev/nul
 fi
 # The logs may hold a GRANT, which only an account that may grant replays.
 ensure_grant_option "$sock"
-replayed=0
+replayed=0 skipped=0
+out=$work/replay.sql err=$work/replay.err
 while read -r file; do
-  if [[ $file < $start_file ]]; then continue; fi
-  if [ -n "$stop_file" ] && [[ $file > $stop_file ]]; then break; fi
   opts=()
-  if [ "$file" = "$start_file" ]; then opts+=("--start-position=$start_pos"); fi
+  if [ -n "$state" ]; then opts+=("--start-position=$state"); fi
   if [ -n "$stop_time" ]; then opts+=("--stop-datetime=$stop_time"); fi
+  if [ -n "$stop_gtid" ]; then opts+=("--stop-position=$stop_gtid"); fi
   if [ "$file" = "$stop_file" ]; then opts+=("--stop-position=$stop_pos"); fi
-  echo "Replaying $file ${opts[*]}"
-  TZ=UTC as_mysql mariadb-binlog "${opts[@]}" "$work/$file" |
-    as_mysql mariadb --protocol=socket -S "$sock" -umysql
+  if TZ=UTC as_mysql mariadb-binlog "${opts[@]}" "$work/$file" > "$out" 2> "$err"; then
+    echo "Replaying $file from ${state:-the start}"
+    as_mysql mariadb --protocol=socket -S "$sock" -umysql < "$out"
+    state=$(advance "$state" < "$out")
+    replayed=$((replayed + 1))
+  elif grep "never reached expected GTID state" "$err" >/dev/null; then
+    skipped=$((skipped + 1))
+  else
+    echo "The archive's binary logs break at $file: $(grep -m1 ERROR "$err" || head -n 1 "$err")" >&2
+    exit 1
+  fi
   rm -f "$work/$file"
-  replayed=$((replayed + 1))
   if [ "$file" = "$stop_file" ]; then break; fi
+  if [ -n "$stop_gtid" ] && reached "$state" "$stop_gtid"; then break; fi
 done < <(cat "$work/binlogs_order" 2>/dev/null || true)
-echo "Replayed $replayed binary log(s) since $since."
+if [ -n "$stop_gtid" ] && ! reached "$state" "$stop_gtid"; then
+  echo "The archive does not reach $stop_gtid: the point's transactions are not archived" >&2
+  exit 1
+fi
+echo "Replayed $replayed binary log(s) since $since, skipped $skipped already applied; at ${state:-the backup}."

@@ -10,6 +10,7 @@
 #   HIVEPAAS_RESTORE_TARGET_BACKUP   the base backup to fetch, or else the latest
 #   HIVEPAAS_RESTORE_TARGET_BEFORE   that starts before this time (RFC 3339);
 #   HIVEPAAS_RESTORE_STOP_TIME       replay to this time (RFC 3339), or
+#   HIVEPAAS_RESTORE_STOP_GTID       to these transactions, a GTID list, or
 #   HIVEPAAS_RESTORE_STOP_POSITION   to this binary log position (FILE:OFFSET), or
 #   HIVEPAAS_RESTORE_REPLAY=none     replay nothing: the base backup as it is;
 #   none of these, to the last binary log archived.
@@ -184,6 +185,7 @@ replay() {
     sleep 1
   done
   if [ -n "${HIVEPAAS_RESTORE_STOP_TIME:-}" ]; then opts+=(--until "$HIVEPAAS_RESTORE_STOP_TIME"); fi
+  if [ -n "${HIVEPAAS_RESTORE_STOP_GTID:-}" ]; then opts+=(--gtid "$HIVEPAAS_RESTORE_STOP_GTID"); fi
   if [ -n "${HIVEPAAS_RESTORE_STOP_POSITION:-}" ]; then opts+=(--position "$HIVEPAAS_RESTORE_STOP_POSITION"); fi
   "$bin/walg-replay" --source --since "$backup" "${opts[@]}"
   rc=$?

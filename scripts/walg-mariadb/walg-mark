@@ -2,8 +2,8 @@
 # walg-mark NAME SECONDS: a restore point named NAME, at the end of what the
 # server has written. It closes the binary log the point is in and archives it,
 # waiting up to SECONDS for that: a point is restorable only once it is. It
-# prints POSITION=FILE:OFFSET, which is what a restore targets, and GTID=, the
-# server's position as GTID replication counts it; it exits 75 when the log was
+# prints GTID=, the transactions the point is after, which is what a restore
+# targets, and POSITION=FILE:OFFSET, where the server's log was; it exits 75 when the log was
 # not archived in time. MariaDB has no named restore points: the name is the
 # engine's, and the server keeps nothing of it.
 set -euo pipefail

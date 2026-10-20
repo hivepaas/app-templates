@@ -254,6 +254,7 @@ test_archive() {
   sql_in src "insert into t (id) select seq from seq_21_to_30"
   check "walg-mark: makes a point once its log is archived" job src walg-mark before-31 60
   point_position=$(sed -n 's/^POSITION=//p' "$work/job.log")
+  point_gtid=$(sed -n 's/^GTID=//p' "$work/job.log")
   time_at_30=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   check "walg-mark: prints its position" grep -qE '^mariadb-bin\.[0-9]{6}:[0-9]+$' <<<"$point_position"
   check "walg-mark: and its GTID" grep -qE '^GTID=[0-9]+-[0-9]+-[0-9]+' "$work/job.log"
@@ -347,11 +348,14 @@ test_restore_test() {
 
 # restore NAME KIND: a new app restored from src to a target of KIND. The target
 # is given as the engine gives it.
+# restore NAME KIND: a new app restored from src - or RESTORE_SOURCE - to a
+# target of KIND, as the engine gives it.
 restore() {
-  local name=$1 kind=$2 code
+  local name=$1 kind=$2 code source=${RESTORE_SOURCE:-src}
   local -a target
   case $kind in
-    latest) target=(-e HIVEPAAS_RESTORE_TARGET_BACKUP=LATEST) ;;
+    latest | gap) target=(-e HIVEPAAS_RESTORE_TARGET_BACKUP=LATEST) ;;
+    point-gtid) target=(-e "HIVEPAAS_RESTORE_TARGET_BEFORE=$time_at_30" -e "HIVEPAAS_RESTORE_STOP_GTID=$point_gtid") ;;
     time) target=(-e "HIVEPAAS_RESTORE_TARGET_BEFORE=$time_at_20" -e "HIVEPAAS_RESTORE_STOP_TIME=$time_at_20") ;;
     point) target=(-e "HIVEPAAS_RESTORE_TARGET_BEFORE=$time_at_30"
       -e "HIVEPAAS_RESTORE_STOP_POSITION=$point_position") ;;
@@ -365,7 +369,7 @@ restore() {
   cp "$work/secrets-src"/WALG_* "$work/secrets-$name/restore/"
   start_db "$name" "walg/$name-$version" "$work/secrets-$name" \
     -e HIVEPAAS_RESTORE_SECRETS_DIR=/run/secrets/walg/restore \
-    -e "HIVEPAAS_RESTORE_WALG_S3_PREFIX=s3://backups/walg/src-$version" \
+    -e "HIVEPAAS_RESTORE_WALG_S3_PREFIX=s3://backups/walg/$source-$version" \
     -e "HIVEPAAS_RESTORE_AWS_ENDPOINT=http://$run-s3:8333" -e HIVEPAAS_RESTORE_AWS_REGION=us-east-1 \
     -e HIVEPAAS_RESTORE_AWS_S3_FORCE_PATH_STYLE=true "${target[@]}" \
     --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
@@ -376,6 +380,12 @@ restore() {
     sleep 1
   done
   docker logs "$run-$name" > "$work/job.log" 2>&1
+  if [ "$kind" = gap ]; then
+    check "a log gone from the middle fails the restore" test "$code" = 1
+    check "naming where the logs break" grep -q "binary logs break at" "$work/status.log"
+    docker rm -fv "$run-$name" >/dev/null
+    return
+  fi
   if [ "$kind" = missing ]; then
     check "a point the archive does not have fails the restore" test "$code" = 1
     check "saying so" grep -q "The archive has no mariadb-bin.999999" "$work/status.log"
@@ -408,7 +418,7 @@ restore() {
       pass "$kind: archives to its own prefix"
     fi
     restored_r=$(sql_in "$name" "select count(*) from r" 2>/dev/null || echo none)
-    if [ "$kind" != backup ]; then
+    if [ "$kind" != backup ] && [ "$source" = src ]; then
       check "$kind: the GRANT in the logs replayed" bash -c \
         "docker exec -u mysql $run-$name mariadb -umysql -N -e \"show grants for 'reader'@'%'\" | grep 'SELECT ON' >/dev/null"
     fi
@@ -430,6 +440,8 @@ test_restores() {
   restore restored-backup backup
   check "backup: holds the 10 rows of the base backup" test "$restored_rows" = 10
   restore restored-missing missing
+  restore restored-point-gtid point-gtid
+  check "point by GTID: holds the 30 rows written before it" test "$restored_rows" = 30
 
   # The state of a restore before, on the volume, is not this one's.
   restore restored-reused time
@@ -613,6 +625,52 @@ test_retention() {
   check "walg-nightly retain: naming it" grep -q "the archive lacks $gone" "$work/job.log"
 }
 
+# A server whose binary logs change their name - as a promoted member's are its
+# own - its archive holding both: restores replay across them, by GTID, and the
+# chain check follows each.
+test_basenames() {
+  say "binary logs of two names in one archive"
+  local volume=$run-renamed gone gtid code
+  start_db renamed "walg/renamed-$version" "$work/secrets-src" --entrypoint /opt/hivepaas/bin/walg-entrypoint \
+    -- "${server_args[@]}"
+  wait_ready renamed || { fail "it starts"; return; }
+  sql_in renamed "create table t (id int primary key)"
+  sql_in renamed "insert into t select seq from seq_1_to_10"
+  job renamed walg-nightly backup >/dev/null || true
+  sql_in renamed "insert into t select seq from seq_11_to_20"
+  check "its logs are archived" caught_up renamed
+  gtid=$(sql_in renamed "select @@gtid_binlog_pos")
+  # Stopped, the server keeps its GTID state beside its logs, by their name: the
+  # state given to the new name goes on from it, as a promoted member's does.
+  docker stop -t 60 "$run-renamed" >/dev/null
+  docker rm "$run-renamed" >/dev/null
+  docker run --rm -v "$volume:/var/lib/mysql" --entrypoint cp "$image" -p /var/lib/mysql/data/mariadb-bin.state \
+    /var/lib/mysql/data/mariadb-bin-b.state
+  DB_VOLUME=$volume start_db renamed-b "walg/renamed-$version" "$work/secrets-src" \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]/--log-bin=mariadb-bin/--log-bin=mariadb-bin-b}"
+  wait_ready renamed-b || { fail "it starts again"; return; }
+  check "it writes logs of another name" grep -q '^mariadb-bin-b' <<<"$(active_log renamed-b)"
+  check "and goes on from the GTID state of the first ($gtid)" test "$(sql_in renamed-b "select @@gtid_binlog_pos")" = "$gtid"
+  local n
+  for n in 21 31 41; do
+    sql_in renamed-b "insert into t select seq from seq_${n}_to_$((n + 9))"
+    check "rows $n to $((n + 9)) archived, in $(active_log renamed-b)" caught_up renamed-b
+  done
+  job_env=()
+  check "walg-nightly retain: the chain follows, each name's" job renamed-b walg-nightly retain
+  check "naming both" grep -q "mariadb-bin mariadb-bin-b\|mariadb-bin-b mariadb-bin" "$work/job.log"
+  RESTORE_SOURCE=renamed restore restored-renamed latest
+  check "latest, across both names: the 50 rows" test "$restored_rows" = 50
+
+  gone=$(archived_logs renamed-b | grep '^mariadb-bin-b' | sed -n 2p)
+  docker exec "$run-renamed-b" /opt/hivepaas/bin/walg-run st rm "binlog_005/$gone.zst" >/dev/null 2>&1
+  job renamed-b walg-nightly retain && code=0 || code=$?
+  check "walg-nightly retain: fails on $gone gone" test "$code" = 1
+  check "naming it" grep -q "lacks $gone" "$work/job.log"
+  RESTORE_SOURCE=renamed restore restored-gap gap
+  docker rm -fv "$run-renamed-b" >/dev/null
+}
+
 # --- each version ------------------------------------------------------------
 
 run_version() {
@@ -627,6 +685,7 @@ print(next(v['image'] for v in d['versions'] if v['name']==sys.argv[2]))" "$temp
   if test_archive; then
     test_restore_test
     test_restores
+    test_basenames
     test_passthrough
     test_fresh_start
     test_secrets

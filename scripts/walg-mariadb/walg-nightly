@@ -18,34 +18,39 @@ list_outputs() {
   if [ -n "$oldest" ]; then out OLDEST_BACKUP_AT "$(rfc3339 "$oldest")"; fi
 }
 
-# verify_chain: every binary log a restore of the oldest base backup kept
-# replays, one after another, to the last archived. A backup's binlog_start is
-# the last log archived when it started: it begins in a later one, and the
-# retention that keeps it may delete binlog_start itself.
+# verify_chain: every server's binary logs in the archive, one after another
+# by number - a log the server purged before it was pushed is a gap a restore
+# stops at. The logs of the server the oldest base backup kept was taken on are
+# checked from the one after its binlog_start, the last log archived when it
+# started, which retention may have deleted; another server's - a member
+# promoted since - from its first. A backup taken before any log was archived
+# names none: then every server's logs are checked from their first.
 verify_chain() {
-  local start first prev name number missing=""
-  start=$("$bin/walg-run" backup-list --detail --json | grep -o '"binlog_start":"[^"]*"' | cut -d'"' -f4 |
-    sort | sed -n 1p || true)
-  if [ -z "$start" ]; then
+  local backups start name base number missing="" from
+  declare -A prev=()
+  backups=$("$bin/walg-run" backup-list --detail --json)
+  if ! grep -q '"backup_name"' <<<"$backups"; then
     echo "No base backup: no binary log chain to check."
     return 0
   fi
-  first=${start%.*}.$(printf '%06d' $((10#${start##*.} + 1)))
-  prev=$((10#${first##*.} - 1))
+  start=$(grep -o '"binlog_start":"[^"]*"' <<<"$backups" | cut -d'"' -f4 | sort | sed -n 1p || true)
+  if [ -n "$start" ]; then prev[${start%.*}]=$((10#${start##*.})); fi
   while read -r name; do
-    if [[ $name < $first ]]; then continue; fi
-    number=$((10#${name##*.}))
-    if [ "$number" != $((prev + 1)) ]; then
-      missing+=" ${name%.*}.$(printf '%06d' $((prev + 1)))"
+    base=${name%.*} number=$((10#${name##*.}))
+    if [ -n "$start" ] && [ "$base" = "${start%.*}" ] && [ "$number" -le $((10#${start##*.})) ]; then continue; fi
+    if [ -n "${prev[$base]:-}" ] && [ "$number" != $((prev[$base] + 1)) ]; then
+      missing+=" $base.$(printf '%06d' $((prev[$base] + 1)))"
     fi
-    prev=$number
+    prev[$base]=$number
   done < <(archived_binlogs)
   if [ -n "$missing" ]; then
     echo "The binary log chain is broken: the archive lacks${missing} and what follows each, to the next" \
       "it has. A restore would stop there" >&2
     return 1
   fi
-  echo "The binary logs from $first on follow one another."
+  from=""
+  for base in "${!prev[@]}"; do from+=" $base"; done
+  echo "The binary logs of${from} follow one another."
 }
 
 case ${1:-} in
