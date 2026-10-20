@@ -125,10 +125,12 @@ start_db() {
   done
   shift
   mapfile -t env < <(archive_env "$prefix")
-  docker volume create --label "$run" --label "$run-db" "$run-$name" >/dev/null
+  # DB_VOLUME is a volume another database had: its name, to make it this one's.
+  local volume=${DB_VOLUME:-$run-$name}
+  docker volume create --label "$run" --label "$run-db" "$volume" >/dev/null
   # --init as HivePaaS runs it: docker's init is PID 1, and reaps what is detached.
   docker run -d --init --label "$run" --label "$run-db" --name "$run-$name" --network "$run" \
-    -v "$run-$name:/var/lib/mysql" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$secrets:/run/secrets/walg:ro" \
+    -v "$volume:/var/lib/mysql" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$secrets:/run/secrets/walg:ro" \
     "${env[@]}" "${opts[@]}" "$image" "$@" >/dev/null
 }
 
@@ -384,7 +386,16 @@ restore() {
     : > "$work/job.log"
     restored_rows=$(sql_in "$name" "select count(*) from t" 2>/dev/null)
     sql_in "$name" "insert into t (id) values (5000)"
-    check "$kind: archives to its own prefix" caught_up "$name"
+    if ! caught_up "$name"; then
+      {
+        docker logs "$run-$name" 2>&1 | grep -E "walg-archive|walg-entrypoint" | tail -n 10
+        docker exec "$run-$name" sh -c 'cat /var/lib/mysql/hivepaas-archive.state; ls -la /var/lib/mysql'
+        sql_in "$name" "show binary logs"
+      } > "$work/job.log" 2>&1
+      fail "$kind: archives to its own prefix"
+    else
+      pass "$kind: archives to its own prefix"
+    fi
     restored_r=$(sql_in "$name" "select count(*) from r" 2>/dev/null || echo none)
   else
     restored_rows=none restored_r=none
@@ -407,7 +418,7 @@ test_restores() {
 
   # The state of a restore before, on the volume, is not this one's.
   restore restored-reused time
-  restore restored-reused latest
+  DB_VOLUME=$run-restored-reused restore restored-reused-again latest
   check "latest, into a volume restored to a time before: holds the 40 rows" test "$restored_rows" = 40
 }
 

@@ -9613,7 +9613,7 @@
       "name": "mariadb-managed",
       "file": {
         "path": "templates/mariadb-managed.yaml",
-        "sha256": "0e7bd1d67868e15a4cf032cee3293073209ae374083058da7d4053c501f5ed8a"
+        "sha256": "60ee6fa2d5dd9110fecd12df1bbf70584fd849555df5724ec25cfcebc489abe2"
       },
       "icon": {
         "path": "icons/mariadb.svg",
@@ -13985,7 +13985,7 @@
       "name": "postgres-managed",
       "file": {
         "path": "templates/postgres-managed.yaml",
-        "sha256": "a1a2ab3d225b4cbc8726c5ce2f77cff373513d81ae62618ad3bb4f29472e72ba"
+        "sha256": "7eac0adfd773a4f5ab9d6a66d65c815a66c2c290fea1b71d49775e818935cfa4"
       },
       "icon": {
         "path": "icons/postgres.svg",
