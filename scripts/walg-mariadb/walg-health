@@ -12,6 +12,44 @@ if [ -s "$(refusal_file)" ]; then
   exit 1
 fi
 
+# replicas: the replicas streaming from this member, as REPLICAS lists them:
+# name@state@bytes@seconds, space-separated. The member lists them by the name
+# each reports; each is asked its own state, as replication_user, which
+# walg-replication left the password of: streaming, connecting or stopped; how
+# many bytes of this member's logs it has not applied; and Seconds_Behind_Master,
+# empty when it has none to say.
+replicas() {
+  local options name port status io sqlr file pos seconds bytes said list=()
+  options=$(replication_options)
+  local logs
+  logs=$(sql "show binary logs")
+  while read -r _ name port _; do
+    [ -n "$name" ] || continue
+    status=""
+    if [ -s "$options" ]; then
+      status=$(mariadb --defaults-extra-file="$options" -h "$name" -P "${port:-3306}" --connect-timeout=5 -E \
+        -e "show slave status" 2>/dev/null | sed -n 's/^ *\([A-Za-z_]*\): \(.*\)$/\1=\2/p' || true)
+    fi
+    io=$(sed -n 's/^Slave_IO_Running=//p' <<<"$status")
+    sqlr=$(sed -n 's/^Slave_SQL_Running=//p' <<<"$status")
+    file=$(sed -n 's/^Relay_Master_Log_File=//p' <<<"$status")
+    pos=$(sed -n 's/^Exec_Master_Log_Pos=//p' <<<"$status")
+    seconds=$(sed -n 's/^Seconds_Behind_Master=//p' <<<"$status")
+    if [ "$seconds" = NULL ]; then seconds=""; fi
+    case $io/$sqlr in
+      Yes/Yes) said=streaming ;;
+      Connecting/*) said=connecting ;;
+      /) said=streaming ;; # listed, but not to be asked
+      *) said=stopped ;;
+    esac
+    # The logs from the one it applies in, less what it applied of that one.
+    bytes=$(awk -v file="$file" -v pos="${pos:-0}" \
+      '$1 == file {on = 1; sum -= pos} on {sum += $2} END {print (on ? sum : 0)}' <<<"$logs")
+    list+=("$name@$said@$bytes@$seconds")
+  done < <(sql "show slave hosts" | awk -F'\t' '{print $1, $2, $3, $4}')
+  echo "${list[*]}"
+}
+
 state=$(archive_state)
 get() { sed -n "s/^$1=//p" "$state" 2>/dev/null | tail -n 1; }
 timeout=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
@@ -47,8 +85,7 @@ out PENDING_BYTES "$pending_bytes"
 out DB_BYTES "$db_bytes"
 out FREE_BYTES "$free_bytes"
 out READY_COUNT "$ready"
-# Replicas come in a later engine API.
-out REPLICAS ""
+out REPLICAS "$(replicas)"
 printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pendingBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
   "$health" "$last_archived_at" "$failed_count" "$ready" "$pending_bytes" "$db_bytes" "$free_bytes"
 if [ "$health" != ok ]; then

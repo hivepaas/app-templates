@@ -16,6 +16,13 @@
 #   none of these, to the last binary log archived.
 #   A binary log replay is not repeatable, as PostgreSQL's recovery is: a restore
 # stopped before it ended fetches the base backup again.
+#   A replica (walg-lib, standby) is seeded from the archive, never from an
+# empty directory: the latest base backup is fetched, the server started on its
+# socket alone, the binary logs archived since replayed into it, and the GTID
+# state reached made where replication starts. walg-archive connects it to the
+# member that writes once it serves. One it cannot seed idles, and never starts
+# a database of its own. Each start adds the member's server arguments
+# (member_args).
 #   A primary initializes an empty data directory only over an archive that holds
 # nothing. One that holds base backups or binary logs was written by this
 # database: initialized here, it would archive into that history. It idles
@@ -60,7 +67,12 @@ status() {
       grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$log" | tail -n 5
       exit 1
       ;;
-    fetching | replaying) exit 75 ;;
+    standby-failed)
+      echo "The replica could not be seeded:"
+      grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$log" | tail -n 5
+      exit 1
+      ;;
+    fetching | replaying | standby-seeding) exit 75 ;;
   esac
   if sql "select 1" >/dev/null 2>&1; then exit 0; fi
   exit 75
@@ -70,6 +82,9 @@ health() {
   if [ -s "$(refusal_file)" ]; then exit 0; fi
   if restoring; then
     case $(state) in fetching | replaying | failed) exit 0 ;; esac
+  fi
+  if standby; then
+    case $(state) in standby-seeding | standby-failed) exit 0 ;; esac
   fi
   sql "select 1" >/dev/null 2>&1
 }
@@ -168,29 +183,86 @@ fetch() {
   set_state replaying
 }
 
-# replay ARGS...: the server on its socket alone, the binary logs replayed into
-# it to the target, and the server stopped: the next start is an ordinary one.
-replay() {
-  local backup pid rc opts=()
-  backup=$(cat "$data_root/hivepaas-restore.backup")
-  if [ "${HIVEPAAS_RESTORE_REPLAY:-}" = none ]; then return 0; fi
-  as_mysql "$@" --skip-networking --socket="$socket" &
-  pid=$!
+# start_local ARGS...: the server on its socket alone, waited for; its pid in
+# local_pid.
+start_local() {
+  as_mysql "$@" --skip-networking --skip-slave-start --socket="$socket" &
+  local_pid=$!
   for _ in $(seq 300); do
-    if sql "select 1" >/dev/null 2>&1; then break; fi
-    if ! kill -0 "$pid" 2>/dev/null; then
+    if sql "select 1" >/dev/null 2>&1; then return 0; fi
+    if ! kill -0 "$local_pid" 2>/dev/null; then
       echo "The server stopped before it answered" >&2
       return 1
     fi
     sleep 1
   done
+  echo "The server did not answer in 300s" >&2
+  return 1
+}
+
+stop_local() {
+  as_mysql mariadb-admin --protocol=socket -S "$socket" -umysql shutdown >/dev/null 2>&1 || kill "$local_pid"
+  wait "$local_pid"
+}
+
+# standby_seed ARGS...: the data seeded from the archive's latest base backup,
+# and the binary logs archived since; replication starts from the GTID state
+# they reach. The server's own binary logs, of the member's name, hold what was
+# replayed with the GTIDs it was written with, so that the member's logs go on
+# from the cluster's state if it is promoted.
+standby_seed() {
+  local backup reached rc
+  if [ ! -r "${HIVEPAAS_STANDBY_PASSWORD_FILE:-}" ]; then
+    echo "The replication password is not given (HIVEPAAS_STANDBY_PASSWORD_FILE)" >&2
+    return 1
+  fi
+  # Seeded before; anything else - a seed that stopped or failed, another
+  # database's data - is seeded again, at each start until it is.
+  if [ "$(state)" = standby ] && [ -d "$datadir/mysql" ]; then return 0; fi
+  set_state standby-seeding
+  mkdir -p "$datadir"
+  find "$datadir" -mindepth 1 -delete
+  forget_archive_state
+  chown mysql:mysql "$data_root" "$datadir"
+  backup=$(backups | tail -n 1 | cut -d' ' -f1)
+  if [ -z "$backup" ]; then
+    echo "The archive holds no base backup to seed the replica from" >&2
+    return 1
+  fi
+  echo "Seeding the replica from $backup..."
+  "$bin/walg-run" backup-fetch "$backup" || return 1
+  start_local "$@" || return 1
+  reached=$data_root/hivepaas-seed.gtid
+  "$bin/walg-replay" --since "$backup" --state-out "$reached"
+  rc=$?
+  if [ "$rc" = 0 ]; then
+    # The logs replayed carry their GTIDs into the member's own; with none
+    # replayed, the member's logs start from the backup's state.
+    if [ -z "$(sql "select @@gtid_binlog_pos")" ] && [ -s "$reached" ]; then
+      sql "SET GLOBAL gtid_binlog_state = '$(cat "$reached")'" >/dev/null || rc=$?
+    fi
+    sql "SET GLOBAL gtid_slave_pos = '$(cat "$reached" 2>/dev/null)'" >/dev/null || rc=$?
+  fi
+  stop_local
+  rm -f "$reached"
+  if [ "$rc" != 0 ]; then return "$rc"; fi
+  set_state standby
+  echo "Seeded; replication starts from the state reached."
+}
+
+# replay ARGS...: the server on its socket alone, the binary logs replayed into
+# it to the target, and the server stopped: the next start is an ordinary one.
+replay() {
+  local backup rc opts=()
+  backup=$(cat "$data_root/hivepaas-restore.backup")
+  if [ "${HIVEPAAS_RESTORE_REPLAY:-}" = none ]; then return 0; fi
+  start_local "$@" || return 1
   if [ -n "${HIVEPAAS_RESTORE_STOP_TIME:-}" ]; then opts+=(--until "$HIVEPAAS_RESTORE_STOP_TIME"); fi
   if [ -n "${HIVEPAAS_RESTORE_STOP_GTID:-}" ]; then opts+=(--gtid "$HIVEPAAS_RESTORE_STOP_GTID"); fi
   if [ -n "${HIVEPAAS_RESTORE_STOP_POSITION:-}" ]; then opts+=(--position "$HIVEPAAS_RESTORE_STOP_POSITION"); fi
   "$bin/walg-replay" --source --since "$backup" "${opts[@]}"
   rc=$?
-  as_mysql mariadb-admin --protocol=socket -S "$socket" -umysql shutdown >/dev/null 2>&1 || kill "$pid"
-  wait "$pid"
+  stop_local
   return $rc
 }
 
@@ -203,6 +275,23 @@ case ${1:-} in
 esac
 
 hold_data_lock
+args=("$@")
+if [ "${1:-}" = mariadbd ]; then
+  mapfile -t member < <(member_args)
+  args+=("${member[@]}")
+fi
+set -- "${args[@]}"
+if standby; then
+  mkdir -p "$data_root"
+  touch "$log"
+  chown mysql:mysql "$data_root" "$log"
+  if ! standby_seed "$@" >> "$log" 2>&1; then
+    set_state standby-failed
+    echo "The replica could not be seeded from the archive; it idles rather than start empty: see $log." >&2
+    idle
+  fi
+  serve "$@"
+fi
 if ! restoring; then
   rm -f "$(refusal_file)"
   if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then

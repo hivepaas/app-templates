@@ -4,6 +4,8 @@
 # (SeaweedFS). Each version is a set of throwaway containers, removed afterwards.
 #
 #   scripts/test/walg-mariadb/run.sh [11.8] [11.4]     both when none is given
+#   ONLY=replicas scripts/test/walg-mariadb/run.sh 11.8   one of the tests that
+#                                                       stand alone
 #
 # Needs docker, python3 with PyYAML, jq, curl and sha256sum. The containers are
 # plain ones on a network of their own: nothing is deployed to a swarm.
@@ -671,6 +673,142 @@ test_basenames() {
   docker rm -fv "$run-renamed-b" >/dev/null
 }
 
+# --- replicas -----------------------------------------------------------------
+
+# start_replica NAME ID PREFIX: a replica of prim, as the engine gives one:
+# the primary's settings, with the standby's variables, its server id and log
+# name, and the replication password as a file.
+start_replica() {
+  local name=$1 id=$2 prefix=${3:-walg/prim-$version}
+  start_db "$name" "$prefix" "$work/secrets-src" -e "HIVEPAAS_STANDBY_HOST=$run-prim" \
+    -e "HIVEPAAS_STANDBY_NAME=$run-$name" -e HIVEPAAS_STANDBY_PASSWORD_FILE=/run/hivepaas-replication/password \
+    -e "HIVEPAAS_SERVER_ID=$id" -e "HIVEPAAS_LOG_BIN=mariadb-bin-$name" -v "$work/repl:/run/hivepaas-replication:ro" \
+    --entrypoint /opt/hivepaas/bin/walg-entrypoint -- "${server_args[@]}"
+}
+
+# writing: rows written to prim's t, two a second, until stop_writing.
+writing() {
+  touch "$work/writing"
+  (
+    n=100000
+    while [ -f "$work/writing" ]; do
+      n=$((n + 1))
+      sql_in prim "insert into t (id) values ($n)" >/dev/null 2>&1 || true
+      sleep 0.5
+    done
+  ) &
+  writer_pid=$!
+}
+stop_writing() {
+  rm -f "$work/writing"
+  wait "$writer_pid" 2>/dev/null || true
+}
+
+# same_rows NAME SECONDS: the replica holds prim's rows of t, in time.
+same_rows() {
+  local want
+  want=$(sql_in prim "select count(*), max(id) from t")
+  for _ in $(seq "${2:-60}"); do
+    if [ "$(sql_in "$1" "select count(*), max(id) from t" 2>/dev/null)" = "$want" ]; then return 0; fi
+    sleep 1
+  done
+  echo "$1: $(sql_in "$1" "select count(*), max(id) from t" 2>&1), prim: $want" > "$work/job.log"
+  docker logs "$run-$1" 2>&1 | grep -E "walg-|ERROR" | tail -n 10 >> "$work/job.log"
+  return 1
+}
+
+test_replicas() {
+  say "replicas: seeded from the archive under writes, streaming, caught up, backed up on"
+  local password code backup
+  password=$(head -c 30 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-40)
+  mkdir -p "$work/repl"
+  rm -f "$work/repl/password"
+  printf '%s' "$password" > "$work/repl/password"
+  chmod 444 "$work/repl/password"
+  start_db prim "walg/prim-$version" "$work/secrets-src" --entrypoint /opt/hivepaas/bin/walg-entrypoint \
+    -- "${server_args[@]}"
+  wait_ready prim || { fail "the primary starts"; return; }
+  sql_in prim "create table t (id int primary key, at timestamp(6) not null default current_timestamp(6))"
+  sql_in prim "insert into t (id) select seq from seq_1_to_10"
+  job_env=()
+  check "the primary's first base backup" job prim walg-nightly backup
+
+  docker exec -i "$run-prim" /opt/hivepaas/bin/walg-replication <<<"$password" > "$work/job.log" 2>&1 &&
+    code=0 || code=$?
+  check "walg-replication: lets replicas in" test "$code" = 0
+  check "walg-replication: again, as it is" bash -c \
+    "docker exec -i $run-prim /opt/hivepaas/bin/walg-replication <<<'$password' >/dev/null"
+  check "walg-replication: refuses a password that is not one" bash -c \
+    "! docker exec -i $run-prim /opt/hivepaas/bin/walg-replication <<<'short' >/dev/null 2>&1"
+  check "walg-replication: keeps the password for walg-health, the mysql user's alone, beside the data" \
+    test "$(docker exec "$run-prim" stat -c '%U %a' /var/lib/mysql/hivepaas-replication.cnf)" = "mysql 600"
+
+  writing
+  start_replica r1 2
+  start_replica r2 3
+  wait_ready r1 || fail "replica 1 starts"
+  wait_ready r2 || fail "replica 2 starts"
+  check "replica 1 was seeded from the archive" docker exec "$run-r1" grep -q "^Seeding the replica from stream_" \
+    /var/lib/mysql/hivepaas-restore.log
+  sleep 5
+  stop_writing
+  check "replica 1 holds the primary's rows, written while it was seeded" same_rows r1
+  check "replica 2 too" same_rows r2
+  check "a replica is read-only to the app" bash -c \
+    "! docker exec $run-r1 mariadb -uapp -papp-password-1 app -e 'insert into t (id) values (1)' 2>/dev/null"
+  check "a replica writes binary logs of its own name" grep -q '^mariadb-bin-r1\.' <<<"$(active_log r1)"
+  check "with the primary's GTIDs" test "$(sql_in r1 "select @@gtid_binlog_pos")" = \
+    "$(sql_in prim "select @@gtid_binlog_pos")"
+  check "the primary's archive loop archives what was written" caught_up prim
+  check "a replica pushes none of its logs" bash -c "! grep -q mariadb-bin-r <<<'$(archived_logs prim)'"
+  check "walg-health: lists the replicas" job prim walg-health
+  check "walg-health: both streaming" bash -c "grep -q '$run-r1@streaming@[0-9]*@[0-9]*' <<<'$(output REPLICAS)' &&
+    grep -q '$run-r2@streaming@' <<<'$(output REPLICAS)'"
+  check "the password is on no process's arguments" bash -c "! docker exec $run-r1 sh -c 'cat /proc/[0-9]*/cmdline' |
+    tr '\0' ' ' | grep -q '$password' && ! docker exec $run-prim sh -c 'cat /proc/[0-9]*/cmdline' | tr '\0' ' ' |
+    grep -q '$password'"
+
+  # A replica behind what the primary keeps: stopped while the primary writes
+  # and archives - and purges what it archived.
+  docker stop "$run-r2" >/dev/null
+  writing
+  sleep $((archive_timeout * 3))
+  stop_writing
+  check "the primary archived on" caught_up prim
+  docker start "$run-r2" >/dev/null
+  wait_ready r2 || fail "replica 2 starts again"
+  check "replica 2, behind what the primary keeps, catches up from the archive" same_rows r2 90
+  check "saying so" bash -c "docker logs $run-r2 2>&1 | grep -q 'catching up from the archive'"
+  check "and streams again" bash -c "sleep 3; [ \"\$(docker exec -u mysql $run-r2 mariadb -umysql -E -e 'show slave status' |
+    sed -n 's/^ *Slave_IO_Running: //p')\" = Yes ]"
+  check "not seeded again" test "$(docker exec "$run-r2" grep -c '^Seeding' /var/lib/mysql/hivepaas-restore.log)" = 1
+
+  # A base backup taken on a replica restores, by its GTID, over the primary's logs.
+  check "walg-nightly backup on a replica" job r1 walg-nightly backup
+  backup=$(output BACKUP_NAME)
+  check "in the cluster's archive, its latest ($backup)" test "$(docker exec "$run-prim" /opt/hivepaas/bin/walg-run \
+    backup-list --json 2>/dev/null | jq -r 'sort_by(.time) | last | .backup_name')" = "$backup"
+  sql_in prim "insert into t (id) select seq from seq_11_to_15"
+  check "the primary archives the rows after it" caught_up prim
+  RESTORE_SOURCE=prim restore restored-replica latest
+  check "latest, from the replica's backup: the primary's rows" test "$restored_rows" = \
+    "$(sql_in prim "select count(*) from t")"
+  check "walg-nightly retain on the primary: the chain still follows" job prim walg-nightly retain
+
+  # A replica the archive cannot seed idles, saying why.
+  start_replica r9 9 "walg/none-$version"
+  for _ in $(seq 60); do
+    docker exec "$run-r9" /opt/hivepaas/bin/walg-entrypoint status > "$work/status.log" 2>&1 && code=0 || code=$?
+    if [ "$code" != 75 ]; then break; fi
+    sleep 1
+  done
+  check "a replica the archive cannot seed: status fails" test "$code" = 1
+  check "saying why" grep -q "no base backup to seed" "$work/status.log"
+  check "healthy, so that it is not restarted" docker exec "$run-r9" /opt/hivepaas/bin/walg-entrypoint health
+  check "and runs no server" bash -c "! docker exec $run-r9 sh -c 'cat /proc/[0-9]*/comm' | grep -qx mariadbd"
+  docker rm -fv "$run-r1" "$run-r2" "$run-r9" "$run-prim" >/dev/null
+}
+
 # --- each version ------------------------------------------------------------
 
 run_version() {
@@ -682,10 +820,13 @@ print(next(v['image'] for v in d['versions'] if v['name']==sys.argv[2]))" "$temp
   secrets "$work/secrets-src" "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   own_key=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
   docker volume create --label "$run" --label "$run-db" "$run-verify-$version" >/dev/null
-  if test_archive; then
+  if [ -n "${ONLY:-}" ]; then
+    "test_$ONLY"
+  elif test_archive; then
     test_restore_test
     test_restores
     test_basenames
+    test_replicas
     test_passthrough
     test_fresh_start
     test_secrets

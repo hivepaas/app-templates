@@ -167,6 +167,33 @@ app:
           datadir=$data_root/data
           socket=/run/mysqld/mysqld.sock
 
+          # A replica (walg-entrypoint's standby mode) streams from the member that
+          # writes, HIVEPAAS_STANDBY_HOST, as replication_user: its password the file
+          # HIVEPAAS_STANDBY_PASSWORD_FILE names, its name HIVEPAAS_STANDBY_NAME. Every
+          # member's server has an id and binary logs of its own: HIVEPAAS_SERVER_ID and
+          # HIVEPAAS_LOG_BIN, when the engine gives them, override the command's.
+          replication_user=hivepaas_replica
+          standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+
+          # replication_options: the option file walg-health reaches the replicas with, as
+          # replication_user: walg-replication writes it beside the data directory - not
+          # in it, so that no base backup holds it - readable by the mysql user alone.
+          replication_options() {
+            echo "$data_root/hivepaas-replication.cnf"
+          }
+
+          # member_args: the server arguments this member adds to the command: its id and
+          # its binary logs' name, and a replica's read-only state and the name the
+          # member that writes lists it by.
+          member_args() {
+            if [ -n "${HIVEPAAS_SERVER_ID:-}" ]; then echo "--server-id=$HIVEPAAS_SERVER_ID"; fi
+            if [ -n "${HIVEPAAS_LOG_BIN:-}" ]; then echo "--log-bin=$HIVEPAAS_LOG_BIN"; fi
+            if standby; then
+              echo "--read-only"
+              echo "--report-host=${HIVEPAAS_STANDBY_NAME:-replica}"
+            fi
+          }
+
           # as_mysql COMMAND...: COMMAND as the mysql user, the owner of the data. The
           # scripts reach the server as mysql@localhost, which the unix socket identifies:
           # no password is used, or kept anywhere.
@@ -381,6 +408,13 @@ app:
           # archive state, which walg-health reads. loop runs a pass every
           # HIVEPAAS_ARCHIVE_TIMEOUT seconds (60) for as long as the container lives;
           # walg-entrypoint starts it beside the server.
+          #   On a replica (walg-lib, standby) a pass never pushes: the member that writes
+          # archives. It connects the replica to that member, by GTID - again when the
+          # member named changes; catches it up from the archive when that member no
+          # longer has the logs it needs (error 1236), replaying them from the replica's
+          # GTID state before streaming again; and purges the replica's own logs older
+          # than a margin - two archive timeouts, an hour at least - which keeps what a
+          # promotion may still need of them.
           set -uo pipefail
           # shellcheck source=walg-lib
           . /opt/hivepaas/bin/walg-lib
@@ -397,8 +431,90 @@ app:
             } > "$tmp" && mv "$tmp" "$state"
           }
 
+          # slave_status: SHOW SLAVE STATUS, a "Field: value" line each; none when the
+          # server is not a replica yet.
+          slave_status() {
+            as_mysql mariadb --protocol=socket -S "$socket" -umysql -E -e "show slave status" 2>/dev/null |
+              sed -n 's/^ *\([A-Za-z_]*\): \(.*\)$/\1=\2/p'
+          }
+          field() { sed -n "s/^$1=//p" <<<"$2" | head -n 1; }
+
+          # local_sql SQL: on the replica alone: nothing of it reaches its binary logs,
+          # which a promotion would hand on.
+          local_sql() {
+            as_mysql mariadb --protocol=socket -S "$socket" -umysql -N -B <<<"SET sql_log_bin=0; $1"
+          }
+
+          # connect: replication from HIVEPAAS_STANDBY_HOST by GTID, as replication_user,
+          # the password read from its file into the statement on the client's stdin.
+          connect() {
+            local password
+            if [[ ! $HIVEPAAS_STANDBY_HOST =~ ^[A-Za-z0-9._-]+$ ]]; then
+              fail "not a host: $HIVEPAAS_STANDBY_HOST"
+              return 1
+            fi
+            password=$(cat "${HIVEPAAS_STANDBY_PASSWORD_FILE:-/dev/null}" 2>/dev/null)
+            if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+              fail "the replication password is not given, or not 16 to 128 letters and digits"
+              return 1
+            fi
+            printf '%s\n' "STOP SLAVE;" \
+              "CHANGE MASTER TO MASTER_HOST='$HIVEPAAS_STANDBY_HOST', MASTER_PORT=3306, MASTER_USER='$replication_user'," \
+              "  MASTER_PASSWORD='$password', MASTER_USE_GTID=slave_pos, MASTER_CONNECT_RETRY=10;" \
+              "START SLAVE;" | as_mysql mariadb --protocol=socket -S "$socket" -umysql
+          }
+
+          # catch_up: the logs the member that writes no longer has, replayed from the
+          # archive - every log the oldest base backup kept reaches, the replay skipping
+          # what the replica has - and streaming started again from where they reach.
+          catch_up() {
+            local from oldest reached=$data_root/hivepaas-catch-up.gtid
+            from=$(sql "select @@gtid_slave_pos")
+            oldest=$(backups | head -n 1 | cut -d' ' -f1)
+            if [ -z "$oldest" ]; then
+              fail "the replica is behind what the member that writes keeps, and the archive has no base backup to catch up from"
+              return 1
+            fi
+            echo "walg-archive: the member that writes no longer has the logs from $from: catching up from the archive" >&2
+            local_sql "STOP SLAVE" >/dev/null || true
+            if ! "$bin/walg-replay" --since "$oldest" --from "$from" --state-out "$reached" > "$state.err" 2>&1; then
+              fail "catching up from the archive failed: $(tail -n 1 "$state.err" | cut -c1-300)"
+              local_sql "START SLAVE" >/dev/null || true
+              return 1
+            fi
+            local_sql "SET GLOBAL gtid_slave_pos = '$(cat "$reached")'; START SLAVE" >/dev/null || {
+              fail "replication could not start again after catching up"
+              return 1
+            }
+            rm -f "$reached" "$state.err"
+          }
+
+          replica_pass() {
+            local status margin
+            if ! sql "select 1" >/dev/null 2>&1; then return 0; fi
+            status=$(slave_status)
+            if [ "$(field Master_Host "$status")" != "$HIVEPAAS_STANDBY_HOST" ]; then
+              connect || return 1
+              status=$(slave_status)
+            fi
+            if [ "$(field Last_IO_Errno "$status")" = 1236 ]; then
+              catch_up || return 1
+            elif [ "$(field Slave_IO_Running "$status")" = No ] && [ "$(field Last_IO_Errno "$status")" = 0 ] &&
+              [ "$(field Last_SQL_Errno "$status")" = 0 ]; then
+              local_sql "START SLAVE" >/dev/null || true
+            fi
+            margin=$((2 * interval))
+            if [ "$margin" -lt 3600 ]; then margin=3600; fi
+            sql "purge binary logs before date_sub(now(), interval $margin second)" >/dev/null || true
+            put "LAST_SUCCESS=$(date +%s)" "FAILED_COUNT=0" "LAST_ERROR="
+          }
+
           pass() {
             local status file offset flushed
+            if standby; then
+              replica_pass
+              return
+            fi
             if ! status=$(binlog_status 2>/dev/null) || [ -z "$status" ]; then
               return 0 # not up yet, or still initializing: nothing to archive
             fi
@@ -465,8 +581,8 @@ app:
       walg-replay:
         content: |
           #!/bin/bash
-          # walg-replay [--source] --since BACKUP [--until TIME | --gtid GTIDS | --position FILE:OFFSET]
-          #             [--datadir DIR] [--socket SOCKET] [--work DIR]
+          # walg-replay [--source] --since BACKUP [--from GTIDS] [--until TIME | --gtid GTIDS | --position FILE:OFFSET]
+          #             [--datadir DIR] [--socket SOCKET] [--work DIR] [--state-out FILE]
           # Replays the binary logs archived since the base backup BACKUP into the server
           # on SOCKET, whose data directory DIR was fetched from that backup: from the
           # GTID state the backup recorded beside the data, to TIME (RFC 3339), to the
@@ -480,15 +596,20 @@ app:
           # gap, which fails the replay, naming the log. The logs are fetched into the
           # work directory, on the data volume unless DIR names another, and each goes
           # once it is replayed.
+          #   --from starts from a GTID state of the caller's, a replica's catching up,
+          # instead of the backup's; --state-out writes the state reached to FILE.
           set -euo pipefail
           # shellcheck source=walg-lib
           . /opt/hivepaas/bin/walg-lib
 
-          source_flag=() since="" until="" stop_gtid="" position="" dir=$datadir sock=$socket work=$data_root/hivepaas-replay
+          source_flag=() since="" from="" from_given="" until="" stop_gtid="" position="" dir=$datadir sock=$socket
+          work=$data_root/hivepaas-replay state_out=""
           while [ $# -gt 0 ]; do
             case $1 in
               --source) source_flag=(--source) ;;
               --since) since=$2; shift ;;
+              --from) from=$2 from_given=1; shift ;;
+              --state-out) state_out=$2; shift ;;
               --until) until=$2; shift ;;
               --gtid) stop_gtid=$2; shift ;;
               --position) position=$2; shift ;;
@@ -507,10 +628,12 @@ app:
           # The backup's GTID state: MariaDB 11 names the file mariadb_backup_binlog_info,
           # 10.x xtrabackup_binlog_info. Its log and offset are the server's it was taken
           # on, which may be a replica's, not in the archive.
-          info=$dir/mariadb_backup_binlog_info
-          [ -f "$info" ] || info=$dir/xtrabackup_binlog_info
-          state=""
-          read -r _ _ state < "$info" || true
+          state=$from
+          if [ -z "$from_given" ]; then
+            info=$dir/mariadb_backup_binlog_info
+            [ -f "$info" ] || info=$dir/xtrabackup_binlog_info
+            read -r _ _ state < "$info" || true
+          fi
           stop_file="" stop_pos=""
           if [ -n "$position" ]; then
             stop_file=${position%%:*}
@@ -584,6 +707,7 @@ app:
             echo "The archive does not reach $stop_gtid: the point's transactions are not archived" >&2
             exit 1
           fi
+          if [ -n "$state_out" ]; then echo "$state" > "$state_out"; fi
           echo "Replayed $replayed binary log(s) since $since, skipped $skipped already applied; at ${state:-the backup}."
         swarmRef:
           file: {name: /opt/hivepaas/bin/walg-replay, mode: 555}
@@ -693,6 +817,44 @@ app:
             exit 1
           fi
 
+          # replicas: the replicas streaming from this member, as REPLICAS lists them:
+          # name@state@bytes@seconds, space-separated. The member lists them by the name
+          # each reports; each is asked its own state, as replication_user, which
+          # walg-replication left the password of: streaming, connecting or stopped; how
+          # many bytes of this member's logs it has not applied; and Seconds_Behind_Master,
+          # empty when it has none to say.
+          replicas() {
+            local options name port status io sqlr file pos seconds bytes said list=()
+            options=$(replication_options)
+            local logs
+            logs=$(sql "show binary logs")
+            while read -r _ name port _; do
+              [ -n "$name" ] || continue
+              status=""
+              if [ -s "$options" ]; then
+                status=$(mariadb --defaults-extra-file="$options" -h "$name" -P "${port:-3306}" --connect-timeout=5 -E \
+                  -e "show slave status" 2>/dev/null | sed -n 's/^ *\([A-Za-z_]*\): \(.*\)$/\1=\2/p' || true)
+              fi
+              io=$(sed -n 's/^Slave_IO_Running=//p' <<<"$status")
+              sqlr=$(sed -n 's/^Slave_SQL_Running=//p' <<<"$status")
+              file=$(sed -n 's/^Relay_Master_Log_File=//p' <<<"$status")
+              pos=$(sed -n 's/^Exec_Master_Log_Pos=//p' <<<"$status")
+              seconds=$(sed -n 's/^Seconds_Behind_Master=//p' <<<"$status")
+              if [ "$seconds" = NULL ]; then seconds=""; fi
+              case $io/$sqlr in
+                Yes/Yes) said=streaming ;;
+                Connecting/*) said=connecting ;;
+                /) said=streaming ;; # listed, but not to be asked
+                *) said=stopped ;;
+              esac
+              # The logs from the one it applies in, less what it applied of that one.
+              bytes=$(awk -v file="$file" -v pos="${pos:-0}" \
+                '$1 == file {on = 1; sum -= pos} on {sum += $2} END {print (on ? sum : 0)}' <<<"$logs")
+              list+=("$name@$said@$bytes@$seconds")
+            done < <(sql "show slave hosts" | awk -F'\t' '{print $1, $2, $3, $4}')
+            echo "${list[*]}"
+          }
+
           state=$(archive_state)
           get() { sed -n "s/^$1=//p" "$state" 2>/dev/null | tail -n 1; }
           timeout=${HIVEPAAS_ARCHIVE_TIMEOUT:-60}
@@ -728,8 +890,7 @@ app:
           out DB_BYTES "$db_bytes"
           out FREE_BYTES "$free_bytes"
           out READY_COUNT "$ready"
-          # Replicas come in a later engine API.
-          out REPLICAS ""
+          out REPLICAS "$(replicas)"
           printf '{"state":"%s","lastArchivedAt":"%s","failedCount":%s,"readyCount":%s,"pendingBytes":%s,"dbBytes":%s,"freeBytes":%s}\n' \
             "$health" "$last_archived_at" "$failed_count" "$ready" "$pending_bytes" "$db_bytes" "$free_bytes"
           if [ "$health" != ok ]; then
@@ -885,6 +1046,13 @@ app:
           #   none of these, to the last binary log archived.
           #   A binary log replay is not repeatable, as PostgreSQL's recovery is: a restore
           # stopped before it ended fetches the base backup again.
+          #   A replica (walg-lib, standby) is seeded from the archive, never from an
+          # empty directory: the latest base backup is fetched, the server started on its
+          # socket alone, the binary logs archived since replayed into it, and the GTID
+          # state reached made where replication starts. walg-archive connects it to the
+          # member that writes once it serves. One it cannot seed idles, and never starts
+          # a database of its own. Each start adds the member's server arguments
+          # (member_args).
           #   A primary initializes an empty data directory only over an archive that holds
           # nothing. One that holds base backups or binary logs was written by this
           # database: initialized here, it would archive into that history. It idles
@@ -929,7 +1097,12 @@ app:
                 grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$log" | tail -n 5
                 exit 1
                 ;;
-              fetching | replaying) exit 75 ;;
+              standby-failed)
+                echo "The replica could not be seeded:"
+                grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2} ' "$log" | tail -n 5
+                exit 1
+                ;;
+              fetching | replaying | standby-seeding) exit 75 ;;
             esac
             if sql "select 1" >/dev/null 2>&1; then exit 0; fi
             exit 75
@@ -939,6 +1112,9 @@ app:
             if [ -s "$(refusal_file)" ]; then exit 0; fi
             if restoring; then
               case $(state) in fetching | replaying | failed) exit 0 ;; esac
+            fi
+            if standby; then
+              case $(state) in standby-seeding | standby-failed) exit 0 ;; esac
             fi
             sql "select 1" >/dev/null 2>&1
           }
@@ -1037,29 +1213,86 @@ app:
             set_state replaying
           }
 
-          # replay ARGS...: the server on its socket alone, the binary logs replayed into
-          # it to the target, and the server stopped: the next start is an ordinary one.
-          replay() {
-            local backup pid rc opts=()
-            backup=$(cat "$data_root/hivepaas-restore.backup")
-            if [ "${HIVEPAAS_RESTORE_REPLAY:-}" = none ]; then return 0; fi
-            as_mysql "$@" --skip-networking --socket="$socket" &
-            pid=$!
+          # start_local ARGS...: the server on its socket alone, waited for; its pid in
+          # local_pid.
+          start_local() {
+            as_mysql "$@" --skip-networking --skip-slave-start --socket="$socket" &
+            local_pid=$!
             for _ in $(seq 300); do
-              if sql "select 1" >/dev/null 2>&1; then break; fi
-              if ! kill -0 "$pid" 2>/dev/null; then
+              if sql "select 1" >/dev/null 2>&1; then return 0; fi
+              if ! kill -0 "$local_pid" 2>/dev/null; then
                 echo "The server stopped before it answered" >&2
                 return 1
               fi
               sleep 1
             done
+            echo "The server did not answer in 300s" >&2
+            return 1
+          }
+
+          stop_local() {
+            as_mysql mariadb-admin --protocol=socket -S "$socket" -umysql shutdown >/dev/null 2>&1 || kill "$local_pid"
+            wait "$local_pid"
+          }
+
+          # standby_seed ARGS...: the data seeded from the archive's latest base backup,
+          # and the binary logs archived since; replication starts from the GTID state
+          # they reach. The server's own binary logs, of the member's name, hold what was
+          # replayed with the GTIDs it was written with, so that the member's logs go on
+          # from the cluster's state if it is promoted.
+          standby_seed() {
+            local backup reached rc
+            if [ ! -r "${HIVEPAAS_STANDBY_PASSWORD_FILE:-}" ]; then
+              echo "The replication password is not given (HIVEPAAS_STANDBY_PASSWORD_FILE)" >&2
+              return 1
+            fi
+            # Seeded before; anything else - a seed that stopped or failed, another
+            # database's data - is seeded again, at each start until it is.
+            if [ "$(state)" = standby ] && [ -d "$datadir/mysql" ]; then return 0; fi
+            set_state standby-seeding
+            mkdir -p "$datadir"
+            find "$datadir" -mindepth 1 -delete
+            forget_archive_state
+            chown mysql:mysql "$data_root" "$datadir"
+            backup=$(backups | tail -n 1 | cut -d' ' -f1)
+            if [ -z "$backup" ]; then
+              echo "The archive holds no base backup to seed the replica from" >&2
+              return 1
+            fi
+            echo "Seeding the replica from $backup..."
+            "$bin/walg-run" backup-fetch "$backup" || return 1
+            start_local "$@" || return 1
+            reached=$data_root/hivepaas-seed.gtid
+            "$bin/walg-replay" --since "$backup" --state-out "$reached"
+            rc=$?
+            if [ "$rc" = 0 ]; then
+              # The logs replayed carry their GTIDs into the member's own; with none
+              # replayed, the member's logs start from the backup's state.
+              if [ -z "$(sql "select @@gtid_binlog_pos")" ] && [ -s "$reached" ]; then
+                sql "SET GLOBAL gtid_binlog_state = '$(cat "$reached")'" >/dev/null || rc=$?
+              fi
+              sql "SET GLOBAL gtid_slave_pos = '$(cat "$reached" 2>/dev/null)'" >/dev/null || rc=$?
+            fi
+            stop_local
+            rm -f "$reached"
+            if [ "$rc" != 0 ]; then return "$rc"; fi
+            set_state standby
+            echo "Seeded; replication starts from the state reached."
+          }
+
+          # replay ARGS...: the server on its socket alone, the binary logs replayed into
+          # it to the target, and the server stopped: the next start is an ordinary one.
+          replay() {
+            local backup rc opts=()
+            backup=$(cat "$data_root/hivepaas-restore.backup")
+            if [ "${HIVEPAAS_RESTORE_REPLAY:-}" = none ]; then return 0; fi
+            start_local "$@" || return 1
             if [ -n "${HIVEPAAS_RESTORE_STOP_TIME:-}" ]; then opts+=(--until "$HIVEPAAS_RESTORE_STOP_TIME"); fi
             if [ -n "${HIVEPAAS_RESTORE_STOP_GTID:-}" ]; then opts+=(--gtid "$HIVEPAAS_RESTORE_STOP_GTID"); fi
             if [ -n "${HIVEPAAS_RESTORE_STOP_POSITION:-}" ]; then opts+=(--position "$HIVEPAAS_RESTORE_STOP_POSITION"); fi
             "$bin/walg-replay" --source --since "$backup" "${opts[@]}"
             rc=$?
-            as_mysql mariadb-admin --protocol=socket -S "$socket" -umysql shutdown >/dev/null 2>&1 || kill "$pid"
-            wait "$pid"
+            stop_local
             return $rc
           }
 
@@ -1072,6 +1305,23 @@ app:
           esac
 
           hold_data_lock
+          args=("$@")
+          if [ "${1:-}" = mariadbd ]; then
+            mapfile -t member < <(member_args)
+            args+=("${member[@]}")
+          fi
+          set -- "${args[@]}"
+          if standby; then
+            mkdir -p "$data_root"
+            touch "$log"
+            chown mysql:mysql "$data_root" "$log"
+            if ! standby_seed "$@" >> "$log" 2>&1; then
+              set_state standby-failed
+              echo "The replica could not be seeded from the archive; it idles rather than start empty: see $log." >&2
+              idle
+            fi
+            serve "$@"
+          fi
           if ! restoring; then
             rm -f "$(refusal_file)"
             if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then
@@ -1106,5 +1356,41 @@ app:
           serve "$@"
         swarmRef:
           file: {name: /opt/hivepaas/bin/walg-entrypoint, mode: 555}
+      walg-replication:
+        content: |
+          #!/bin/bash
+          # walg-replication: lets the database's replicas in. It reads the replication
+          # account's password on stdin - never an argument, never the environment -
+          # makes $replication_user with it, or gives the account it, with what a replica
+          # needs of the member that writes: REPLICATION SLAVE to stream, SLAVE MONITOR
+          # for walg-health to read each replica's state. The account is in the binary
+          # logs, so every replica has it too, as a member promoted needs. It keeps the
+          # password in replication_options for walg-health. It runs again as it is, the
+          # password changed or not.
+          set -euo pipefail
+          # shellcheck source=walg-lib
+          . /opt/hivepaas/bin/walg-lib
+
+          IFS= read -r password || true
+          if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+            echo "walg-replication: the password must be 16 to 128 letters and digits, on stdin" >&2
+            exit 2
+          fi
+          # The password reaches the client on its stdin: it is in no process's arguments.
+          printf '%s\n' \
+            "CREATE USER IF NOT EXISTS '$replication_user'@'%' IDENTIFIED BY '$password';" \
+            "ALTER USER '$replication_user'@'%' IDENTIFIED BY '$password';" \
+            "GRANT REPLICATION SLAVE, SLAVE MONITOR ON *.* TO '$replication_user'@'%';" |
+            as_mysql mariadb --protocol=socket -S "$socket" -umysql
+          options=$(replication_options)
+          (
+            umask 077
+            printf '[client]\nuser=%s\npassword="%s"\n' "$replication_user" "$password" > "$options.new"
+          )
+          if [ "$(id -u)" = 0 ]; then chown mysql:mysql "$options.new"; fi
+          mv "$options.new" "$options"
+          echo "Replicas may connect as $replication_user."
+        swarmRef:
+          file: {name: /opt/hivepaas/bin/walg-replication, mode: 555}
     routing:
       port: 3306

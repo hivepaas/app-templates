@@ -1,6 +1,6 @@
 #!/bin/bash
-# walg-replay [--source] --since BACKUP [--until TIME | --gtid GTIDS | --position FILE:OFFSET]
-#             [--datadir DIR] [--socket SOCKET] [--work DIR]
+# walg-replay [--source] --since BACKUP [--from GTIDS] [--until TIME | --gtid GTIDS | --position FILE:OFFSET]
+#             [--datadir DIR] [--socket SOCKET] [--work DIR] [--state-out FILE]
 # Replays the binary logs archived since the base backup BACKUP into the server
 # on SOCKET, whose data directory DIR was fetched from that backup: from the
 # GTID state the backup recorded beside the data, to TIME (RFC 3339), to the
@@ -14,15 +14,20 @@
 # gap, which fails the replay, naming the log. The logs are fetched into the
 # work directory, on the data volume unless DIR names another, and each goes
 # once it is replayed.
+#   --from starts from a GTID state of the caller's, a replica's catching up,
+# instead of the backup's; --state-out writes the state reached to FILE.
 set -euo pipefail
 # shellcheck source=walg-lib
 . /opt/hivepaas/bin/walg-lib
 
-source_flag=() since="" until="" stop_gtid="" position="" dir=$datadir sock=$socket work=$data_root/hivepaas-replay
+source_flag=() since="" from="" from_given="" until="" stop_gtid="" position="" dir=$datadir sock=$socket
+work=$data_root/hivepaas-replay state_out=""
 while [ $# -gt 0 ]; do
   case $1 in
     --source) source_flag=(--source) ;;
     --since) since=$2; shift ;;
+    --from) from=$2 from_given=1; shift ;;
+    --state-out) state_out=$2; shift ;;
     --until) until=$2; shift ;;
     --gtid) stop_gtid=$2; shift ;;
     --position) position=$2; shift ;;
@@ -41,10 +46,12 @@ fi
 # The backup's GTID state: MariaDB 11 names the file mariadb_backup_binlog_info,
 # 10.x xtrabackup_binlog_info. Its log and offset are the server's it was taken
 # on, which may be a replica's, not in the archive.
-info=$dir/mariadb_backup_binlog_info
-[ -f "$info" ] || info=$dir/xtrabackup_binlog_info
-state=""
-read -r _ _ state < "$info" || true
+state=$from
+if [ -z "$from_given" ]; then
+  info=$dir/mariadb_backup_binlog_info
+  [ -f "$info" ] || info=$dir/xtrabackup_binlog_info
+  read -r _ _ state < "$info" || true
+fi
 stop_file="" stop_pos=""
 if [ -n "$position" ]; then
   stop_file=${position%%:*}
@@ -118,4 +125,5 @@ if [ -n "$stop_gtid" ] && ! reached "$state" "$stop_gtid"; then
   echo "The archive does not reach $stop_gtid: the point's transactions are not archived" >&2
   exit 1
 fi
+if [ -n "$state_out" ]; then echo "$state" > "$state_out"; fi
 echo "Replayed $replayed binary log(s) since $since, skipped $skipped already applied; at ${state:-the backup}."
