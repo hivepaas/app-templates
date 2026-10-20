@@ -118,6 +118,15 @@ hold_data_lock() {
   ( exec -a hivepaas-data-lock sleep infinity & )
 }
 
+# forget_archive_state: the archive loop's state is the data directory's: one
+# made afresh, or fetched, starts from none. Another database's - the volume
+# had one before - would compare its logs with those it no longer has; and
+# WAL-G's own record of the last log it pushed, which it keeps in the mysql
+# user's home, the volume, would have it skip this one's logs, numbered afresh.
+forget_archive_state() {
+  rm -f "$(archive_state)" "$(archive_state).err" "$data_root/.walg_mysql_binlogs_cache"
+}
+
 # serve ARGS...: the image's entrypoint, with the archive loop beside the server.
 # The loop runs detached twice, so that it is not the server's child once this
 # script has become the server.
@@ -138,6 +147,7 @@ fetch() {
   set_state fetching
   mkdir -p "$datadir"
   find "$datadir" -mindepth 1 -delete
+  forget_archive_state
   chown mysql:mysql "$data_root" "$datadir"
   if [ -z "$backup" ]; then
     backup=$(backup_before "$(date -u -d "${HIVEPAAS_RESTORE_TARGET_BEFORE:?a restore needs its target}" +%s)" \
@@ -185,7 +195,10 @@ esac
 hold_data_lock
 if ! restoring; then
   rm -f "$(refusal_file)"
-  if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then guard_fresh_start; fi
+  if [ "${1:-}" = mariadbd ] && [ ! -d "$datadir/mysql" ]; then
+    guard_fresh_start
+    forget_archive_state
+  fi
   serve "$@"
 fi
 case $(state) in

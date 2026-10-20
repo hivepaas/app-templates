@@ -119,10 +119,12 @@ start_db() {
   done
   shift
   mapfile -t env < <(archive_env "$prefix")
-  docker volume create --label "$run" --label "$run-db" "$run-$name" >/dev/null
+  # DB_VOLUME is a volume another database had: its name, to make it this one's.
+  local volume=${DB_VOLUME:-$run-$name}
+  docker volume create --label "$run" --label "$run-db" "$volume" >/dev/null
   # --init as HivePaaS runs it: docker's init is PID 1, and reaps what is detached.
   docker run -d --init --label "$run" --label "$run-db" --name "$run-$name" --network "$run" \
-    -v "$run-$name:$data_mount" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$secrets:/run/secrets/walg:ro" \
+    -v "$volume:$data_mount" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$secrets:/run/secrets/walg:ro" \
     "${env[@]}" "${version_env[@]}" "${opts[@]}" "$image" "$@" >/dev/null
 }
 
@@ -349,12 +351,16 @@ test_restores() {
   restore restored-point point 30
   restore restored-backup backup 10
   restore restored-future future 0
+
+  # The state of a restore before, on the volume, is not this one's.
+  restore restored-reused time 20
+  DB_VOLUME=$run-restored-reused restore restored-reused-again latest 40
 }
 
 test_retention() {
   say "retention, before the backup the engine keeps from"
   check "walg-nightly retain: deletes before $second" job src walg-nightly retain "$second"
-  check "walg-nightly retain: keeps $second and after" test "$(output BACKUPS | wc -w)" = 2
+  check "walg-nightly retain: keeps $second and after: $(output BACKUPS)" test "$(output BACKUPS | wc -w)" = 2
   check "walg-nightly retain: the oldest is gone" bash -c "! grep -q '$backup_at_10@' <<<'$(output BACKUPS)'"
   check "walg-nightly retain: and the chain still verifies" grep -q '"status":"OK"' "$work/job.log"
 }
@@ -368,7 +374,39 @@ test_passthrough() {
   check "it starts as the image's own does" wait_ready plain
   check "status: up and promoted" docker exec "$run-plain" /opt/hivepaas/bin/walg-entrypoint status
   check "health: healthy" docker exec "$run-plain" /opt/hivepaas/bin/walg-entrypoint health
-  docker rm -fv "$run-plain" >/dev/null
+
+  # A second container on its volume, as a rollout's next task can be before the
+  # last one has stopped: one server at a time.
+  local code
+  check "a process of its own holds the data lock" bash -c "docker exec $run-plain sh -c \
+    'ls -l /proc/\$(pgrep -f ^hivepaas-data-lock)/fd' | grep hivepaas-server.lock >/dev/null"
+  twin twin-late -e HIVEPAAS_DATA_LOCK_TIMEOUT=3
+  code=$(timeout 60 docker wait "$run-twin-late" 2>/dev/null || echo running)
+  docker logs "$run-twin-late" > "$work/job.log" 2>&1
+  check "a second server beside it gives up after its wait" test "$code" = 1
+  check "saying so" grep -q "another server still runs on this volume" "$work/job.log"
+  : > "$work/job.log"
+  twin twin
+  sleep 5
+  docker logs "$run-twin" > "$work/job.log" 2>&1
+  check "a second server waits for the first" grep -q "waiting for it to stop" "$work/job.log"
+  : > "$work/job.log"
+  check "and starts none meanwhile" bash -c "! docker exec $run-twin pgrep -x postgres >/dev/null"
+  docker stop "$run-plain" >/dev/null
+  check "it starts once the first has stopped" wait_ready twin
+  docker rm -fv "$run-twin" "$run-twin-late" "$run-plain" >/dev/null
+}
+
+# twin NAME [docker options...]: a second database on plain's volume.
+twin() {
+  local name=$1
+  shift
+  local -a env
+  mapfile -t env < <(archive_env "walg/plain-$major")
+  docker run -d --init --label "$run" --label "$run-db" --name "$run-$name" --network "$run" \
+    -v "$run-plain:$data_mount" -v "$work/bin:/opt/hivepaas/bin:ro" -v "$work/secrets-plain:/run/secrets/walg:ro" \
+    "${env[@]}" "${version_env[@]}" "$@" --entrypoint /opt/hivepaas/bin/walg-entrypoint "$image" "${server_args[@]}" \
+    >/dev/null
 }
 
 # replica_follows NAME ID SECONDS: the row ID written on src is on the replica in time.

@@ -34,8 +34,8 @@ export WALG_STREAM_CREATE_COMMAND="mariadb-backup --backup --stream=xbstream --u
 export WALG_STREAM_RESTORE_COMMAND="mbstream -x -C $target"
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariadb-backup --prepare --target-dir=$target"
 export WALG_MYSQL_BINLOG_DST=${WALG_MYSQL_BINLOG_DST:-/tmp/hivepaas-binlogs}
-# WAL-G keeps what it pushed in a cache under HOME; the mysql user has none.
-export HOME=/tmp
+# WAL-G keeps the last binary log it pushed in a cache in HOME: gosu makes it
+# the mysql user's, the volume, so that a restart does not push again.
 if [ "$(id -u)" = 0 ]; then
   exec gosu mysql /opt/hivepaas/bin/wal-g "$@"
 fi

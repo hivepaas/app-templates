@@ -588,6 +588,8 @@ app:
           # Initialized here, it would archive into that history: it idles instead, saying
           # why. An archive it cannot read within HIVEPAAS_ARCHIVE_CHECK_TIMEOUT seconds
           # (60) fails the start, for Swarm to start it again.
+          #   One server at a time runs on the volume: a second container waits up to
+          # HIVEPAAS_DATA_LOCK_TIMEOUT seconds (300) for the first to stop, then fails.
           #   walg-entrypoint status: 0 once the server is up and promoted, 75 while it
           #     starts or recovers, 1 when the recovery failed, having printed why.
           #   walg-entrypoint health: the container's health check, healthy while it
@@ -598,10 +600,23 @@ app:
 
           state_dir=$(data_root)/hivepaas-restore
           log=$state_dir/recovery.log
-          state() { cat "$state_dir/state" 2>/dev/null || true; }
+          # state_id: what the state is of, as the variables the database is given say
+          # it - a restore's source and target, and the app's own archive, which is each
+          # app's own. The state of another restore on the volume - a volume restored
+          # before, into another app or to another target - is none of this one's: it
+          # fetches again.
+          state_id() {
+            env | grep -E '^(HIVEPAAS_RESTORE_|WALG_S3_PREFIX=|WALG_FILE_PREFIX=)' | sort | sha256sum | cut -c1-16
+          }
+          state() {
+            local value id
+            if [ ! -f "$state_dir/state" ]; then return 0; fi
+            read -r value id < "$state_dir/state" || true
+            if [ "$id" = "$(state_id)" ]; then echo "$value"; fi
+          }
           set_state() {
             mkdir -p "$state_dir"
-            echo "$1" > "$state_dir/state.new" && mv "$state_dir/state.new" "$state_dir/state"
+            echo "$1 $(state_id)" > "$state_dir/state.new" && mv "$state_dir/state.new" "$state_dir/state"
           }
           restoring() { [ -n "${HIVEPAAS_RESTORE_SECRETS_DIR:-}" ]; }
           standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
@@ -764,6 +779,25 @@ app:
             fi
           }
 
+          # hold_data_lock: the data directory is this container's alone, for as long as
+          # its server runs. Two tasks of the service can overlap on the volume for a
+          # moment - Swarm starts a rollout's task without waiting for the task of one it
+          # superseded to stop - and two servers on one data directory corrupt it: in
+          # another container, the other's postmaster.pid names a process that is not
+          # there. The lock is on the volume, held by a process of its own for as long as
+          # the container lives: it goes when the container does.
+          hold_data_lock() {
+            exec 9>>"$(data_root)/hivepaas-server.lock"
+            if ! flock -n 9; then
+              echo "walg-entrypoint: another server runs on this volume; waiting for it to stop" >&2
+              if ! flock -w "${HIVEPAAS_DATA_LOCK_TIMEOUT:-300}" 9; then
+                echo "walg-entrypoint: another server still runs on this volume: not starting beside it" >&2
+                exit 1
+              fi
+            fi
+            ( exec -a hivepaas-data-lock sleep infinity & )
+          }
+
           # serve ARGS...: the image's entrypoint, with one checkpoint once a server it
           # starts is up. The checkpoint runs detached twice, so that it is not the server's
           # child once this script has become the server.
@@ -777,6 +811,7 @@ app:
             health) health ;;
           esac
 
+          hold_data_lock
           if fenced; then
             echo "walg-entrypoint: fenced ($HIVEPAAS_FENCED): another member is the primary; this one idles and never" \
               "starts its server" >&2
@@ -807,7 +842,9 @@ app:
               ;;
             "done") serve "$@" ;;
           esac
-          if [ "$(state)" = fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
+          # A restore starts by fetching, unless it has: a volume restored before, or
+          # holding another database, is not this restore's data.
+          if [ -z "$(state)" ] || [ "$(state)" = fetching ] || [ ! -s "$PGDATA/PG_VERSION" ]; then
             if ! fetch; then
               set_state failed
               echo "The base backup could not be fetched; the database idles so that its restore can say why." | tee -a "$log" >&2
