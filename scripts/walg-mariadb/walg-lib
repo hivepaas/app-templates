@@ -9,6 +9,33 @@ data_root=/var/lib/mysql
 datadir=$data_root/data
 socket=/run/mysqld/mysqld.sock
 
+# A replica (walg-entrypoint's standby mode) streams from the member that
+# writes, HIVEPAAS_STANDBY_HOST, as replication_user: its password the file
+# HIVEPAAS_STANDBY_PASSWORD_FILE names, its name HIVEPAAS_STANDBY_NAME. Every
+# member's server has an id and binary logs of its own: HIVEPAAS_SERVER_ID and
+# HIVEPAAS_LOG_BIN, when the engine gives them, override the command's.
+replication_user=hivepaas_replica
+standby() { [ -n "${HIVEPAAS_STANDBY_HOST:-}" ]; }
+
+# replication_options: the option file walg-health reaches the replicas with, as
+# replication_user: walg-replication writes it beside the data directory - not
+# in it, so that no base backup holds it - readable by the mysql user alone.
+replication_options() {
+  echo "$data_root/hivepaas-replication.cnf"
+}
+
+# member_args: the server arguments this member adds to the command: its id and
+# its binary logs' name, and a replica's read-only state and the name the
+# member that writes lists it by.
+member_args() {
+  if [ -n "${HIVEPAAS_SERVER_ID:-}" ]; then echo "--server-id=$HIVEPAAS_SERVER_ID"; fi
+  if [ -n "${HIVEPAAS_LOG_BIN:-}" ]; then echo "--log-bin=$HIVEPAAS_LOG_BIN"; fi
+  if standby; then
+    echo "--read-only"
+    echo "--report-host=${HIVEPAAS_STANDBY_NAME:-replica}"
+  fi
+}
+
 # as_mysql COMMAND...: COMMAND as the mysql user, the owner of the data. The
 # scripts reach the server as mysql@localhost, which the unix socket identifies:
 # no password is used, or kept anywhere.

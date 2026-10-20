@@ -1,0 +1,32 @@
+#!/bin/bash
+# walg-replication: lets the database's replicas in. It reads the replication
+# account's password on stdin - never an argument, never the environment -
+# makes $replication_user with it, or gives the account it, with what a replica
+# needs of the member that writes: REPLICATION SLAVE to stream, SLAVE MONITOR
+# for walg-health to read each replica's state. The account is in the binary
+# logs, so every replica has it too, as a member promoted needs. It keeps the
+# password in replication_options for walg-health. It runs again as it is, the
+# password changed or not.
+set -euo pipefail
+# shellcheck source=walg-lib
+. /opt/hivepaas/bin/walg-lib
+
+IFS= read -r password || true
+if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+  echo "walg-replication: the password must be 16 to 128 letters and digits, on stdin" >&2
+  exit 2
+fi
+# The password reaches the client on its stdin: it is in no process's arguments.
+printf '%s\n' \
+  "CREATE USER IF NOT EXISTS '$replication_user'@'%' IDENTIFIED BY '$password';" \
+  "ALTER USER '$replication_user'@'%' IDENTIFIED BY '$password';" \
+  "GRANT REPLICATION SLAVE, SLAVE MONITOR ON *.* TO '$replication_user'@'%';" |
+  as_mysql mariadb --protocol=socket -S "$socket" -umysql
+options=$(replication_options)
+(
+  umask 077
+  printf '[client]\nuser=%s\npassword="%s"\n' "$replication_user" "$password" > "$options.new"
+)
+if [ "$(id -u)" = 0 ]; then chown mysql:mysql "$options.new"; fi
+mv "$options.new" "$options"
+echo "Replicas may connect as $replication_user."

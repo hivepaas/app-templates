@@ -8,6 +8,13 @@
 # archive state, which walg-health reads. loop runs a pass every
 # HIVEPAAS_ARCHIVE_TIMEOUT seconds (60) for as long as the container lives;
 # walg-entrypoint starts it beside the server.
+#   On a replica (walg-lib, standby) a pass never pushes: the member that writes
+# archives. It connects the replica to that member, by GTID - again when the
+# member named changes; catches it up from the archive when that member no
+# longer has the logs it needs (error 1236), replaying them from the replica's
+# GTID state before streaming again; and purges the replica's own logs older
+# than a margin - two archive timeouts, an hour at least - which keeps what a
+# promotion may still need of them.
 set -uo pipefail
 # shellcheck source=walg-lib
 . /opt/hivepaas/bin/walg-lib
@@ -24,8 +31,90 @@ put() { # put KEY=VALUE...: the state with those keys replaced, written whole
   } > "$tmp" && mv "$tmp" "$state"
 }
 
+# slave_status: SHOW SLAVE STATUS, a "Field: value" line each; none when the
+# server is not a replica yet.
+slave_status() {
+  as_mysql mariadb --protocol=socket -S "$socket" -umysql -E -e "show slave status" 2>/dev/null |
+    sed -n 's/^ *\([A-Za-z_]*\): \(.*\)$/\1=\2/p'
+}
+field() { sed -n "s/^$1=//p" <<<"$2" | head -n 1; }
+
+# local_sql SQL: on the replica alone: nothing of it reaches its binary logs,
+# which a promotion would hand on.
+local_sql() {
+  as_mysql mariadb --protocol=socket -S "$socket" -umysql -N -B <<<"SET sql_log_bin=0; $1"
+}
+
+# connect: replication from HIVEPAAS_STANDBY_HOST by GTID, as replication_user,
+# the password read from its file into the statement on the client's stdin.
+connect() {
+  local password
+  if [[ ! $HIVEPAAS_STANDBY_HOST =~ ^[A-Za-z0-9._-]+$ ]]; then
+    fail "not a host: $HIVEPAAS_STANDBY_HOST"
+    return 1
+  fi
+  password=$(cat "${HIVEPAAS_STANDBY_PASSWORD_FILE:-/dev/null}" 2>/dev/null)
+  if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
+    fail "the replication password is not given, or not 16 to 128 letters and digits"
+    return 1
+  fi
+  printf '%s\n' "STOP SLAVE;" \
+    "CHANGE MASTER TO MASTER_HOST='$HIVEPAAS_STANDBY_HOST', MASTER_PORT=3306, MASTER_USER='$replication_user'," \
+    "  MASTER_PASSWORD='$password', MASTER_USE_GTID=slave_pos, MASTER_CONNECT_RETRY=10;" \
+    "START SLAVE;" | as_mysql mariadb --protocol=socket -S "$socket" -umysql
+}
+
+# catch_up: the logs the member that writes no longer has, replayed from the
+# archive - every log the oldest base backup kept reaches, the replay skipping
+# what the replica has - and streaming started again from where they reach.
+catch_up() {
+  local from oldest reached=$data_root/hivepaas-catch-up.gtid
+  from=$(sql "select @@gtid_slave_pos")
+  oldest=$(backups | head -n 1 | cut -d' ' -f1)
+  if [ -z "$oldest" ]; then
+    fail "the replica is behind what the member that writes keeps, and the archive has no base backup to catch up from"
+    return 1
+  fi
+  echo "walg-archive: the member that writes no longer has the logs from $from: catching up from the archive" >&2
+  local_sql "STOP SLAVE" >/dev/null || true
+  if ! "$bin/walg-replay" --since "$oldest" --from "$from" --state-out "$reached" > "$state.err" 2>&1; then
+    fail "catching up from the archive failed: $(tail -n 1 "$state.err" | cut -c1-300)"
+    local_sql "START SLAVE" >/dev/null || true
+    return 1
+  fi
+  local_sql "SET GLOBAL gtid_slave_pos = '$(cat "$reached")'; START SLAVE" >/dev/null || {
+    fail "replication could not start again after catching up"
+    return 1
+  }
+  rm -f "$reached" "$state.err"
+}
+
+replica_pass() {
+  local status margin
+  if ! sql "select 1" >/dev/null 2>&1; then return 0; fi
+  status=$(slave_status)
+  if [ "$(field Master_Host "$status")" != "$HIVEPAAS_STANDBY_HOST" ]; then
+    connect || return 1
+    status=$(slave_status)
+  fi
+  if [ "$(field Last_IO_Errno "$status")" = 1236 ]; then
+    catch_up || return 1
+  elif [ "$(field Slave_IO_Running "$status")" = No ] && [ "$(field Last_IO_Errno "$status")" = 0 ] &&
+    [ "$(field Last_SQL_Errno "$status")" = 0 ]; then
+    local_sql "START SLAVE" >/dev/null || true
+  fi
+  margin=$((2 * interval))
+  if [ "$margin" -lt 3600 ]; then margin=3600; fi
+  sql "purge binary logs before date_sub(now(), interval $margin second)" >/dev/null || true
+  put "LAST_SUCCESS=$(date +%s)" "FAILED_COUNT=0" "LAST_ERROR="
+}
+
 pass() {
   local status file offset flushed
+  if standby; then
+    replica_pass
+    return
+  fi
   if ! status=$(binlog_status 2>/dev/null) || [ -z "$status" ]; then
     return 0 # not up yet, or still initializing: nothing to archive
   fi
