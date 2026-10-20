@@ -9613,7 +9613,7 @@
       "name": "mariadb-managed",
       "file": {
         "path": "templates/mariadb-managed.yaml",
-        "sha256": "bced4a979fa86e4df6407930188922b496b9484abd70cb50934c2f941f6c9d20"
+        "sha256": "c5cc627a2e14591a6d43c2834437f314178a3e4479bb21119b0cf3a3b140861a"
       },
       "icon": {
         "path": "icons/mariadb.svg",

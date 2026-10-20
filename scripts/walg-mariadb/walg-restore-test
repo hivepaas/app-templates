@@ -74,7 +74,9 @@ until sql "select 1" "$copy_socket" >/dev/null 2>&1; do
 done
 
 # 5. Replayed to the point.
-"$bin/walg-replay" --since "$backup" --position "$point" --datadir "$scratch/data" --socket "$copy_socket" \
+stop=(--position "$point")
+if [ -n "$point_gtid" ]; then stop=(--gtid "$point_gtid"); fi
+"$bin/walg-replay" --since "$backup" "${stop[@]}" --datadir "$scratch/data" --socket "$copy_socket" \
   --work "$scratch/binlogs"
 duration=$(($(date +%s) - started))
 
