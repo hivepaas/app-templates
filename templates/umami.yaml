@@ -74,9 +74,9 @@ dependencies:
 
 versions:
   - name: "3.4"
-    release: "3.4.0"
+    release: "3.4.1"
     default: true
-    image: ghcr.io/umami-software/umami:3.4.0
+    image: ghcr.io/umami-software/umami:3.4.1
 
 app:
   deployment:

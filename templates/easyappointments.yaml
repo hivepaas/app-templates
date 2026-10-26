@@ -73,9 +73,9 @@ dependencies:
 
 versions:
   - name: "1.6"
-    release: "1.6.0"
+    release: "1.6.1"
     default: true
-    image: alextselegidis/easyappointments:1.6.0
+    image: alextselegidis/easyappointments:1.6.1
 
 app:
   deployment:

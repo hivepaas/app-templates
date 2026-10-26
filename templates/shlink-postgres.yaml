@@ -81,9 +81,9 @@ dependencies:
 
 versions:
   - name: "5.1"
-    release: "5.1.7"
+    release: "5.1.8"
     default: true
-    image: shlinkio/shlink:5.1.7
+    image: shlinkio/shlink:5.1.8
 
 app:
   deployment:

@@ -62,9 +62,9 @@ parameters:
 
 versions:
   - name: "2.3"
-    release: "2.3.4"
+    release: "2.3.8"
     default: true
-    image: lissy93/web-check:2.3.4
+    image: lissy93/web-check:2.3.8
 
 app:
   deployment:

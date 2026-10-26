@@ -61,9 +61,9 @@ parameters:
 
 versions:
   - name: "4.3"
-    release: "4.3.6"
+    release: "4.3.7"
     default: true
-    image: rabbitmq:4.3.6-management-alpine
+    image: rabbitmq:4.3.7-management-alpine
 
 app:
   deployment:

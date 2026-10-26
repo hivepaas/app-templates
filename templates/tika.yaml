@@ -62,9 +62,9 @@ parameters:
 
 versions:
   - name: "3.3"
-    release: "3.3.1.0"
+    release: "3.3.3.0"
     default: true
-    image: apache/tika:3.3.1.0
+    image: apache/tika:3.3.3.0
   - name: "3.2"
     release: "3.2.3.0"
     image: apache/tika:3.2.3.0

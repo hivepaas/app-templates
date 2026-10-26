@@ -89,9 +89,9 @@ dependencies:
 
 versions:
   - name: "3.7"
-    release: "3.7.2"
+    release: "3.7.3"
     default: true
-    image: joplin/server:3.7.2
+    image: joplin/server:3.7.3
 
 app:
   deployment:

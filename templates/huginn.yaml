@@ -136,9 +136,9 @@ dependencies:
 
 versions:
   - name: "2026.10"
-    release: "2026.10.04"
+    release: "2026.10.24"
     default: true
-    image: ghcr.io/huginn/huginn:v2026.10.04@sha256:ca6a5603f84d6fb74dd8fdee087e9cf6facf6f059ef1dc4b96d474ef732ab4f8
+    image: ghcr.io/huginn/huginn:v2026.10.24
 
 app:
   deployment:

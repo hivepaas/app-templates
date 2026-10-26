@@ -52,9 +52,9 @@ parameters:
 
 versions:
   - name: "5.26"
-    release: "5.26.31"
+    release: "5.26.32"
     default: true
-    image: neo4j:5.26.31-community-trixie
+    image: neo4j:5.26.32-community-trixie
 
 app:
   deployment:

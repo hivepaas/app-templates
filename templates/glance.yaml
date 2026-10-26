@@ -82,9 +82,9 @@ parameters:
     min: 128MB
 versions:
   - name: "0.8"
-    release: "0.8.6"
+    release: "0.8.7"
     default: true
-    image: glanceapp/glance:v0.8.6
+    image: glanceapp/glance:v0.8.7
 
 app:
   deployment:

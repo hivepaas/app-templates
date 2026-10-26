@@ -123,11 +123,11 @@ variants:
 
 versions:
   - name: "2026.9"
-    release: "2026.9.9"
+    release: "2026.9.34"
     default: true
     images:
-      standard: openclaw/openclaw:2026.9.9
-      browser: openclaw/openclaw:2026.9.9-browser
+      standard: openclaw/openclaw:2026.9.34
+      browser: openclaw/openclaw:2026.9.34-browser
 
 app:
   deployment:

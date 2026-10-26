@@ -85,9 +85,9 @@ dependencies:
 
 versions:
   - name: "8.2"
-    release: "8.2.0"
+    release: "8.2.1"
     default: true
-    image: unleashorg/unleash-server:8.2.0
+    image: unleashorg/unleash-server:8.2.1
 
 app:
   deployment:

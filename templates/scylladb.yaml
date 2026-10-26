@@ -61,9 +61,9 @@ parameters:
 
 versions:
   - name: "2026.3"
-    release: "2026.3.3"
+    release: "2026.3.4"
     default: true
-    image: scylladb/scylla:2026.3.3
+    image: scylladb/scylla:2026.3.4
 
 app:
   deployment:

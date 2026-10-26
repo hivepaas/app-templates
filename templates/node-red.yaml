@@ -87,9 +87,9 @@ parameters:
 
 versions:
   - name: "4.1"
-    release: "4.1.16"
+    release: "4.1.17"
     default: true
-    image: nodered/node-red:4.1.16-22
+    image: nodered/node-red:4.1.17-22
 
 app:
   deployment:
