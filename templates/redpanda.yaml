@@ -107,9 +107,9 @@ parameters:
 
 versions:
   - name: "26.2"
-    release: "26.2.4"
+    release: "26.2.6"
     default: true
-    image: redpandadata/redpanda:v26.2.4
+    image: redpandadata/redpanda:v26.2.6
 
 app:
   deployment:

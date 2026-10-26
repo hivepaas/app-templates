@@ -73,9 +73,9 @@ parameters:
 
 versions:
   - name: "4.3"
-    release: "4.3.1"
+    release: "4.3.2"
     default: true
-    image: apache/kafka:4.3.1
+    image: apache/kafka:4.3.2
 
 app:
   deployment:

@@ -95,9 +95,9 @@ dependencies:
 
 versions:
   - name: "10.5"
-    release: "10.5.3"
+    release: "10.5.5"
     default: true
-    image: ignisda/ryot:v10.5.3
+    image: ignisda/ryot:v10.5.5
 
 app:
   deployment:

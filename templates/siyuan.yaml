@@ -77,9 +77,9 @@ parameters:
 
 versions:
   - name: "3.8"
-    release: "3.8.6"
+    release: "3.8.8"
     default: true
-    image: b3log/siyuan:v3.8.6
+    image: b3log/siyuan:v3.8.8
 
 app:
   deployment:

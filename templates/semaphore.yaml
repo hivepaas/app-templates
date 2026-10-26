@@ -114,9 +114,9 @@ dependencies:
 
 versions:
   - name: "2.19"
-    release: "2.19.16"
+    release: "2.19.17"
     default: true
-    image: semaphoreui/semaphore:v2.19.16
+    image: semaphoreui/semaphore:v2.19.17
 
 app:
   deployment:

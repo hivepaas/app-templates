@@ -98,9 +98,9 @@ dependencies:
 
 versions:
   - name: "2.6"
-    release: "2.6.1"
+    release: "2.6.2"
     default: true
-    image: bugsink/bugsink:2.6.1
+    image: bugsink/bugsink:2.6.2
 
 app:
   deployment:

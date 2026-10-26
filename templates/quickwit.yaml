@@ -59,9 +59,9 @@ parameters:
 
 versions:
   - name: "0.9"
-    release: "0.9.1"
+    release: "0.9.3"
     default: true
-    image: quickwit/quickwit:0.9.1
+    image: quickwit/quickwit:0.9.3
 
 app:
   deployment:

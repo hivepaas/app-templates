@@ -119,9 +119,9 @@ parameters:
 
 versions:
   - name: "17"
-    release: "17.9.1"
+    release: "17.9.4"
     default: true
-    image: openproject/openproject:17.9.1-slim
+    image: openproject/openproject:17.9.4-slim
 
 app:
   deployment:

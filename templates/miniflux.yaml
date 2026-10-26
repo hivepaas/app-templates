@@ -86,9 +86,9 @@ dependencies:
 
 versions:
   - name: "2.3"
-    release: "2.3.3"
+    release: "2.3.4"
     default: true
-    image: miniflux/miniflux:2.3.3
+    image: miniflux/miniflux:2.3.4
 
 app:
   deployment:

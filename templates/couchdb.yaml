@@ -62,9 +62,9 @@ parameters:
 
 versions:
   - name: "3.5"
-    release: "3.5.2.1"
+    release: "3.5.3"
     default: true
-    image: couchdb:3.5.2.1
+    image: couchdb:3.5.3
 
 app:
   deployment:
