@@ -166,10 +166,10 @@ dependencies:
 
 versions:
   - name: "1.11"
-    release: "1.11.1"
+    release: "1.11.3"
     default: true
     # The project publishes every release with a -beta suffix; this is its latest.
-    image: daveearley/hi.events-all-in-one:v1.11.1-beta
+    image: daveearley/hi.events-all-in-one:v1.11.3-beta
 
 app:
   deployment:

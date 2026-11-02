@@ -97,8 +97,8 @@ versions:
     default: true
     image: opensearchproject/opensearch:3.8.0
   - name: "2.19"
-    release: "2.19.6"
-    image: opensearchproject/opensearch:2.19.6
+    release: "2.19.7"
+    image: opensearchproject/opensearch:2.19.7
 
 app:
   deployment:

@@ -88,9 +88,9 @@ dependencies:
 
 versions:
   - name: "1.8"
-    release: "1.8.19"
+    release: "1.8.20"
     default: true
-    image: crazymax/flarum:1.8.19
+    image: crazymax/flarum:1.8.20
 
 app:
   deployment:

@@ -113,12 +113,12 @@ parameters:
 
 versions:
   - name: "9.1"
-    release: "9.1.2"
+    release: "9.1.3"
     default: true
-    image: valkey/valkey:9.1.2-alpine3.24
+    image: valkey/valkey:9.1.3-alpine3.24
   - name: "8.1"
-    release: "8.1.10"
-    image: valkey/valkey:8.1.10-alpine3.24
+    release: "8.1.11"
+    image: valkey/valkey:8.1.11-alpine3.24
 
 app:
   deployment:

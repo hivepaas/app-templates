@@ -79,9 +79,9 @@ parameters:
 
 versions:
   - name: "5"
-    release: "5.14"
+    release: "5.14.2"
     default: true
-    image: matomo:5.14-apache
+    image: matomo:5.14.2-apache
 
 app:
   deployment:

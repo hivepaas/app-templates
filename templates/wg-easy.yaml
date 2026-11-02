@@ -136,9 +136,9 @@ parameters:
 
 versions:
   - name: "15"
-    release: "15.4.0"
+    release: "15.5"
     default: true
-    image: ghcr.io/wg-easy/wg-easy:15.4.0
+    image: ghcr.io/wg-easy/wg-easy:15.5
 
 app:
   deployment:

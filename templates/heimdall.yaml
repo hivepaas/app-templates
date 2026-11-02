@@ -68,9 +68,9 @@ parameters:
 
 versions:
   - name: "2.8"
-    release: "2.8.3"
+    release: "2.8.4"
     default: true
-    image: lscr.io/linuxserver/heimdall:v2.8.3-ls365
+    image: lscr.io/linuxserver/heimdall:v2.8.4-ls371
 
 app:
   deployment:

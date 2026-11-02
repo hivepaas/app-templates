@@ -117,12 +117,12 @@ parameters:
 
 versions:
   - name: "8.10"
-    release: "8.10.2"
+    release: "8.10.3"
     default: true
-    image: redis:8.10.2-alpine3.23
+    image: redis:8.10.3-alpine3.23
   - name: "7.4"
-    release: "7.4.11"
-    image: redis:7.4.11-alpine3.21
+    release: "7.4.12"
+    image: redis:7.4.12-alpine3.21
 
 app:
   deployment:

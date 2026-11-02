@@ -61,9 +61,9 @@ parameters:
 
 versions:
   - name: "6.3"
-    release: "6.3.0"
+    release: "6.3.1"
     default: true
-    image: ghcr.io/librespeed/speedtest:6.3.0-alpine@sha256:6ac033cd117bff1b0158cf702c6cafcff31a84d7e3dd812421306ed0c8fd8b5a
+    image: ghcr.io/librespeed/speedtest:6.3.1-alpine
 
 app:
   deployment:

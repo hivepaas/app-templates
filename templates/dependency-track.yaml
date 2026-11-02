@@ -81,10 +81,10 @@ dependencies:
 
 versions:
   - name: "4.14"
-    release: "4.14.5"
+    release: "4.14.6"
     default: true
     # The bundled image: the API server and the web interface in one container.
-    image: dependencytrack/bundled:4.14.5
+    image: dependencytrack/bundled:4.14.6
 
 app:
   deployment:
