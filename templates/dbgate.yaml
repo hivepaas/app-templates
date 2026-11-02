@@ -71,9 +71,9 @@ parameters:
 
 versions:
   - name: "7.3"
-    release: "7.3.2"
+    release: "7.3.3"
     default: true
-    image: dbgate/dbgate:7.3.2-alpine
+    image: dbgate/dbgate:7.3.3-alpine
 
 app:
   deployment:

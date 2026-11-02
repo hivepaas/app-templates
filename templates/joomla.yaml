@@ -101,9 +101,9 @@ parameters:
 
 versions:
   - name: "5"
-    release: "5.4.9"
+    release: "5.4.10"
     default: true
-    image: joomla:5.4.9-php8.3-apache
+    image: joomla:5.4.10-php8.3-apache
 
 app:
   deployment:

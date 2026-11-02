@@ -120,9 +120,9 @@ parameters:
 
 versions:
   - name: "5.8"
-    release: "5.8.3"
+    release: "5.8.4"
     default: true
-    image: bellamy/wallos:5.8.3
+    image: bellamy/wallos:5.8.4
 
 app:
   deployment:

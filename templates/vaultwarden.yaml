@@ -80,9 +80,9 @@ parameters:
 
 versions:
   - name: "1.37"
-    release: "1.37.4"
+    release: "1.37.5"
     default: true
-    image: vaultwarden/server:1.37.4-alpine
+    image: vaultwarden/server:1.37.5-alpine
 
 app:
   deployment:
