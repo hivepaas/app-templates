@@ -81,7 +81,7 @@ versions:
   - name: "3.1"
     release: "3.1.17"
     default: true
-    image: tiago2/cap:3.1.17
+    image: tiago2/cap:3.1.17@sha256:b47424a1b4ab3e6e7205ba1ed35fa25c8817c78bf0a82a0c7dac5d3393167a03
 
 app:
   deployment:

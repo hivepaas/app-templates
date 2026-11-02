@@ -138,7 +138,7 @@ versions:
   - name: "2026.10"
     release: "2026.10.26"
     default: true
-    image: ghcr.io/huginn/huginn:v2026.10.26
+    image: ghcr.io/huginn/huginn:v2026.10.26@sha256:c470d96e4b8ba2d92ca7cbbbc4e125cc0c8c88c02a10d209e04414d5c41b41f1
 
 app:
   deployment:
