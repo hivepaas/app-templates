@@ -2005,7 +2005,7 @@
       "name": "cap",
       "file": {
         "path": "templates/cap.yaml",
-        "sha256": "3196e3dc386ad04b7c32220297787142873577e794603f30735c2bf0b9813e73"
+        "sha256": "b2ad83b173037c80084c889ff2f782806a45a23250a02a7f99cb33ea69cbfc2a"
       },
       "icon": {
         "path": "icons/cap.png",
@@ -6789,7 +6789,7 @@
       "name": "huginn",
       "file": {
         "path": "templates/huginn.yaml",
-        "sha256": "0f3e1048974f7d26173e6cc73117ee70da9bd783b7be054676979f4f24e30f36"
+        "sha256": "d195306cb80fdd11c428b1ded67eca1e2baefcd29d951aae26f63fab2b95c613"
       },
       "icon": {
         "path": "icons/huginn.svg",
@@ -8796,7 +8796,7 @@
       "name": "librespeed",
       "file": {
         "path": "templates/librespeed.yaml",
-        "sha256": "5f2d8a4d7e1e1537137b6e1d80eee389deb5b010163af0f52b349e23064b18b7"
+        "sha256": "cc128a4b11a43836d0a2ace4a43c34055dd6e6b84002f58ca29598ad1c22eb80"
       },
       "icon": {
         "path": "icons/librespeed.svg",
@@ -18867,7 +18867,7 @@
       "name": "wg-easy",
       "file": {
         "path": "templates/wg-easy.yaml",
-        "sha256": "a1da4eab20e2b5273182b88588efc4e190a6c9afe6c1141d1533cefa81473186"
+        "sha256": "eeab8fc5205edac84ed6ada6ce7c29876bba5140ed3395dad329c63d0d35208f"
       },
       "icon": {
         "path": "icons/wg-easy.svg",
@@ -18893,7 +18893,7 @@
       "versions": [
         {
           "name": "15",
-          "release": "15.5",
+          "release": "15.5.0",
           "default": true
         }
       ],
