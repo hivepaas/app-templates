@@ -68,9 +68,9 @@ dependencies:
 
 versions:
   - name: "6.1"
-    release: "6.1.5"
+    release: "6.1.6"
     default: true
-    image: redmine:6.1.5
+    image: redmine:6.1.6
 
 app:
   deployment:

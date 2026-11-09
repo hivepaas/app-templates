@@ -129,9 +129,9 @@ parameters:
 
 versions:
   - name: "0.10"
-    release: "0.10.18"
+    release: "0.10.19"
     default: true
-    image: learnedmachine/speakr:0.10.18-alpha-lite
+    image: learnedmachine/speakr:0.10.19-alpha-lite
 
 app:
   deployment:

@@ -78,9 +78,9 @@ parameters:
 
 versions:
   - name: "0.107"
-    release: "0.107.79"
+    release: "0.107.80"
     default: true
-    image: adguard/adguardhome:v0.107.79
+    image: adguard/adguardhome:v0.107.80
 
 app:
   deployment:
