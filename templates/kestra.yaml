@@ -93,9 +93,9 @@ dependencies:
 
 versions:
   - name: "2.0"
-    release: "2.0.8"
+    release: "2.0.9"
     default: true
-    image: kestra/kestra:v2.0.8
+    image: kestra/kestra:v2.0.9
 
 app:
   deployment:

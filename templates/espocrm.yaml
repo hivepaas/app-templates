@@ -95,9 +95,9 @@ dependencies:
 
 versions:
   - name: "10.0"
-    release: "10.0.11"
+    release: "10.0.12"
     default: true
-    image: espocrm/espocrm:10.0.11-apache
+    image: espocrm/espocrm:10.0.12-apache
 
 app:
   deployment:
