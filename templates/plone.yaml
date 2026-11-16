@@ -100,9 +100,9 @@ parameters:
 
 versions:
   - name: "6.2"
-    release: "6.2.2.1"
+    release: "6.2.3"
     default: true
-    image: plone/plone-backend:6.2.2.1
+    image: plone/plone-backend:6.2.3
 
 app:
   deployment:

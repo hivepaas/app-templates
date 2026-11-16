@@ -91,9 +91,9 @@ parameters:
 
 versions:
   - name: "1.0"
-    release: "1.0.4"
+    release: "1.0.6"
     default: true
-    image: rustfs/rustfs:1.0.4
+    image: rustfs/rustfs:1.0.6
 
 app:
   deployment:

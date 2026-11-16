@@ -95,9 +95,9 @@ dependencies:
 
 versions:
   - name: "5.2"
-    release: "5.2.4"
+    release: "5.2.5"
     default: true
-    image: erseco/alpine-moodle:v5.2.4
+    image: erseco/alpine-moodle:v5.2.5
 
 app:
   deployment:
