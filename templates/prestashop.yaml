@@ -112,9 +112,9 @@ versions:
   # assets and leaves the installer in place, on 9.1.5 with and without a renamed admin
   # folder. 8.2 installs cleanly and is supported into 2028.
   - name: "8.2"
-    release: "8.2.8"
+    release: "8.2.9"
     default: true
-    image: prestashop/prestashop:8.2.8-apache
+    image: prestashop/prestashop:8.2.9-apache
 
 app:
   deployment:

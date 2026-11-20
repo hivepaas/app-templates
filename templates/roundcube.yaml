@@ -102,9 +102,9 @@ parameters:
 
 versions:
   - name: "1.6"
-    release: "1.6.20"
+    release: "1.6.21"
     default: true
-    image: roundcube/roundcubemail:1.6.20-apache
+    image: roundcube/roundcubemail:1.6.21-apache
 
 app:
   deployment:
