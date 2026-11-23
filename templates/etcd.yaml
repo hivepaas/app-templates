@@ -76,12 +76,12 @@ parameters:
 
 versions:
   - name: "3.6"
-    release: "3.6.16"
+    release: "3.6.17"
     default: true
-    image: quay.io/coreos/etcd:v3.6.16
+    image: quay.io/coreos/etcd:v3.6.17
   - name: "3.5"
-    release: "3.5.35"
-    image: quay.io/coreos/etcd:v3.5.35
+    release: "3.5.36"
+    image: quay.io/coreos/etcd:v3.5.36
 
 app:
   deployment:

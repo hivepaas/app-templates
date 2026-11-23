@@ -52,9 +52,9 @@ parameters:
 
 versions:
   - name: "0.23"
-    release: "0.23.5"
+    release: "0.23.6"
     default: true
-    image: codeberg.org/readeck/readeck:0.23.5
+    image: codeberg.org/readeck/readeck:0.23.6
 
 app:
   deployment:

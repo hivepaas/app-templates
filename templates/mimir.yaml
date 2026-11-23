@@ -70,9 +70,9 @@ parameters:
 
 versions:
   - name: "3.2"
-    release: "3.2.5"
+    release: "3.2.6"
     default: true
-    image: grafana/mimir:3.2.5
+    image: grafana/mimir:3.2.6
 
 app:
   deployment:

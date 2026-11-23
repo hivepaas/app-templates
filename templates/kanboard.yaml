@@ -51,9 +51,9 @@ parameters:
 
 versions:
   - name: "1.2"
-    release: "1.2.57"
+    release: "1.2.58"
     default: true
-    image: kanboard/kanboard:v1.2.57
+    image: kanboard/kanboard:v1.2.58
 
 app:
   deployment:

@@ -58,9 +58,9 @@ parameters:
 # The simple build: the same tools, without bentopdf.com's own landing page and marketing.
 versions:
   - name: "2.8"
-    release: "2.8.11"
+    release: "2.8.12"
     default: true
-    image: bentopdfteam/bentopdf-simple:2.8.11
+    image: bentopdfteam/bentopdf-simple:v2.8.12
 
 app:
   deployment:

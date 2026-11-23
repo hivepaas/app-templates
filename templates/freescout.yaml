@@ -92,9 +92,9 @@ dependencies:
 
 versions:
   - name: "2.2"
-    release: "2.2.25"
+    release: "2.2.26"
     default: true
-    image: nfrastack/freescout:2.2.25
+    image: nfrastack/freescout:2.2.26
 
 app:
   deployment:

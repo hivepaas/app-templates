@@ -71,9 +71,9 @@ parameters:
 
 versions:
   - name: "1.5"
-    release: "1.5.4"
+    release: "1.5.5"
     default: true
-    image: mtlynch/picoshare:v1.5.4
+    image: mtlynch/picoshare:v1.5.5
 
 app:
   deployment:

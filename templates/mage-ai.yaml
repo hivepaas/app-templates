@@ -102,9 +102,9 @@ dependencies:
 
 versions:
   - name: "0.9"
-    release: "0.9.80"
+    release: "0.9.81"
     default: true
-    image: mageai/mageai:0.9.80
+    image: mageai/mageai:0.9.81
 
 app:
   deployment:
