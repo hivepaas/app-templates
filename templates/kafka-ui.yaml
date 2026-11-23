@@ -80,9 +80,9 @@ parameters:
 
 versions:
   - name: "1.5"
-    release: "1.5.0"
+    release: "1.5.1"
     default: true
-    image: kafbat/kafka-ui:v1.5.0
+    image: kafbat/kafka-ui:v1.5.1
 
 app:
   deployment:

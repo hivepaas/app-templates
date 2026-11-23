@@ -103,12 +103,12 @@ parameters:
 
 versions:
   - name: "19.4"
-    release: "19.4.7"
+    release: "19.4.10"
     default: true
-    image: gitlab/gitlab-ce:19.4.7-ce.0
+    image: gitlab/gitlab-ce:19.4.10-ce.0
   - name: "19.3"
-    release: "19.3.8"
-    image: gitlab/gitlab-ce:19.3.8-ce.0
+    release: "19.3.9"
+    image: gitlab/gitlab-ce:19.3.9-ce.0
 
 app:
   deployment:

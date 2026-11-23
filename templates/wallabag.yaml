@@ -73,9 +73,9 @@ parameters:
 
 versions:
   - name: "2.6"
-    release: "2.6.17"
+    release: "2.6.18"
     default: true
-    image: wallabag/wallabag:2.6.17
+    image: wallabag/wallabag:2.6.18
 
 app:
   deployment:

@@ -492,7 +492,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 25554
+        "stars": 25683
       }
     },
     {
@@ -534,7 +534,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 30297
+        "stars": 30417
       }
     },
     {
@@ -578,7 +578,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 38498
+        "stars": 38749
       }
     },
     {
@@ -619,7 +619,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 748
+        "stars": 744
       }
     },
     {
@@ -675,7 +675,7 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 74572
+        "stars": 77104
       }
     },
     {
@@ -726,7 +726,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 10313
+        "stars": 10333
       }
     },
     {
@@ -769,7 +769,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 8698
+        "stars": 8704
       }
     },
     {
@@ -812,7 +812,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 68334
+        "stars": 68534
       }
     },
     {
@@ -866,7 +866,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 15711
+        "stars": 15716
       }
     },
     {
@@ -908,7 +908,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 1342
+        "stars": 1349
       }
     },
     {
@@ -950,7 +950,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 41255
+        "stars": 41294
       }
     },
     {
@@ -1060,7 +1060,7 @@
       "requiresDockerApi": true,
       "stats": {
         "added": "2026-09-26",
-        "stars": 58105
+        "stars": 58616
       }
     },
     {
@@ -1145,7 +1145,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 29034
+        "stars": 29081
       }
     },
     {
@@ -1197,7 +1197,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 32462
+        "stars": 32575
       }
     },
     {
@@ -1239,7 +1239,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 15025
+        "stars": 15097
       }
     },
     {
@@ -1282,14 +1282,14 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 29662
+        "stars": 29711
       }
     },
     {
       "name": "authentik",
       "file": {
         "path": "templates/authentik.yaml",
-        "sha256": "38e83cdd5359f45e8fab7a64454f6ee981f95e33b455092dfc1d4a43852c7daa"
+        "sha256": "b67187dc7d77404897262802d71df6c8194add9a43ecb4034b07fe3297e7eee3"
       },
       "icon": {
         "path": "icons/authentik.svg",
@@ -1329,7 +1329,7 @@
       "versions": [
         {
           "name": "2026.8",
-          "release": "2026.8.5",
+          "release": "2026.8.6",
           "default": true
         }
       ],
@@ -1338,7 +1338,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 26361
+        "stars": 26421
       }
     },
     {
@@ -1383,7 +1383,7 @@
       "requiresDockerApi": true,
       "stats": {
         "added": "2026-09-24",
-        "stars": 4440
+        "stars": 4450
       }
     },
     {
@@ -1425,7 +1425,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 7916
+        "stars": 7964
       }
     },
     {
@@ -1480,7 +1480,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 6348
+        "stars": 6381
       }
     },
     {
@@ -1520,14 +1520,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 4426
+        "stars": 4440
       }
     },
     {
       "name": "bentopdf",
       "file": {
         "path": "templates/bentopdf.yaml",
-        "sha256": "2dd4565ae545e7430b4904d674a31f2325df2c8891d580d3659dbcd981ec6be6"
+        "sha256": "5aa8d9c4059cf21c0a83db03fbabdf8e661a9ff14274f4683695d190a88a7ead"
       },
       "icon": {
         "path": "icons/bentopdf.svg",
@@ -1557,7 +1557,7 @@
       "versions": [
         {
           "name": "2.8",
-          "release": "2.8.11",
+          "release": "2.8.12",
           "default": true
         }
       ],
@@ -1566,7 +1566,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 16376
+        "stars": 16438
       }
     },
     {
@@ -1608,7 +1608,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 27398
+        "stars": 27566
       }
     },
     {
@@ -1658,7 +1658,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 19144
+        "stars": 19148
       }
     },
     {
@@ -1702,7 +1702,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 683
+        "stars": 685
       }
     },
     {
@@ -1748,7 +1748,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 28421
+        "stars": 28437
       }
     },
     {
@@ -1800,7 +1800,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 2194
+        "stars": 2201
       }
     },
     {
@@ -1847,7 +1847,7 @@
       },
       "stats": {
         "added": "2026-09-23",
-        "stars": 14718
+        "stars": 14732
       }
     },
     {
@@ -1891,7 +1891,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 2580
+        "stars": 2583
       }
     },
     {
@@ -1955,7 +1955,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 50084
+        "stars": 50335
       }
     },
     {
@@ -1998,7 +1998,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 18571
+        "stars": 18588
       }
     },
     {
@@ -2050,7 +2050,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 8435
+        "stars": 8525
       }
     },
     {
@@ -2093,7 +2093,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 35837
+        "stars": 35974
       }
     },
     {
@@ -2163,7 +2163,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 39965
+        "stars": 40398
       }
     },
     {
@@ -2205,7 +2205,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 29695
+        "stars": 29732
       }
     },
     {
@@ -2251,14 +2251,14 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 50952
+        "stars": 51075
       }
     },
     {
       "name": "cloudbeaver",
       "file": {
         "path": "templates/cloudbeaver.yaml",
-        "sha256": "aa54685a82df14a940ae45e9f62fae4d544ce69d89dbae8ce16beed1b20d6012"
+        "sha256": "f35067900296c8e8575f151387e73b2cdd61e50a93b2c4c6ef5fa60871c025fb"
       },
       "icon": {
         "path": "icons/cloudbeaver.svg",
@@ -2285,7 +2285,7 @@
       "versions": [
         {
           "name": "26.2",
-          "release": "26.2.4",
+          "release": "26.2.5.1",
           "default": true
         },
         {
@@ -2298,7 +2298,7 @@
       },
       "stats": {
         "added": "2026-09-23",
-        "stars": 5232
+        "stars": 5244
       }
     },
     {
@@ -2341,7 +2341,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 2975
+        "stars": 2979
       }
     },
     {
@@ -2385,7 +2385,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 16611
+        "stars": 16703
       }
     },
     {
@@ -2427,14 +2427,14 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 79884
+        "stars": 79932
       }
     },
     {
       "name": "collabora",
       "file": {
         "path": "templates/collabora.yaml",
-        "sha256": "75299188ad2be5cd44ac489475d6d67e69930ba483e4d8086ffbdb9a4efaa9c2"
+        "sha256": "bba05f7da5743115bfbb7c7c459994c053ab54d0d2a49284cd97fcdc2fa36424"
       },
       "icon": {
         "path": "icons/collabora.svg",
@@ -2461,7 +2461,7 @@
       "versions": [
         {
           "name": "26.04",
-          "release": "26.04.6.1.1",
+          "release": "26.04.6.2.1",
           "default": true
         }
       ],
@@ -2470,7 +2470,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 3397
+        "stars": 3405
       }
     },
     {
@@ -2513,14 +2513,14 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 19732
+        "stars": 19770
       }
     },
     {
       "name": "copyparty",
       "file": {
         "path": "templates/copyparty.yaml",
-        "sha256": "19d591abf1672f0d5a6742d90179c4aa8d7ce668a6a5b10495121fea97998cbc"
+        "sha256": "e671329571c0fe68fe8f77eb8ed795c07348d736e9c4f388f5698bb5671680df"
       },
       "icon": {
         "path": "icons/copyparty.svg",
@@ -2548,7 +2548,7 @@
       "versions": [
         {
           "name": "1.20",
-          "release": "1.20.26",
+          "release": "1.20.27",
           "default": true
         }
       ],
@@ -2557,7 +2557,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 47368
+        "stars": 47437
       }
     },
     {
@@ -2642,7 +2642,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 4453
+        "stars": 4456
       }
     },
     {
@@ -2683,7 +2683,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 36419
+        "stars": 36505
       }
     },
     {
@@ -2728,14 +2728,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 27004
+        "stars": 27057
       }
     },
     {
       "name": "databend",
       "file": {
         "path": "templates/databend.yaml",
-        "sha256": "14c7c572e05be1da16fb345355dc4c1e225e326f80a969979f73e1f79aa36540"
+        "sha256": "54e11497815f7695b87ca7c8e10469be5a808d4e648fbb632d43a69d11bd9678"
       },
       "icon": {
         "path": "icons/databend.svg",
@@ -2762,7 +2762,7 @@
       "versions": [
         {
           "name": "1.2",
-          "release": "1.2.965",
+          "release": "1.2.968",
           "default": true
         }
       ],
@@ -2771,7 +2771,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 9497
+        "stars": 9504
       }
     },
     {
@@ -2817,14 +2817,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 7384
+        "stars": 7394
       }
     },
     {
       "name": "dependency-track",
       "file": {
         "path": "templates/dependency-track.yaml",
-        "sha256": "399eccdaa254a807dd9cf5903d6b915f2e07cd7482b8b1be37d937abe0d82e15"
+        "sha256": "0993f6bb1a65eb9fabce018d609fd5ab30454b17782a2074985a047ae19a830f"
       },
       "icon": {
         "path": "icons/dependency-track.svg",
@@ -2859,7 +2859,7 @@
       "versions": [
         {
           "name": "4.14",
-          "release": "4.14.6",
+          "release": "4.14.7",
           "default": true
         }
       ],
@@ -2868,7 +2868,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 4466
+        "stars": 4505
       }
     },
     {
@@ -2975,7 +2975,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 161261
+        "stars": 161728
       }
     },
     {
@@ -3024,7 +3024,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 38727
+        "stars": 38627
       }
     },
     {
@@ -3079,7 +3079,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 22345
+        "stars": 22402
       }
     },
     {
@@ -3131,7 +3131,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 15774
+        "stars": 15880
       }
     },
     {
@@ -3174,7 +3174,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 19056
+        "stars": 19131
       }
     },
     {
@@ -3219,7 +3219,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 4742
+        "stars": 4745
       }
     },
     {
@@ -3271,7 +3271,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 7874
+        "stars": 7890
       }
     },
     {
@@ -3312,7 +3312,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 24908
+        "stars": 24966
       }
     },
     {
@@ -3354,7 +3354,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 31877
+        "stars": 31916
       }
     },
     {
@@ -3399,7 +3399,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 40331
+        "stars": 40371
       }
     },
     {
@@ -3443,7 +3443,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 2278
+        "stars": 2283
       }
     },
     {
@@ -3531,7 +3531,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 15208
+        "stars": 15222
       }
     },
     {
@@ -3580,7 +3580,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 4491
+        "stars": 4500
       }
     },
     {
@@ -3622,7 +3622,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 13661
+        "stars": 13675
       }
     },
     {
@@ -3711,7 +3711,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 41339
+        "stars": 41568
       }
     },
     {
@@ -3755,7 +3755,7 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 12111
+        "stars": 12152
       }
     },
     {
@@ -3805,14 +3805,14 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 3620
+        "stars": 3658
       }
     },
     {
       "name": "etcd",
       "file": {
         "path": "templates/etcd.yaml",
-        "sha256": "6b1f1ccf762bf47e7e4106b5c56368e332e93bc4654bc71b078fffd857446a35"
+        "sha256": "63cc4e5ff7370be41ca85ad5584d405250e694bca405c9dff293d528c8cd4bd7"
       },
       "icon": {
         "path": "icons/etcd.svg",
@@ -3838,12 +3838,12 @@
       "versions": [
         {
           "name": "3.6",
-          "release": "3.6.16",
+          "release": "3.6.17",
           "default": true
         },
         {
           "name": "3.5",
-          "release": "3.5.35"
+          "release": "3.5.36"
         }
       ],
       "requires": {
@@ -3851,14 +3851,14 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 52615
+        "stars": 52650
       }
     },
     {
       "name": "etherpad",
       "file": {
         "path": "templates/etherpad.yaml",
-        "sha256": "16fc4ecf0e7386db9693ee354c5aeea34b58a06c72db7bba177a78c1c1a98bb2"
+        "sha256": "13fb385492e29b2b65c95d6dffd25f5504e630c774f58436a5e9c3a0d42ca711"
       },
       "icon": {
         "path": "icons/etherpad.svg",
@@ -3894,7 +3894,7 @@
       "versions": [
         {
           "name": "3.3",
-          "release": "3.3.17",
+          "release": "3.3.22",
           "default": true
         }
       ],
@@ -3903,7 +3903,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 18629
+        "stars": 18631
       }
     },
     {
@@ -3954,7 +3954,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 10558
+        "stars": 10563
       }
     },
     {
@@ -3998,14 +3998,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 135772
+        "stars": 136165
       }
     },
     {
       "name": "factorio",
       "file": {
         "path": "templates/factorio.yaml",
-        "sha256": "7cbb0f10d96d8da1b74c2f1119d5879f2ae5ac340cb6e80c51e0bcabceb3d058"
+        "sha256": "a198f489fb4e9ab7a8e309bc2ffd9b2e7d7008175f6cf3f074114c22020e2422"
       },
       "icon": {
         "path": "icons/factorio.svg",
@@ -4030,7 +4030,7 @@
       "versions": [
         {
           "name": "2.1",
-          "release": "2.1.24",
+          "release": "2.1.25",
           "default": true
         }
       ],
@@ -4088,7 +4088,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11113
+        "stars": 11116
       }
     },
     {
@@ -4141,7 +4141,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 4627
+        "stars": 4632
       }
     },
     {
@@ -4184,7 +4184,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 35848
+        "stars": 35836
       }
     },
     {
@@ -4232,7 +4232,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 14908
+        "stars": 14924
       }
     },
     {
@@ -4281,7 +4281,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 25260
+        "stars": 25320
       }
     },
     {
@@ -4325,7 +4325,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 2580
+        "stars": 2593
       }
     },
     {
@@ -4370,7 +4370,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 8296
+        "stars": 8301
       }
     },
     {
@@ -4414,7 +4414,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 16240
+        "stars": 16292
       }
     },
     {
@@ -4465,7 +4465,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 16439
+        "stars": 16446
       }
     },
     {
@@ -4509,7 +4509,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 4949
+        "stars": 4953
       }
     },
     {
@@ -4554,7 +4554,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 55570
+        "stars": 55590
       }
     },
     {
@@ -4607,7 +4607,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 55570
+        "stars": 55590
       }
     },
     {
@@ -4707,14 +4707,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 13247
+        "stars": 13289
       }
     },
     {
       "name": "freescout",
       "file": {
         "path": "templates/freescout.yaml",
-        "sha256": "52e8425b2a265460d34025658c82e054c5149f0063dfe345e5af4988e9f37851"
+        "sha256": "10343ca332b12b9c19c54a3d737efbb51c4065c15fd572abd71ee14cf319f789"
       },
       "icon": {
         "path": "icons/freescout.svg",
@@ -4750,7 +4750,7 @@
       "versions": [
         {
           "name": "2.2",
-          "release": "2.2.25",
+          "release": "2.2.26",
           "default": true
         }
       ],
@@ -4759,7 +4759,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 4671
+        "stars": 4680
       }
     },
     {
@@ -4801,7 +4801,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 16597
+        "stars": 16655
       }
     },
     {
@@ -4851,7 +4851,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 16597
+        "stars": 16655
       }
     },
     {
@@ -4902,7 +4902,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 1701
+        "stars": 1704
       }
     },
     {
@@ -4945,7 +4945,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 110594
+        "stars": 110727
       }
     },
     {
@@ -5031,7 +5031,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 12092
+        "stars": 12097
       }
     },
     {
@@ -5073,7 +5073,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 12794
+        "stars": 12872
       }
     },
     {
@@ -5119,7 +5119,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 55832
+        "stars": 55885
       }
     },
     {
@@ -5173,7 +5173,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 9714
+        "stars": 9764
       }
     },
     {
@@ -5219,7 +5219,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 59109
+        "stars": 59222
       }
     },
     {
@@ -5304,14 +5304,14 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 59109
+        "stars": 59222
       }
     },
     {
       "name": "gitlab",
       "file": {
         "path": "templates/gitlab.yaml",
-        "sha256": "e545c3994cae3c57f2d0fb3b71dfb2a5bd3882d42798e101143a522d7ad90ee9"
+        "sha256": "a50a6c488267bb9fb47f25449f9655b7c0309a7f833e16df3cf23abb98356ee8"
       },
       "icon": {
         "path": "icons/gitlab.svg",
@@ -5339,12 +5339,12 @@
       "versions": [
         {
           "name": "19.4",
-          "release": "19.4.7",
+          "release": "19.4.10",
           "default": true
         },
         {
           "name": "19.3",
-          "release": "19.3.8"
+          "release": "19.3.9"
         }
       ],
       "requires": {
@@ -5392,7 +5392,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 38214
+        "stars": 38351
       }
     },
     {
@@ -5491,7 +5491,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 6166
+        "stars": 6184
       }
     },
     {
@@ -5540,7 +5540,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 47939
+        "stars": 47986
       }
     },
     {
@@ -5587,7 +5587,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 13604
+        "stars": 13652
       }
     },
     {
@@ -5628,7 +5628,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 16209
+        "stars": 16228
       }
     },
     {
@@ -5677,7 +5677,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 16209
+        "stars": 16228
       }
     },
     {
@@ -5763,7 +5763,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 5058
+        "stars": 5079
       }
     },
     {
@@ -5804,7 +5804,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 77937
+        "stars": 78049
       }
     },
     {
@@ -5854,7 +5854,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 77937
+        "stars": 78049
       }
     },
     {
@@ -5904,7 +5904,7 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 1831
+        "stars": 1860
       }
     },
     {
@@ -5947,7 +5947,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 15729
+        "stars": 15736
       }
     },
     {
@@ -5993,7 +5993,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 6813
+        "stars": 6824
       }
     },
     {
@@ -6037,7 +6037,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 12103
+        "stars": 12128
       }
     },
     {
@@ -6079,7 +6079,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 9686
+        "stars": 9705
       }
     },
     {
@@ -6130,7 +6130,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 8597
+        "stars": 8648
       }
     },
     {
@@ -6181,7 +6181,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 8297
+        "stars": 8333
       }
     },
     {
@@ -6254,7 +6254,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 45759
+        "stars": 46002
       }
     },
     {
@@ -6303,7 +6303,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 10521
+        "stars": 10540
       }
     },
     {
@@ -6354,7 +6354,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 7514
+        "stars": 7521
       }
     },
     {
@@ -6398,14 +6398,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 9414
+        "stars": 9421
       }
     },
     {
       "name": "heyform",
       "file": {
         "path": "templates/heyform.yaml",
-        "sha256": "bae05666b56f0b152f93c5fc10efd5d58fe002e7c3f66956ea4259e519e3cd09"
+        "sha256": "bfb33157fcad3f990dccb914c9786371a7deac1568843802ea71da9bee43e0c6"
       },
       "icon": {
         "path": "icons/heyform.svg",
@@ -6446,7 +6446,7 @@
       "versions": [
         {
           "name": "3.0",
-          "release": "3.0.7",
+          "release": "3.0.8",
           "default": true
         }
       ],
@@ -6455,7 +6455,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 9078
+        "stars": 9083
       }
     },
     {
@@ -6512,7 +6512,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 4181
+        "stars": 4200
       }
     },
     {
@@ -6556,7 +6556,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 5380
+        "stars": 5427
       }
     },
     {
@@ -6601,7 +6601,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 92319
+        "stars": 92567
       }
     },
     {
@@ -6643,7 +6643,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 7891
+        "stars": 7947
       }
     },
     {
@@ -6686,7 +6686,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 33696
+        "stars": 33788
       }
     },
     {
@@ -6731,7 +6731,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 11719
+        "stars": 11738
       }
     },
     {
@@ -6782,7 +6782,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 80828
+        "stars": 80874
       }
     },
     {
@@ -6836,7 +6836,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 50552
+        "stars": 50612
       }
     },
     {
@@ -6877,7 +6877,7 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 369
+        "stars": 383
       }
     },
     {
@@ -6937,7 +6937,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 119339
+        "stars": 119921
       }
     },
     {
@@ -6978,7 +6978,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 119339
+        "stars": 119921
       }
     },
     {
@@ -7032,7 +7032,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 30530
+        "stars": 30699
       }
     },
     {
@@ -7071,7 +7071,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 31814
+        "stars": 31833
       }
     },
     {
@@ -7122,7 +7122,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 6043
+        "stars": 6068
       }
     },
     {
@@ -7194,7 +7194,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 7866
+        "stars": 7895
       }
     },
     {
@@ -7255,7 +7255,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 10592
+        "stars": 10613
       }
     },
     {
@@ -7303,7 +7303,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 41284
+        "stars": 41337
       }
     },
     {
@@ -7346,7 +7346,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 16373
+        "stars": 16404
       }
     },
     {
@@ -7388,7 +7388,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 23415
+        "stars": 23443
       }
     },
     {
@@ -7431,7 +7431,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 59417
+        "stars": 59660
       }
     },
     {
@@ -7520,7 +7520,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 2515
+        "stars": 2516
       }
     },
     {
@@ -7568,7 +7568,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 26778
+        "stars": 26804
       }
     },
     {
@@ -7616,14 +7616,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 5165
+        "stars": 5168
       }
     },
     {
       "name": "joplin-server",
       "file": {
         "path": "templates/joplin-server.yaml",
-        "sha256": "35bf85e16ac4eb8dd7eb5242c004580a09c359201aa7c6e21e7c65ebfff1f847"
+        "sha256": "710b7eaf603854409f290bf607a99f21c86c715dc8473133103c2cee5cd3969e"
       },
       "icon": {
         "path": "icons/joplin-server.svg",
@@ -7659,7 +7659,7 @@
       "versions": [
         {
           "name": "3.7",
-          "release": "3.7.5",
+          "release": "3.7.6",
           "default": true
         }
       ],
@@ -7668,7 +7668,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 57200
+        "stars": 57320
       }
     },
     {
@@ -7711,7 +7711,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 8479
+        "stars": 8480
       }
     },
     {
@@ -7754,14 +7754,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 34222
+        "stars": 34253
       }
     },
     {
       "name": "kafka-ui",
       "file": {
         "path": "templates/kafka-ui.yaml",
-        "sha256": "c80d80445b6e0d72297b73f9fb6ebbcac8f12929ac8cd7c54099f0846f31b71b"
+        "sha256": "6663aba6d7dcd96b0e483115b80026059ea9c6847d52d0cbbae4c6e4434689e0"
       },
       "icon": {
         "path": "icons/kafka-ui.svg",
@@ -7788,7 +7788,7 @@
       "versions": [
         {
           "name": "1.5",
-          "release": "1.5.0",
+          "release": "1.5.1",
           "default": true
         }
       ],
@@ -7797,14 +7797,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 2844
+        "stars": 2854
       }
     },
     {
       "name": "kanboard",
       "file": {
         "path": "templates/kanboard.yaml",
-        "sha256": "611eafa3068cda3eec7ca1b330d40d8b791c19d8baa40dca2a46c73bfe9dd30a"
+        "sha256": "be65e32eec30caa6dab46fd064ef5294e2771fe7f8e4a404df4fcb1eb8103e83"
       },
       "icon": {
         "path": "icons/kanboard.svg",
@@ -7830,7 +7830,7 @@
       "versions": [
         {
           "name": "1.2",
-          "release": "1.2.57",
+          "release": "1.2.58",
           "default": true
         }
       ],
@@ -7839,7 +7839,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 9961
+        "stars": 9975
       }
     },
     {
@@ -7889,7 +7889,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 30601
+        "stars": 30786
       }
     },
     {
@@ -7931,7 +7931,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 12136
+        "stars": 12168
       }
     },
     {
@@ -7984,14 +7984,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 5252
+        "stars": 5257
       }
     },
     {
       "name": "kestra",
       "file": {
         "path": "templates/kestra.yaml",
-        "sha256": "ac9abc10fd1b06450b9a7b50ba0cf5404c187688b62a397052a915c5088d030b"
+        "sha256": "f1efcc68da02de72e794aaf4dfb9861d324e70d8d9f4bcec840a1e2e567c7a12"
       },
       "icon": {
         "path": "icons/kestra.svg",
@@ -8029,7 +8029,7 @@
       "versions": [
         {
           "name": "2.0",
-          "release": "2.0.10",
+          "release": "2.0.12",
           "default": true
         }
       ],
@@ -8038,7 +8038,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 30242
+        "stars": 30321
       }
     },
     {
@@ -8087,7 +8087,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 37888
+        "stars": 38007
       }
     },
     {
@@ -8135,7 +8135,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 5164
+        "stars": 5174
       }
     },
     {
@@ -8180,7 +8180,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 999
+        "stars": 1013
       }
     },
     {
@@ -8232,7 +8232,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 17351
+        "stars": 17356
       }
     },
     {
@@ -8275,7 +8275,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 6851
+        "stars": 6874
       }
     },
     {
@@ -8322,7 +8322,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 14717
+        "stars": 14799
       }
     },
     {
@@ -8362,7 +8362,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11207
+        "stars": 11217
       }
     },
     {
@@ -8477,7 +8477,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 28703
+        "stars": 28747
       }
     },
     {
@@ -8528,7 +8528,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 156696
+        "stars": 156867
       }
     },
     {
@@ -8591,7 +8591,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 37481
+        "stars": 37747
       }
     },
     {
@@ -8636,7 +8636,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 37481
+        "stars": 37747
       }
     },
     {
@@ -8686,7 +8686,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 12113
+        "stars": 12139
       }
     },
     {
@@ -8743,7 +8743,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 47177
+        "stars": 47442
       }
     },
     {
@@ -8834,7 +8834,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 15306
+        "stars": 15325
       }
     },
     {
@@ -8879,7 +8879,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 17769
+        "stars": 17829
       }
     },
     {
@@ -8922,7 +8922,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 5829
+        "stars": 5844
       }
     },
     {
@@ -8964,7 +8964,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 11425
+        "stars": 11446
       }
     },
     {
@@ -9013,7 +9013,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 11425
+        "stars": 11446
       }
     },
     {
@@ -9056,7 +9056,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 3954
+        "stars": 3961
       }
     },
     {
@@ -9106,7 +9106,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 20446
+        "stars": 20508
       }
     },
     {
@@ -9156,7 +9156,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 24322
+        "stars": 24430
       }
     },
     {
@@ -9206,7 +9206,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 63336
+        "stars": 63751
       }
     },
     {
@@ -9248,7 +9248,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 6627
+        "stars": 6638
       }
     },
     {
@@ -9293,7 +9293,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 50391
+        "stars": 50511
       }
     },
     {
@@ -9344,7 +9344,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 14937
+        "stars": 14973
       }
     },
     {
@@ -9385,7 +9385,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 29166
+        "stars": 29228
       }
     },
     {
@@ -9426,14 +9426,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 13868
+        "stars": 13885
       }
     },
     {
       "name": "mage-ai",
       "file": {
         "path": "templates/mage-ai.yaml",
-        "sha256": "6e04c3f51e78d8cd7ce45d8d33b7e97daa7b4af5393f3ce8204a8831c74a56f1"
+        "sha256": "3525dffca21353ecbe84531d3df0f094f9630c4cd8b0e9bf95c6ef5745a897dc"
       },
       "icon": {
         "path": "icons/mage-ai.svg",
@@ -9469,7 +9469,7 @@
       "versions": [
         {
           "name": "0.9",
-          "release": "0.9.80",
+          "release": "0.9.81",
           "default": true
         }
       ],
@@ -9478,7 +9478,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 8848
+        "stars": 8850
       }
     },
     {
@@ -9519,7 +9519,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 10944
+        "stars": 11009
       }
     },
     {
@@ -9562,7 +9562,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 12086
+        "stars": 12100
       }
     },
     {
@@ -9606,7 +9606,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 8596
+        "stars": 8648
       }
     },
     {
@@ -9657,7 +9657,7 @@
       "managed": "mariadb",
       "stats": {
         "added": "2026-10-19",
-        "stars": 8596
+        "stars": 8648
       }
     },
     {
@@ -9705,7 +9705,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 8596
+        "stars": 8648
       }
     },
     {
@@ -9761,7 +9761,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 23559
+        "stars": 23705
       }
     },
     {
@@ -9812,7 +9812,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 4078
+        "stars": 4094
       }
     },
     {
@@ -9888,7 +9888,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 50603
+        "stars": 50712
       }
     },
     {
@@ -9943,14 +9943,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 5180
+        "stars": 5185
       }
     },
     {
       "name": "matomo",
       "file": {
         "path": "templates/matomo.yaml",
-        "sha256": "06edf2c7e2b937b0890f36a77d6abfaa972c3c870b8d84be7e94a5eee66da3a3"
+        "sha256": "98449f32e864479e2057acd7e058563f269f0cf70a2bd9540a04140859c86d07"
       },
       "icon": {
         "path": "icons/matomo.svg",
@@ -9984,7 +9984,7 @@
       "versions": [
         {
           "name": "5",
-          "release": "5.14.2",
+          "release": "5.14.3",
           "default": true
         }
       ],
@@ -9993,7 +9993,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 22030
+        "stars": 22046
       }
     },
     {
@@ -10043,7 +10043,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 39624
+        "stars": 39694
       }
     },
     {
@@ -10084,7 +10084,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 13913
+        "stars": 13974
       }
     },
     {
@@ -10174,7 +10174,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 59870
+        "stars": 59972
       }
     },
     {
@@ -10214,7 +10214,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 14305
+        "stars": 14311
       }
     },
     {
@@ -10255,7 +10255,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 64498
+        "stars": 64649
       }
     },
     {
@@ -10302,14 +10302,14 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 64498
+        "stars": 64649
       }
     },
     {
       "name": "metabase",
       "file": {
         "path": "templates/metabase.yaml",
-        "sha256": "42f80613acee5ce1be6a7f6c212b254e94e3aa544cbac0afdae387b4039b3390"
+        "sha256": "5a80255a9e53257cbbf4870f0eff773911f28bb6592fe7b33c0ac54f4403b321"
       },
       "icon": {
         "path": "icons/metabase.svg",
@@ -10342,7 +10342,7 @@
       "versions": [
         {
           "name": "0.63",
-          "release": "0.63.22.3",
+          "release": "0.63.22.4",
           "default": true
         }
       ],
@@ -10351,7 +10351,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 50357
+        "stars": 50488
       }
     },
     {
@@ -10444,7 +10444,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 15276
+        "stars": 15335
       }
     },
     {
@@ -10489,14 +10489,14 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 46674
+        "stars": 46723
       }
     },
     {
       "name": "mimir",
       "file": {
         "path": "templates/mimir.yaml",
-        "sha256": "49d97c0cfbfe4fe7ec3b7b7c6bd4e1b2597998a9d05dfb0e056168edc46b63db"
+        "sha256": "5d3cbdca0ecb801ff4517988ec8e924d2c1193c2460757b231122ebfaf0529db"
       },
       "icon": {
         "path": "icons/mimir.svg",
@@ -10524,7 +10524,7 @@
       "versions": [
         {
           "name": "3.2",
-          "release": "3.2.5",
+          "release": "3.2.6",
           "default": true
         }
       ],
@@ -10533,7 +10533,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 5282
+        "stars": 5284
       }
     },
     {
@@ -10575,7 +10575,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 14553
+        "stars": 14567
       }
     },
     {
@@ -10617,7 +10617,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 1884
+        "stars": 1892
       }
     },
     {
@@ -10666,7 +10666,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 9942
+        "stars": 9962
       }
     },
     {
@@ -10720,7 +10720,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11393
+        "stars": 11402
       }
     },
     {
@@ -10766,7 +10766,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 28681
+        "stars": 28706
       }
     },
     {
@@ -10818,7 +10818,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 25788
+        "stars": 25827
       }
     },
     {
@@ -10869,14 +10869,14 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 7615
+        "stars": 7634
       }
     },
     {
       "name": "mosquitto",
       "file": {
         "path": "templates/mosquitto.yaml",
-        "sha256": "a081b4837ece9de672c38a7a249cb2419cc5727c6dd5ec40a89a9a9131a0eeec"
+        "sha256": "763dfba9a983e54341df1a291445dd6081b34dae4162328ab796c37c9c159785"
       },
       "icon": {
         "path": "icons/mosquitto.svg",
@@ -10903,7 +10903,7 @@
       "versions": [
         {
           "name": "2.0",
-          "release": "2.0.22",
+          "release": "2.0.23",
           "default": true
         }
       ],
@@ -10912,7 +10912,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 11434
+        "stars": 11485
       }
     },
     {
@@ -10956,7 +10956,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 8423
+        "stars": 8434
       }
     },
     {
@@ -11002,7 +11002,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 3058
+        "stars": 3061
       }
     },
     {
@@ -11045,7 +11045,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 12517
+        "stars": 12522
       }
     },
     {
@@ -11093,7 +11093,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 12517
+        "stars": 12522
       }
     },
     {
@@ -11137,7 +11137,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 210627
+        "stars": 211895
       }
     },
     {
@@ -11193,7 +11193,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 210627
+        "stars": 211895
       }
     },
     {
@@ -11231,7 +11231,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 210627
+        "stars": 211895
       }
     },
     {
@@ -11275,7 +11275,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 210627
+        "stars": 211895
       }
     },
     {
@@ -11316,7 +11316,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 21046
+        "stars": 21114
       }
     },
     {
@@ -11358,7 +11358,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 24770
+        "stars": 24910
       }
     },
     {
@@ -11397,7 +11397,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 17444
+        "stars": 17480
       }
     },
     {
@@ -11465,7 +11465,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 21888
+        "stars": 21927
       }
     },
     {
@@ -11519,7 +11519,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 37530
+        "stars": 37615
       }
     },
     {
@@ -11575,7 +11575,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 37530
+        "stars": 37615
       }
     },
     {
@@ -11621,14 +11621,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 5134
+        "stars": 5146
       }
     },
     {
       "name": "nocobase",
       "file": {
         "path": "templates/nocobase.yaml",
-        "sha256": "98bfc01ae627d298d95148d9a6bd7f208adf2228c34fd500c617ef48b05dead6"
+        "sha256": "2cecba96ca2f131dddf80865093e1fa58f83fc6e22d16c6bf1ef97d06d87ee31"
       },
       "icon": {
         "path": "icons/nocobase.svg",
@@ -11664,7 +11664,7 @@
       "versions": [
         {
           "name": "2.2",
-          "release": "2.2.46",
+          "release": "2.2.51",
           "default": true
         }
       ],
@@ -11673,7 +11673,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 24943
+        "stars": 24985
       }
     },
     {
@@ -11722,14 +11722,14 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 65546
+        "stars": 65603
       }
     },
     {
       "name": "node-red",
       "file": {
         "path": "templates/node-red.yaml",
-        "sha256": "1048c23abae03b014e5895421e6ae9dc1e1635f0edad14326e8aa611f29f54c9"
+        "sha256": "6df211d123a84e6b0a7cdc50674b061653b8d21fb61185bc4c36f4e43456f382"
       },
       "icon": {
         "path": "icons/node-red.svg",
@@ -11756,7 +11756,7 @@
       "versions": [
         {
           "name": "4.1",
-          "release": "4.1.17",
+          "release": "4.1.18",
           "default": true
         }
       ],
@@ -11765,7 +11765,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 23850
+        "stars": 23871
       }
     },
     {
@@ -11805,7 +11805,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 35586
+        "stars": 35705
       }
     },
     {
@@ -11852,7 +11852,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 12997
+        "stars": 13039
       }
     },
     {
@@ -11907,7 +11907,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 55829
+        "stars": 56037
       }
     },
     {
@@ -11950,7 +11950,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 187180
+        "stars": 187909
       }
     },
     {
@@ -11995,7 +11995,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 10729
+        "stars": 10775
       }
     },
     {
@@ -12048,14 +12048,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 15365
+        "stars": 15376
       }
     },
     {
       "name": "onetimesecret",
       "file": {
         "path": "templates/onetimesecret.yaml",
-        "sha256": "2f2d5fab1ef7c51cd76e06bc805def634d4afe530f560d87583084ca785b676f"
+        "sha256": "7357345e965d22eaa8d006c5ad6c0af5281786b52aead0b19985792b64e71c10"
       },
       "icon": {
         "path": "icons/onetimesecret.svg",
@@ -12088,7 +12088,7 @@
       "versions": [
         {
           "name": "0.26",
-          "release": "0.26.19",
+          "release": "0.26.20",
           "default": true
         }
       ],
@@ -12097,7 +12097,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 2992
+        "stars": 2999
       }
     },
     {
@@ -12142,7 +12142,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 7132
+        "stars": 7159
       }
     },
     {
@@ -12181,14 +12181,14 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 158804
+        "stars": 159322
       }
     },
     {
       "name": "openbao",
       "file": {
         "path": "templates/openbao.yaml",
-        "sha256": "d639411c5244cf31613372b79b3e210eb8c9df8aeb15f97200551d8b1b10338b"
+        "sha256": "be88437f1a5071348ebe5f5a25d246ab765875f01090772b81d2312c8ecd6df5"
       },
       "icon": {
         "path": "icons/openbao.svg",
@@ -12214,12 +12214,12 @@
       "versions": [
         {
           "name": "2.7",
-          "release": "2.7.2",
+          "release": "2.7.3",
           "default": true
         },
         {
           "name": "2.6",
-          "release": "2.6.5"
+          "release": "2.6.6"
         }
       ],
       "requires": {
@@ -12227,7 +12227,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 9046
+        "stars": 9154
       }
     },
     {
@@ -12287,14 +12287,14 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 394563
+        "stars": 395081
       }
     },
     {
       "name": "opencloud",
       "file": {
         "path": "templates/opencloud.yaml",
-        "sha256": "d833cb6790bff500b372b881b7cccba9c50ca3f2fe4d428f073442737dc19bbe"
+        "sha256": "184bdf4919dc48ec1a404b82314cb9e6ef0a6e7020cfd85d954835fba5b952e6"
       },
       "icon": {
         "path": "icons/opencloud.svg",
@@ -12322,7 +12322,7 @@
       "versions": [
         {
           "name": "7.2",
-          "release": "7.2.5",
+          "release": "7.2.6",
           "default": true
         }
       ],
@@ -12331,7 +12331,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 6348
+        "stars": 6392
       }
     },
     {
@@ -12378,7 +12378,7 @@
       },
       "stats": {
         "added": "2026-09-24",
-        "stars": 93572
+        "stars": 94130
       }
     },
     {
@@ -12425,14 +12425,14 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 23070
+        "stars": 23160
       }
     },
     {
       "name": "openproject",
       "file": {
         "path": "templates/openproject.yaml",
-        "sha256": "a63c41d0b9b5c28eea9f76f00c5031c1077aa3d187370b177bc4bbb1ff96c625"
+        "sha256": "097d253c53bf4dda47e49bf70d2df27ce6c4811a6bdb58fbb699fc5a90b5223c"
       },
       "icon": {
         "path": "icons/openproject.svg",
@@ -12466,7 +12466,7 @@
       "versions": [
         {
           "name": "17",
-          "release": "17.9.7",
+          "release": "17.9.8",
           "default": true
         }
       ],
@@ -12475,7 +12475,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 17420
+        "stars": 17651
       }
     },
     {
@@ -12523,7 +12523,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 14012
+        "stars": 14055
       }
     },
     {
@@ -12587,7 +12587,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 4007
+        "stars": 4013
       }
     },
     {
@@ -12630,7 +12630,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 5052
+        "stars": 5062
       }
     },
     {
@@ -12686,7 +12686,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 41278
+        "stars": 41342
       }
     },
     {
@@ -12750,7 +12750,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 18346
+        "stars": 18356
       }
     },
     {
@@ -12791,7 +12791,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11670
+        "stars": 11691
       }
     },
     {
@@ -12836,7 +12836,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 11819
+        "stars": 11890
       }
     },
     {
@@ -12907,7 +12907,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 48158
+        "stars": 48523
       }
     },
     {
@@ -12953,7 +12953,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 5753
+        "stars": 5766
       }
     },
     {
@@ -13000,7 +13000,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 9522
+        "stars": 9557
       }
     },
     {
@@ -13052,7 +13052,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 6237
+        "stars": 6242
       }
     },
     {
@@ -13109,7 +13109,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 15413
+        "stars": 15423
       }
     },
     {
@@ -13182,7 +13182,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 62413
+        "stars": 62657
       }
     },
     {
@@ -13223,7 +13223,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 3946
+        "stars": 3959
       }
     },
     {
@@ -13265,7 +13265,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 4452
+        "stars": 4460
       }
     },
     {
@@ -13324,7 +13324,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 23694
+        "stars": 23786
       }
     },
     {
@@ -13374,7 +13374,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 40454
+        "stars": 40471
       }
     },
     {
@@ -13417,14 +13417,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 7974
+        "stars": 7977
       }
     },
     {
       "name": "picoshare",
       "file": {
         "path": "templates/picoshare.yaml",
-        "sha256": "5eefefdfc978ed0393bdece901b27d216a9395a1fcb30e1f5a14c7f50ee79bcb"
+        "sha256": "ab82af7d91add3e64e6d755a4df4915148ef829a63399e96a4c38873151d5c57"
       },
       "icon": {
         "path": "icons/picoshare.svg",
@@ -13450,7 +13450,7 @@
       "versions": [
         {
           "name": "1.5",
-          "release": "1.5.4",
+          "release": "1.5.5",
           "default": true
         }
       ],
@@ -13459,7 +13459,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 3071
+        "stars": 3067
       }
     },
     {
@@ -13503,7 +13503,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11785
+        "stars": 11798
       }
     },
     {
@@ -13576,7 +13576,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 62509
+        "stars": 63013
       }
     },
     {
@@ -13626,7 +13626,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 12687
+        "stars": 12705
       }
     },
     {
@@ -13681,7 +13681,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 29862
+        "stars": 29916
       }
     },
     {
@@ -13767,7 +13767,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 10329
+        "stars": 10446
       }
     },
     {
@@ -13810,7 +13810,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 61585
+        "stars": 61573
       }
     },
     {
@@ -13867,7 +13867,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 1603
+        "stars": 1602
       }
     },
     {
@@ -13937,7 +13937,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 22843
+        "stars": 22915
       }
     },
     {
@@ -14030,7 +14030,7 @@
       "managed": "postgres",
       "stats": {
         "added": "2026-10-18",
-        "stars": 22843
+        "stars": 22915
       }
     },
     {
@@ -14102,7 +14102,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 22843
+        "stars": 22915
       }
     },
     {
@@ -14224,7 +14224,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 41725
+        "stars": 42204
       }
     },
     {
@@ -14274,7 +14274,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 9256
+        "stars": 9262
       }
     },
     {
@@ -14315,7 +14315,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 8746
+        "stars": 8765
       }
     },
     {
@@ -14356,7 +14356,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 67643
+        "stars": 67764
       }
     },
     {
@@ -14397,7 +14397,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 7591
+        "stars": 7643
       }
     },
     {
@@ -14438,7 +14438,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 41663
+        "stars": 41836
       }
     },
     {
@@ -14479,7 +14479,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 35586
+        "stars": 35674
       }
     },
     {
@@ -14519,7 +14519,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 17535
+        "stars": 17546
       }
     },
     {
@@ -14564,14 +14564,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11796
+        "stars": 11812
       }
     },
     {
       "name": "rabbitmq",
       "file": {
         "path": "templates/rabbitmq.yaml",
-        "sha256": "62668226ea9938010d297105b63b770f44e99a3785f921345ed7a60104592db6"
+        "sha256": "c812a396797bd958e889b449bd36bb036595b8d527d1e1ed14a19bc01932d365"
       },
       "icon": {
         "path": "icons/rabbitmq.svg",
@@ -14596,7 +14596,7 @@
       "versions": [
         {
           "name": "4.3",
-          "release": "4.3.7",
+          "release": "4.3.8",
           "default": true
         }
       ],
@@ -14605,7 +14605,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 13973
+        "stars": 13980
       }
     },
     {
@@ -14646,7 +14646,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 14792
+        "stars": 14860
       }
     },
     {
@@ -14688,7 +14688,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 5221
+        "stars": 5243
       }
     },
     {
@@ -14739,7 +14739,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 5362
+        "stars": 5368
       }
     },
     {
@@ -14781,7 +14781,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 14465
+        "stars": 14487
       }
     },
     {
@@ -14833,14 +14833,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 45810
+        "stars": 46007
       }
     },
     {
       "name": "readeck",
       "file": {
         "path": "templates/readeck.yaml",
-        "sha256": "563e63afa2dba1c0f91a377c3cf2be9e0accba88aa9ec303b91bc5c6c05e45e9"
+        "sha256": "fd76b5a2daa30f74eceec2d34801affd31f94747a4670902e968696b0d98f80a"
       },
       "icon": {
         "path": "icons/readeck.svg",
@@ -14866,7 +14866,7 @@
       "versions": [
         {
           "name": "0.23",
-          "release": "0.23.5",
+          "release": "0.23.6",
           "default": true
         }
       ],
@@ -14919,7 +14919,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 77519
+        "stars": 77718
       }
     },
     {
@@ -14966,7 +14966,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 8934
+        "stars": 8939
       }
     },
     {
@@ -15015,7 +15015,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 6082
+        "stars": 6094
       }
     },
     {
@@ -15057,7 +15057,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 12676
+        "stars": 12674
       }
     },
     {
@@ -15100,7 +15100,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 10690
+        "stars": 10702
       }
     },
     {
@@ -15181,7 +15181,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 1547
+        "stars": 1554
       }
     },
     {
@@ -15237,7 +15237,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 46511
+        "stars": 46603
       }
     },
     {
@@ -15289,7 +15289,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 14390
+        "stars": 14458
       }
     },
     {
@@ -15330,7 +15330,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 7281
+        "stars": 7295
       }
     },
     {
@@ -15375,7 +15375,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 9351
+        "stars": 9375
       }
     },
     {
@@ -15439,7 +15439,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 47047
+        "stars": 47170
       }
     },
     {
@@ -15481,7 +15481,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 10750
+        "stars": 10801
       }
     },
     {
@@ -15525,14 +15525,14 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 36147
+        "stars": 36399
       }
     },
     {
       "name": "ryot",
       "file": {
         "path": "templates/ryot.yaml",
-        "sha256": "dd16bc23497be6c29cbecfd58db9feee5f75c7cbd290e9c961b4465edd8ef889"
+        "sha256": "505d671fe50d273e990c31bddb60a9503603da65c201ba076a389bc999b39ffe"
       },
       "icon": {
         "path": "icons/ryot.svg",
@@ -15567,7 +15567,7 @@
       "versions": [
         {
           "name": "10.5",
-          "release": "10.5.8",
+          "release": "10.5.9",
           "default": true
         }
       ],
@@ -15576,7 +15576,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 3669
+        "stars": 3678
       }
     },
     {
@@ -15617,14 +15617,14 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 2424
+        "stars": 2425
       }
     },
     {
       "name": "scylladb",
       "file": {
         "path": "templates/scylladb.yaml",
-        "sha256": "ace105a3b325561ef8d9789e8bc240367eea390ec7864d89a94eedcba4796ee4"
+        "sha256": "a4c57514a336e7949a30612cc87a0d133e97930bcd725bd78bf78c358e7026da"
       },
       "icon": {
         "path": "icons/scylladb.svg",
@@ -15649,7 +15649,7 @@
       "versions": [
         {
           "name": "2026.3",
-          "release": "2026.3.5",
+          "release": "2026.3.6",
           "default": true
         }
       ],
@@ -15658,7 +15658,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 15834
+        "stars": 15852
       }
     },
     {
@@ -15764,7 +15764,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 39593
+        "stars": 39799
       }
     },
     {
@@ -15804,7 +15804,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 36088
+        "stars": 36211
       }
     },
     {
@@ -15847,7 +15847,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 13246
+        "stars": 13323
       }
     },
     {
@@ -15898,7 +15898,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 14415
+        "stars": 14444
       }
     },
     {
@@ -15954,7 +15954,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 2231
+        "stars": 2233
       }
     },
     {
@@ -15998,14 +15998,14 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 12819
+        "stars": 12846
       }
     },
     {
       "name": "shlink",
       "file": {
         "path": "templates/shlink.yaml",
-        "sha256": "7872387c9c83aeab08d1465973b01c22195e1c7d869b71fc6aae6c07b0f3bbe3"
+        "sha256": "9a4c4ddb2800f96d6eb0ef91a878b7ee0af3b135b6d732dd595e301bd414da50"
       },
       "icon": {
         "path": "icons/shlink.svg",
@@ -16029,7 +16029,7 @@
       "versions": [
         {
           "name": "5.1",
-          "release": "5.1.8",
+          "release": "5.1.9",
           "default": true
         }
       ],
@@ -16038,14 +16038,14 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 5427
+        "stars": 5439
       }
     },
     {
       "name": "shlink-postgres",
       "file": {
         "path": "templates/shlink-postgres.yaml",
-        "sha256": "c59cc4bfcaec2552b9c66bf5b38ac71d3023df0a3cc054fe58e9781279ca6911"
+        "sha256": "127023a23bcb04b971a4135a830d87db3a189f00f9d16ffd4274282898ac03e7"
       },
       "icon": {
         "path": "icons/shlink.svg",
@@ -16077,7 +16077,7 @@
       "versions": [
         {
           "name": "5.1",
-          "release": "5.1.8",
+          "release": "5.1.9",
           "default": true
         }
       ],
@@ -16086,7 +16086,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 5427
+        "stars": 5439
       }
     },
     {
@@ -16136,7 +16136,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 3157
+        "stars": 3156
       }
     },
     {
@@ -16184,7 +16184,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 4701
+        "stars": 4798
       }
     },
     {
@@ -16230,14 +16230,14 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 6541
+        "stars": 6581
       }
     },
     {
       "name": "siyuan",
       "file": {
         "path": "templates/siyuan.yaml",
-        "sha256": "4499d13e71a44e8dbef9161ffef7a680e77a2c70ee0e5768274bd96e4a2a2e19"
+        "sha256": "c9f24fb35ed41a1da7469b5edc80cbfbc34a3c3a897f00d437257d9bd7b5b375"
       },
       "icon": {
         "path": "icons/siyuan.svg",
@@ -16268,7 +16268,7 @@
       "versions": [
         {
           "name": "3.8",
-          "release": "3.8.10",
+          "release": "3.8.11",
           "default": true
         }
       ],
@@ -16277,7 +16277,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 47255
+        "stars": 47347
       }
     },
     {
@@ -16325,7 +16325,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 15192
+        "stars": 15235
       }
     },
     {
@@ -16374,7 +16374,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 11184
+        "stars": 11208
       }
     },
     {
@@ -16415,7 +16415,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 17726
+        "stars": 17818
       }
     },
     {
@@ -16462,7 +16462,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 4178
+        "stars": 4187
       }
     },
     {
@@ -16506,7 +16506,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 15970
+        "stars": 16134
       }
     },
     {
@@ -16551,7 +16551,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 9072
+        "stars": 9093
       }
     },
     {
@@ -16594,7 +16594,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 96734
+        "stars": 97281
       }
     },
     {
@@ -16676,14 +16676,14 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 115080
+        "stars": 115378
       }
     },
     {
       "name": "supabase-postgres",
       "file": {
         "path": "templates/supabase-postgres.yaml",
-        "sha256": "eda6790420621f98877ece177830f673a783e4b2f94db5047fe62df8dd6d4eb6"
+        "sha256": "396192d1fe70a9f5c9528b6c851c06d5d55704920f0832218692d78aeb4be38e"
       },
       "icon": {
         "path": "icons/postgres.svg",
@@ -16704,7 +16704,7 @@
       "versions": [
         {
           "name": "17",
-          "release": "17.12.0.000",
+          "release": "17.12.0.002",
           "default": true
         }
       ],
@@ -16763,7 +16763,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 75527
+        "stars": 75630
       }
     },
     {
@@ -16805,7 +16805,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 33312
+        "stars": 33352
       }
     },
     {
@@ -16876,7 +16876,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 1223
+        "stars": 1227
       }
     },
     {
@@ -16926,7 +16926,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 4800
+        "stars": 4817
       }
     },
     {
@@ -16968,7 +16968,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 90482
+        "stars": 90733
       }
     },
     {
@@ -17018,7 +17018,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 8738
+        "stars": 8745
       }
     },
     {
@@ -17061,7 +17061,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 25194
+        "stars": 25204
       }
     },
     {
@@ -17118,7 +17118,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 21994
+        "stars": 22011
       }
     },
     {
@@ -17162,7 +17162,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 10368
+        "stars": 10434
       }
     },
     {
@@ -17205,7 +17205,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 5577
+        "stars": 5587
       }
     },
     {
@@ -17270,7 +17270,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 24430
+        "stars": 24563
       }
     },
     {
@@ -17327,7 +17327,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 16035
+        "stars": 16095
       }
     },
     {
@@ -17367,14 +17367,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 398
+        "stars": 397
       }
     },
     {
       "name": "tika",
       "file": {
         "path": "templates/tika.yaml",
-        "sha256": "8686f90c054022a10d1d422e023c02d076dc146b3391bafbbd286f35ecd34fad"
+        "sha256": "33b66bcda496e6b9228f304a7289ce918d524c4c35f4477aaeb9d463ccd9e9bd"
       },
       "icon": {
         "path": "icons/tika.svg",
@@ -17402,7 +17402,7 @@
       "versions": [
         {
           "name": "3.3",
-          "release": "3.3.3.0",
+          "release": "3.3.3.1",
           "default": true
         },
         {
@@ -17415,7 +17415,7 @@
       },
       "stats": {
         "added": "2026-09-19",
-        "stars": 4150
+        "stars": 4155
       }
     },
     {
@@ -17473,7 +17473,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 23862
+        "stars": 23889
       }
     },
     {
@@ -17537,7 +17537,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 41230
+        "stars": 41287
       }
     },
     {
@@ -17588,7 +17588,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 8136
+        "stars": 8177
       }
     },
     {
@@ -17633,7 +17633,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 5769
+        "stars": 5776
       }
     },
     {
@@ -17676,7 +17676,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 38962
+        "stars": 39064
       }
     },
     {
@@ -17720,7 +17720,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 13513
+        "stars": 13540
       }
     },
     {
@@ -17786,7 +17786,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 60986
+        "stars": 61360
       }
     },
     {
@@ -17857,7 +17857,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 10630
+        "stars": 10643
       }
     },
     {
@@ -17902,7 +17902,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 27138
+        "stars": 27168
       }
     },
     {
@@ -17950,7 +17950,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 40178
+        "stars": 40309
       }
     },
     {
@@ -17998,7 +17998,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 14328
+        "stars": 14337
       }
     },
     {
@@ -18040,14 +18040,14 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 2559
+        "stars": 2560
       }
     },
     {
       "name": "uptime-kuma",
       "file": {
         "path": "templates/uptime-kuma.yaml",
-        "sha256": "bb51aadd59ff2681b46da8a46b0abb49c2e03eb7df8d270bef7a5692ea0e99fe"
+        "sha256": "153994314e153bc4b4e80ad1caf38b6a192de217dee92a3133c063845ed6d49d"
       },
       "icon": {
         "path": "icons/uptime-kuma.svg",
@@ -18072,7 +18072,7 @@
       "versions": [
         {
           "name": "2.5",
-          "release": "2.5.11",
+          "release": "2.5.12",
           "default": true
         }
       ],
@@ -18081,14 +18081,14 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 94464
+        "stars": 94788
       }
     },
     {
       "name": "uptime-kuma-mariadb",
       "file": {
         "path": "templates/uptime-kuma-mariadb.yaml",
-        "sha256": "ae0d805424ea7d3e15959d909621adca3d4c22ad42a7a6263af7f6388a74c190"
+        "sha256": "103b28d5628171f2f3d4ab186da24b99e181716a2b8b716e72d2c1661c87432f"
       },
       "icon": {
         "path": "icons/uptime-kuma.svg",
@@ -18121,7 +18121,7 @@
       "versions": [
         {
           "name": "2.5",
-          "release": "2.5.11",
+          "release": "2.5.12",
           "default": true
         }
       ],
@@ -18130,14 +18130,14 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 94464
+        "stars": 94788
       }
     },
     {
       "name": "valkey",
       "file": {
         "path": "templates/valkey.yaml",
-        "sha256": "ee29697776b67d663a30ca33b03420cae10ada3d87e71b3b7b82455a3b4bf300"
+        "sha256": "98c50c3bf183de11783ca3ec042a83e3afd8fb80ee23542521a2ed3459abbf65"
       },
       "icon": {
         "path": "icons/valkey.svg",
@@ -18162,12 +18162,12 @@
       "versions": [
         {
           "name": "9.1",
-          "release": "9.1.3",
+          "release": "9.1.4",
           "default": true
         },
         {
           "name": "8.1",
-          "release": "8.1.11"
+          "release": "8.1.12"
         }
       ],
       "requires": {
@@ -18175,7 +18175,7 @@
       },
       "stats": {
         "added": "2026-09-17",
-        "stars": 27724
+        "stars": 27839
       }
     },
     {
@@ -18220,7 +18220,7 @@
       },
       "stats": {
         "added": "2026-09-22",
-        "stars": 4043
+        "stars": 4039
       }
     },
     {
@@ -18263,7 +18263,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 36521
+        "stars": 36557
       }
     },
     {
@@ -18303,7 +18303,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 70818
+        "stars": 71209
       }
     },
     {
@@ -18351,7 +18351,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 70818
+        "stars": 71209
       }
     },
     {
@@ -18392,7 +18392,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 17989
+        "stars": 18006
       }
     },
     {
@@ -18438,7 +18438,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 16258
+        "stars": 16335
       }
     },
     {
@@ -18481,7 +18481,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 2516
+        "stars": 2543
       }
     },
     {
@@ -18525,7 +18525,7 @@
       },
       "stats": {
         "added": "2026-09-20",
-        "stars": 18112
+        "stars": 18170
       }
     },
     {
@@ -18579,7 +18579,7 @@
       "name": "wallabag",
       "file": {
         "path": "templates/wallabag.yaml",
-        "sha256": "a8a42f7d049d4eb8c975df9bb9d1929a52f3cec929f3df45c1dd791e836d3d8c"
+        "sha256": "c14d16c787259144102a598417b66605ffbb4739ace6203325027b26fbb6791e"
       },
       "icon": {
         "path": "icons/wallabag.svg",
@@ -18604,7 +18604,7 @@
       "versions": [
         {
           "name": "2.6",
-          "release": "2.6.17",
+          "release": "2.6.18",
           "default": true
         }
       ],
@@ -18613,7 +18613,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 13063
+        "stars": 13069
       }
     },
     {
@@ -18657,7 +18657,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 8847
+        "stars": 8886
       }
     },
     {
@@ -18721,7 +18721,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 4071
+        "stars": 4082
       }
     },
     {
@@ -18764,7 +18764,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 16952
+        "stars": 16959
       }
     },
     {
@@ -18810,7 +18810,7 @@
       },
       "stats": {
         "added": "2026-10-07",
-        "stars": 35528
+        "stars": 35574
       }
     },
     {
@@ -18860,7 +18860,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 21174
+        "stars": 21175
       }
     },
     {
@@ -18903,7 +18903,7 @@
       "requiresCapabilities": true,
       "stats": {
         "added": "2026-09-20",
-        "stars": 27498
+        "stars": 27557
       }
     },
     {
@@ -18949,7 +18949,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 29303
+        "stars": 29362
       }
     },
     {
@@ -19000,7 +19000,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 18608
+        "stars": 18689
       }
     },
     {
@@ -19057,14 +19057,14 @@
       "requiresDockerApi": true,
       "stats": {
         "added": "2026-09-30",
-        "stars": 8203
+        "stars": 8272
       }
     },
     {
       "name": "wordpress",
       "file": {
         "path": "templates/wordpress.yaml",
-        "sha256": "113a408950210765dde5e9197f571e7e4f874a9c3a8318484b26504a35a9cea1"
+        "sha256": "e9c9eac8b5de3f5fca8f1aafd5f10ed199cd55cf69bcc9b3499bdeecccaa7caf"
       },
       "icon": {
         "path": "icons/wordpress.svg",
@@ -19093,7 +19093,7 @@
       "versions": [
         {
           "name": "7.1",
-          "release": "7.1.4",
+          "release": "7.1.5",
           "default": true
         }
       ],
@@ -19102,7 +19102,7 @@
       },
       "stats": {
         "added": "2026-09-18",
-        "stars": 21538
+        "stars": 21554
       }
     },
     {
@@ -19150,7 +19150,7 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 3838
+        "stars": 3857
       }
     },
     {
@@ -19205,7 +19205,7 @@
       },
       "stats": {
         "added": "2026-09-28",
-        "stars": 3838
+        "stars": 3857
       }
     },
     {
@@ -19255,7 +19255,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 3503
+        "stars": 3520
       }
     },
     {
@@ -19325,7 +19325,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 15591
+        "stars": 15637
       }
     },
     {
@@ -19368,7 +19368,7 @@
       },
       "stats": {
         "added": "2026-09-21",
-        "stars": 3018
+        "stars": 3063
       }
     },
     {
@@ -19435,7 +19435,7 @@
       },
       "stats": {
         "added": "2026-09-30",
-        "stars": 26238
+        "stars": 26292
       }
     }
   ]
